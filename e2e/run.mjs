@@ -26,13 +26,18 @@
 //   - the settings, once per engine: a "New" hint closed in one opening is
 //     kept (state.set) and does not show in the next one; and Print where
 //     filex has no print (print=none) hands the PDF over as a download;
-//   - screenshots at 1280 and 390 px, light and dark (--shots).
+//   - a phone, once per engine (390 x 844, a phone's user agent, touch):
+//     ONLYOFFICE's phone app opens the document to read, its Download (PDF)
+//     and Print reach filex, a format x2t does not write here is refused and
+//     said, "Edit" opens the editor folded and its save holds the typed
+//     text, "Reading view" goes back (phoneRun);
+//   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -70,6 +75,7 @@ function args(argv) {
     shots: false,
     keep: false,
     settings: true,
+    phone: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -79,6 +85,7 @@ function args(argv) {
     else if (a === '--shots') o.shots = true;
     else if (a === '--keep') o.keep = true;
     else if (a === '--no-settings') o.settings = false;
+    else if (a === '--no-phone') o.phone = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -445,6 +452,172 @@ async function settingsRun(browser, server, engine) {
   return r;
 }
 
+/** A phone's browser for each engine: a phone's user agent, its size, touch (Firefox has no isMobile). */
+const PHONES = {
+  chromium: {
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36',
+    isMobile: true,
+  },
+  firefox: { userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:148.0) Gecko/148.0 Firefox/148.0' },
+  webkit: {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    isMobile: true,
+  },
+};
+
+async function phoneContext(browser, engine, colorScheme = 'light') {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, colorScheme, ...(PHONES[engine] ?? {}) });
+  // A touch screen in every frame, whatever the engine emulates (Firefox
+  // has no isMobile): the app page decides "phone" from it (config.ts isPhone).
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { configurable: true, get: () => 5 });
+    } catch {
+      /* the engine's own value stays */
+    }
+  });
+  return ctx;
+}
+
+const phoneFrame = (page) => page.frames().find((f) => f.url().includes('/editor/web-apps/apps/') && f.url().includes('/mobile/index.html'));
+
+/** Until the app shows `view` ("reader": ONLYOFFICE's phone app; "editor": the editor) with the document open. */
+async function viewReady(page, view) {
+  return until(`the ${view} to open the document`, async () => {
+    const a = appFrame(page);
+    if (!a) return false;
+    const st = await a.evaluate(() => ({ ph: document.documentElement.dataset.fxPhase || '', view: document.documentElement.dataset.fxView || '' }));
+    if (st.ph === 'failed') throw new Error(await a.evaluate(() => document.getElementById('fx-status-text')?.textContent || 'failed'));
+    return st.ph === 'ready' && st.view === view;
+  }, OPEN_MS);
+}
+
+/**
+ * Once per engine, on a phone (390 x 844, a phone's user agent, touch): the
+ * document opens in ONLYOFFICE's phone app, to read, without the open-source
+ * build's "commercial licence" message; its Download (PDF) and Print go
+ * through x2t to filex, a format x2t does not write here is refused and the
+ * person told; "Edit" opens the editor (folded) with the document, typed
+ * text is saved; "Reading view" goes back to the phone app with it.
+ */
+async function phoneRun(browser, server, engine, o) {
+  const r = { engine, doc: 'tr.docx (phone)', ok: false, steps: [], problems: [], notes: [] };
+  const tag = `${engine}-phone`;
+  const ctx = await phoneContext(browser, engine);
+  const page = await ctx.newPage();
+  const failures = [];
+  const requests = [];
+  const consoleErrors = [];
+  page.on('request', (q) => requests.push(q.url()));
+  page.on('response', (s) => {
+    if (s.status() >= 400) failures.push(`${s.status()} ${s.url()}`);
+  });
+  page.on('requestfailed', (q) => {
+    const f = q.failure()?.errorText ?? '';
+    // A frame the app replaces ("Edit", "Reading view") aborts what it was loading.
+    if (!/ERR_ABORTED|NS_BINDING_ABORTED|cancelled/i.test(f)) failures.push(`failed ${q.url()} ${f}`);
+  });
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300));
+  });
+  page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${String(e.message ?? e).slice(0, 300)}`));
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const shot = async (name) => {
+    if (!o.shots) return;
+    mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+    await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-tr.docx-phone-${name}.png`) });
+  };
+  try {
+    await page.goto(`${server.origin}/?doc=tr.docx&locale=tr&tag=${tag}`);
+    await viewReady(page, 'reader');
+    step('opened (phone app)');
+    const reader = phoneFrame(page);
+    if (!reader) throw new Error("the phone app's page is not the editor's frame");
+    const words = await reader.evaluate(() => document.body.innerText || '');
+    if (/Community version|commercial license/i.test(words)) r.problems.push('the phone app shows its open-source licence message');
+    const app = appFrame(page);
+    const button = await app.evaluate(() => {
+      const b = document.getElementById('fx-switch');
+      return b ? { hidden: b.hidden, text: b.textContent, view: b.dataset.view } : null;
+    });
+    r.button = button;
+    if (!button || button.hidden || button.view !== 'reader') r.problems.push(`no "Edit" in the phone app: ${JSON.stringify(button)}`);
+    await shot('reader');
+
+    // Download (PDF) and Print from the phone app: x2t, then filex.
+    let n = server.files.filter((f) => f.tag === tag).length;
+    await reader.evaluate(() => {
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      api.asc_DownloadAs(new window.Asc.asc_CDownloadOptions(window.Asc.c_oAscFileType.PDF));
+    });
+    const pdf = await nextFile(server, tag, n++, 'the PDF from the phone app');
+    const facts = pdfFacts(readFileSync(pdf.file));
+    step('download pdf (phone app)', { bytes: pdf.size, ...facts });
+    if (pdf.how !== 'download' || !facts.pdf || facts.pages < 1 || facts.fonts < 1) r.problems.push(`the phone app's PDF: ${pdf.how} ${JSON.stringify(facts)}`);
+    await reader.evaluate(() => {
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
+    });
+    const printed = await nextFile(server, tag, n++, 'the PDF to print from the phone app');
+    step('print (phone app)', { bytes: printed.size });
+    if (printed.how !== 'print') r.problems.push(`Print in the phone app gave filex ${printed.how} ${printed.name}`);
+    // A format the phone app lists that x2t does not write here: refused, and said.
+    const toastsBefore = (await page.evaluate(() => window.__fx.toasts)).length;
+    await reader.evaluate(() => {
+      const T = window.Asc.c_oAscFileType;
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      api.asc_DownloadAs(new window.Asc.asc_CDownloadOptions(T.FB2 ?? T.EPUB ?? T.HTML));
+    });
+    await until('the person to be told the format is not available', async () => (await page.evaluate(() => window.__fx.toasts)).slice(toastsBefore).some((t) => t && t.tone === 'info'), 20_000);
+    if (server.files.filter((f) => f.tag === tag).length !== n) r.problems.push('a format x2t does not write here still gave filex a file');
+    step('refused format told');
+
+    // "Edit": the editor, folded, with the document; typed text is saved.
+    await app.locator('#fx-switch').click();
+    await viewReady(page, 'editor');
+    step('opened (editor)');
+    if (!editorFrame(page)) r.problems.push('"Edit" did not open the editor');
+    await shot('editor');
+    await sleep(800);
+    await typeInto(page, 'docx');
+    await until('filex to be told there are unsaved changes', () => page.evaluate(() => window.__fx.dirty === true), 20_000);
+    const before = server.saves.filter((s) => s.tag === tag).length;
+    await page.keyboard.press('Control+S');
+    const saved = await until('the editor Save to write the file', () => server.saves.filter((s) => s.tag === tag)[before], 60_000);
+    step('saved (editor on the phone)', { bytes: saved.size });
+    if (!documentText(readFileSync(saved.file), 'docx').includes(TYPED)) r.problems.push('the save on the phone does not hold the typed text');
+
+    // "Reading view": back to the phone app, with what was written.
+    const savesBefore = server.saves.filter((s) => s.tag === tag).length;
+    await app.locator('#fx-switch').click();
+    await viewReady(page, 'reader');
+    step('opened (phone app again)');
+    if (!phoneFrame(page)) r.problems.push('"Reading view" did not open the phone app');
+    if (await page.evaluate(() => window.__fx.dirty)) r.problems.push('filex still says "unsaved changes" in the phone app');
+    if (server.saves.filter((s) => s.tag === tag).length !== savesBefore) r.notes.push('going back to reading saved again (there were changes the Save had not covered)');
+    await shot('reader-again');
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+    try {
+      mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+      await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${tag}-FAILED.png`) });
+    } catch {
+      /* the page is gone */
+    }
+  }
+  const pkg = `${server.origin}${APP_PATH}`;
+  const host = [`${server.origin}/?`, `${server.origin}/host.js`, `${server.origin}/__doc/`, `${server.origin}/__save`, `${server.origin}/__file`];
+  r.outside = [...new Set(requests.filter((u) => !u.startsWith(pkg) && !u.startsWith('blob:') && !u.startsWith('data:') && !u.startsWith('about:') && !host.some((h) => u.startsWith(h))))];
+  r.failures = [...new Set(failures)];
+  r.consoleErrors = [...new Set(consoleErrors)];
+  if (r.outside.length) r.problems.push(`requests outside the package: ${r.outside.slice(0, 5).join(', ')}`);
+  if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
+  r.ok = r.problems.length === 0;
+  await ctx.close();
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -466,6 +639,22 @@ async function shots(browser, server, engine) {
       }
       await ctx.close();
     }
+  }
+  // On a phone: the document in ONLYOFFICE's phone app, light and dark.
+  for (const theme of ['light', 'dark']) {
+    const ctx = await phoneContext(browser, engine, theme);
+    const page = await ctx.newPage();
+    const name = `${engine}-tr.docx-phone-390-${theme}.png`;
+    try {
+      await page.goto(`${server.origin}/?doc=tr.docx&locale=tr&theme=${theme}&tag=shot-${engine}-phone-${theme}`);
+      await viewReady(page, 'reader');
+      await sleep(1500);
+      await page.screenshot({ path: path.join(DIST, 'e2e-shots', name) });
+      out.push({ name, ok: true });
+    } catch (e) {
+      out.push({ name, ok: false, error: String(e?.message ?? e).slice(0, 200) });
+    }
+    await ctx.close();
   }
   return out;
 }
@@ -491,6 +680,11 @@ async function main() {
       }
       if (o.settings) {
         const r = await settingsRun(browser, server, engine);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.phone) {
+        const r = await phoneRun(browser, server, engine, o);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
