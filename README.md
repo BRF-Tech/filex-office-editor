@@ -488,7 +488,8 @@ the editor's Ctrl+S and with filex's Save, and reads the written files back.
 For the Turkish documents it then opens File → Download as, checks what is
 offered, downloads the OpenDocument copy and the PDF, and prints. Once per
 browser, in one browser context, it closes the editor's "New" hint, reopens
-the document, and prints where filex has no print (`print=none`).
+the document, and prints where filex has no print (`print=none`) and,
+reopened, where the app has no `ui:print` grant.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
