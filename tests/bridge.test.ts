@@ -392,11 +392,28 @@ describe('saving changes', () => {
     s.process(a);
     s.process(a);
     s.flush();
-    // b's editor claims to know 0 changes while its bridge has passed it 1.
+    // b's editor claims to know 0 changes while its bridge has passed it 1
+    // (the change is still on its way). DocsCoServer.js lets 0 through as
+    // "the first save"; here it is told to wait - saveLock true, after
+    // which the editor asks again - and the lease is not even asked for.
     b.bridge.fromEditor({ type: 'isSaveLock', syncChangesIndex: 0 });
-    expect(last(b, 'saveLock')).toBeUndefined();
+    expect(last(b, 'saveLock')!.saveLock).toBe(true);
+    expect(s.holder).toBeNull();
     b.bridge.fromEditor({ type: 'isSaveLock', syncChangesIndex: 5 });
     expect(last(b, 'saveLock')!.saveLock).toBe(true);
+    expect(s.holder).toBeNull();
+    // Once it has read the change, it gets the lease.
+    s.process(b);
+    b.bridge.fromEditor({ type: 'isSaveLock', syncChangesIndex: 1 });
+    expect(last(b, 'saveLock')!.saveLock).toBe(false);
+    expect(s.holder).toBe(b.member.client);
+  });
+
+  it('a document with no changes: 0 is in sync (the first save)', () => {
+    const s = new Session();
+    const a = s.join('A');
+    a.bridge.fromEditor({ type: 'isSaveLock', syncChangesIndex: 0 });
+    expect(last(a, 'saveLock')!.saveLock).toBe(false);
   });
 
   it('a writer whose bridge has not seen the latest changes does not get the lease', () => {

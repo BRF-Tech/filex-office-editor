@@ -402,9 +402,22 @@ export class OfficeBridge {
       return;
     }
     // An editor that has not received every change is not synced: it waits
-    // (the server's "unsynced" answer), it does not get to write.
+    // (the server's "unsynced" answer, saveLock true, after which the editor
+    // asks again), it does not get to write.
+    //
+    // ⚠ Unlike DocsCoServer.js, 0 is checked too. The server skips the check
+    // at 0 "for compatibility or the first save" - it cannot tell an old
+    // editor that sends no index from a new one that knows no change - and
+    // the relay's lease would not catch it either: the lease asks whether
+    // this BRIDGE has seen every change, and a change the bridge has passed
+    // on may still be on its way to the editor (the shim delivers a turn
+    // later). The editor here is the pinned one, which always sends the
+    // count it holds (docscoapi.js askSaveChanges), so 0 against a document
+    // that has changes is an editor behind, never an old client. Nor is
+    // there the server's way out after expire.saveLock: the shim loses no
+    // message, so an editor behind is behind for a turn, not for good.
     const sync = typeof msg.syncChangesIndex === 'number' ? msg.syncChangesIndex : 0;
-    if (sync && sync !== this.changes.length) {
+    if (sync !== this.changes.length) {
       this.send({ type: 'saveLock', saveLock: true });
       return;
     }
