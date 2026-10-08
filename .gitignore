@@ -1,0 +1,17 @@
+# build output (a release attaches ui.zip; the repository does not carry it)
+dist/
+*.wasm
+coverage/
+
+# Node
+node_modules/
+
+# editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# worktrees made inside the repository
+/.claude/worktrees/

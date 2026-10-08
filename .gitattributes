@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.wasm binary
+*.zip binary
+*.bin binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.odt binary
+*.ods binary
+*.odp binary
+*.png binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
