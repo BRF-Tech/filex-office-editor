@@ -1,12 +1,21 @@
-# filex-onlyoffice
+# filex-office-editor
 
-The office editor app for [filex](https://github.com/BRF-Tech/filex):
-ONLYOFFICE's editor in the browser, **without a Document Server**. Word,
-Excel and PowerPoint documents (and their OpenDocument kin) open in the
-editor in place of filex's preview, alone or with other people - and also
-**inside encrypted folders**, where the document is decrypted in the
-browser, edited there and encrypted again before it is saved, so no server
-ever reads it.
+The office editor app for [filex](https://github.com/BRF-Tech/filex), based
+on ONLYOFFICE Docs: ONLYOFFICE's editor in the browser, **without a Document
+Server**. Word, Excel and PowerPoint documents (and their OpenDocument kin)
+open in the editor in place of filex's preview, alone or with other people -
+and also **inside encrypted folders**, where the document is decrypted in
+the browser, edited there and encrypted again before it is saved, so no
+server ever reads it.
+
+> **Legal notice.** This app is based on ONLYOFFICE Docs by Ascensio System
+> SIA, and this version may have been modified. It is free software under
+> the GNU Affero General Public License (see [License](#license) and
+> [NOTICE](NOTICE)). "ONLYOFFICE" is a trademark of Ascensio System SIA. This
+> project is not affiliated with, endorsed by or sponsored by Ascensio System
+> SIA, so the name appears here only to say what the app is based on, never
+> as the name of the repository or of the app (in filex it is the "Office
+> editor").
 
 > **Status: prototype, not installable.** This repository holds the part of
 > the design that runs next to the editor - the bridge that stands in for the

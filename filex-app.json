@@ -11,7 +11,7 @@
     "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server - also inside encrypted folders, where no server ever reads the document. Based on ONLYOFFICE Docs by Ascensio System SIA.",
     "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin - şifreli klasörlerde de; orada belgeyi hiçbir sunucu okumaz. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır."
   },
-  "homepage": "https://github.com/BRF-Tech/filex-onlyoffice",
+  "homepage": "https://github.com/BRF-Tech/filex-office-editor",
   "permissions": [
     "files:read",
     "files:write",
@@ -106,7 +106,7 @@
   ],
   "ui": {
     "bundle": {
-      "url": "https://github.com/BRF-Tech/filex-onlyoffice/releases/download/{tag}/ui.zip",
+      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/ui.zip",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "csp": [

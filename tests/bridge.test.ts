@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Tests for filex-onlyoffice (see README.md and NOTICE).
+// Tests for filex-office-editor (see README.md and NOTICE).
 //
 // The bridge (task #189): a Document Server for one ONLYOFFICE editor, whose
 // "database" is the session's log. Two things are under test:

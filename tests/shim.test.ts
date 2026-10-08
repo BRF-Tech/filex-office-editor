@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Tests for filex-onlyoffice (see README.md and NOTICE).
+// Tests for filex-office-editor (see README.md and NOTICE).
 //
 // The socket.io stand-in the editor's frame serves in place of
 // socket.io.min.js (task #189). The editor must not be able to tell it from

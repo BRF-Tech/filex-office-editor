@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to filex-onlyoffice are recorded here. The format
+All notable changes to filex-office-editor are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 follow [Semantic Versioning](https://semver.org/). The version in
 `filex-app.json` is the one a tag must match, and a version's section is its
@@ -27,6 +27,10 @@ update.
 
 ### Changed
 
+- The project is named **filex-office-editor** (it started as
+  filex-onlyoffice). "ONLYOFFICE" is Ascensio System SIA's trademark and
+  grants no rights, so it appears only to say what the app is based on,
+  never in the name of the repository or of the app.
 - The license is **AGPL-3.0-or-later** (the prototype said AGPL-3.0-only).
   `src/locks.ts` stays AGPL-3.0-only: it is a modified version of ONLYOFFICE
   Docs, which is licensed under the AGPL version 3 only.

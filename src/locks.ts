@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 BRF Tech. Part of filex-onlyoffice, the office editor
+// Copyright (C) 2026 BRF Tech. Part of filex-office-editor, the office editor
 // app for filex (see README.md and NOTICE).
 // Portions Copyright (C) Ascensio System SIA (ONLYOFFICE Docs).
 //
