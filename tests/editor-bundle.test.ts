@@ -76,7 +76,9 @@ describe('what the bundle keeps', () => {
     ['sdkjs/common/libfont/engine/fonts.wasm', 'keep'],
     ['sdkjs/common/Images/fonts_thumbnail@2x.png', 'keep'],
     ['sdkjs/slide/themes/theme3/theme.bin', 'keep'],
-    ['sdkjs/slide/themes/theme3/thumbnail@1.5x.png', 'keep'],
+    ['sdkjs/slide/themes/theme3/thumbnail@1.5x.png', 'drop'],
+    ['sdkjs/slide/themes/theme12/thumbnail.png', 'drop'],
+    ['sdkjs/common/Images/themes_thumbnail@2x.png', 'keep'],
     ['fonts/042', 'keep'],
     ['LICENSE.txt', 'keep'],
     ['3rd-Party.txt', 'keep'],
@@ -90,7 +92,8 @@ describe('what the bundle keeps', () => {
     ['web-apps/apps/documenteditor/forms/index.html', 'drop'],
     ['web-apps/apps/api/wopi/editor-wopi.ejs', 'drop'],
     ['web-apps/vendor/monaco/monaco/min/vs/loader.js', 'drop'],
-    ['web-apps/apps/documenteditor/main/app/template/StatusBar.template', 'drop'],
+    ['web-apps/apps/documenteditor/main/app/template/StatusBar.template', 'rename'],
+    ['web-apps/apps/common/main/lib/template/ExtendedColorDialog.template', 'rename'],
     ['sdkjs/pdf/src/engine/drawingfile.wasm', 'drop'],
     ['sdkjs/visio/sdk-all.js', 'drop'],
     ['sdkjs/cell/sdk-all.bin', 'drop'],
@@ -112,6 +115,22 @@ describe('what the bundle keeps', () => {
     expect(classify('license/Backbone.license')).toMatchObject({ action: 'rename', to: 'license/Backbone.license.txt' });
     expect(classify('core-fonts-licenses/asana/LICENSE.txt').action).toBe('keep');
     expect(classify('core-fonts-licenses/x/COPYING').action).toBe('keep');
+  });
+
+  it('serves the interface templates the editor loads while it runs as .template.txt', () => {
+    expect(classify('web-apps/apps/documenteditor/main/app/template/ParagraphSettings.template')).toMatchObject({
+      action: 'rename',
+      to: 'web-apps/apps/documenteditor/main/app/template/ParagraphSettings.template.txt',
+    });
+    expect(servedType('x/ParagraphSettings.template.txt')).toBe(true);
+  });
+
+  it("serves the Document Server's blank documents as .bin, for filex's New menu", () => {
+    for (const ext of ['docx', 'xlsx', 'pptx']) {
+      const p = `document-templates/new/default/new.${ext}`;
+      expect(classify(p)).toMatchObject({ action: 'rename', to: `${p}.bin` });
+      expect(servedType(`${p}.bin`)).toBe(true);
+    }
   });
 
   it('leaves out the large CJK fonts and keeps the metric stand-ins', () => {

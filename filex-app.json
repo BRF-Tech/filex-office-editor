@@ -152,7 +152,7 @@
         "tr": "Metin belgesi (.docx)"
       },
       "view": "editor",
-      "template": "filex/blank.docx"
+      "template": "editor/document-templates/new/default/new.docx.bin"
     },
     {
       "ext": "xlsx",
@@ -161,7 +161,7 @@
         "tr": "Tablo (.xlsx)"
       },
       "view": "editor",
-      "template": "filex/blank.xlsx"
+      "template": "editor/document-templates/new/default/new.xlsx.bin"
     },
     {
       "ext": "pptx",
@@ -170,7 +170,7 @@
         "tr": "Sunu (.pptx)"
       },
       "view": "editor",
-      "template": "filex/blank.pptx"
+      "template": "editor/document-templates/new/default/new.pptx.bin"
     }
   ]
 }

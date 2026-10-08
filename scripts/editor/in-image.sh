@@ -14,6 +14,10 @@
 #   web-apps/  sdkjs/  fonts/            as the image has them, plus the
 #                                        generated files
 #   LICENSE.txt 3rd-Party.txt license/   ONLYOFFICE's license and notices
+#   document-templates/new/default/      the Document Server's blank docx,
+#                                        xlsx and pptx (what its "Create
+#                                        new" starts from; filex's New menu
+#                                        copies them)
 #   core-fonts-licenses/<family>/        the license files of every font
 #                                        family the fonts come from
 #   core-fonts-src/                      those families' original font
@@ -86,6 +90,9 @@ rm -f "$DS"/fonts/*.gz "$DS/sdkjs/common/AllFonts.js.gz" "$DS"/sdkjs/common/Imag
 
 echo "in-image: copying out"
 cp -a "$DS/web-apps" "$DS/sdkjs" "$DS/fonts" "$DS/license" "$DS/LICENSE.txt" "$DS/3rd-Party.txt" "$OUT/"
+mkdir -p "$OUT/document-templates/new/default"
+cp -a "$DS/document-templates/new/default/new.docx" "$DS/document-templates/new/default/new.xlsx" \
+  "$DS/document-templates/new/default/new.pptx" "$OUT/document-templates/new/default/"
 mkdir -p "$OUT/core-fonts-licenses"
 for dir in "$FIN"/*/; do
   family="$(basename "$dir")"

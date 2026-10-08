@@ -44,11 +44,16 @@ const RULES = [
   { re: /\/resources\/help\//, drop: 'the help pages' },
   { re: /^web-apps\/apps\/api\/wopi\//, drop: "the WOPI host's server templates" },
   { re: /^web-apps\/vendor\/monaco\//, drop: 'the macro editor (macros are off)' },
-  { re: /^web-apps\/apps\/[^/]+\/main\/(app|lib)\/template\/[^/]+\.template$/, drop: 'templates already built into the apps' },
   { re: /^sdkjs\/(pdf|visio)\//, drop: 'the PDF and Visio engines' },
   { re: /^sdkjs\/[^/]+\/sdk-all\.bin$/, drop: "the server's script snapshot (doctrenderer)" },
   { re: /^sdkjs\/slide\/themes\/src\//, drop: 'the theme sources (the generated themes stay)' },
   { re: /^sdkjs\/slide\/themes\/[^/]+\/Image__[^/]*$/, drop: "the theme generator's temporary files" },
+  {
+    // Measured 2026-10-08 (9.4.0.129, Chromium, network log): the editor asks for none of them, opening a
+    // presentation or its Design tab; the theme gallery is sdkjs/common/Images/themes_thumbnail*.png.
+    re: /^sdkjs\/slide\/themes\/theme\d+\/thumbnail(@[\d.]+x)?\.png$/,
+    drop: "the per-theme thumbnails (the editor's theme gallery uses one sprite, sdkjs/common/Images/themes_thumbnail)",
+  },
   { re: /\.mem$/, drop: 'asm.js memory images (the WebAssembly builds are used)' },
   {
     re: /^sdkjs\/common\/[^/]+\/[^/]+\/[^/]+_ie\.js$/,
@@ -58,6 +63,21 @@ const RULES = [
     re: /^web-apps\/apps\/api\/documents\/api\.js\.tpl$/,
     rename: () => 'web-apps/apps/api/documents/api.js',
     why: "api.js is api.js.tpl, as the Document Server's first start makes it, with the cache tag left as a placeholder (so the editor's paths are not rewritten)",
+  },
+  {
+    // ⚠ Not built into the apps (measured 2026-10-08, 9.4.0.129: the editor
+    // pages ask for them with RequireJS's text! plugin while they run, and
+    // stop with "HTTP status: 404" without them). filex does not serve
+    // .template, so they are served as .template.txt and the editor page's
+    // script (src/frame/text.ts) asks for that name.
+    re: /^web-apps\/apps\/[^/]+\/main\/(app|lib)\/template\/[^/]+\.template$/,
+    rename: (p) => `${p}.txt`,
+    why: "an interface template the editor page loads while it runs (RequireJS text!), renamed with .txt so filex serves it (content unchanged; the editor page's script asks for this name)",
+  },
+  {
+    re: /^document-templates\/new\/default\/new\.(docx|xlsx|pptx)$/,
+    rename: (p) => `${p}.bin`,
+    why: "a blank document filex's New menu copies (filex-app.json new_documents), renamed with .bin so filex serves it (content unchanged)",
   },
   {
     re: /^(license|core-fonts-licenses)\/.+$/,
