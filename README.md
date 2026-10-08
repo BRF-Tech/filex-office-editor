@@ -8,14 +8,18 @@ and also **inside encrypted folders**, where the document is decrypted in
 the browser, edited there and encrypted again before it is saved, so no
 server ever reads it.
 
-> **Legal notice.** This app is based on ONLYOFFICE Docs by Ascensio System
-> SIA, and this version may have been modified. It is free software under
-> the GNU Affero General Public License (see [License](#license) and
-> [NOTICE](NOTICE)). "ONLYOFFICE" is a trademark of Ascensio System SIA. This
-> project is not affiliated with, endorsed by or sponsored by Ascensio System
-> SIA, so the name appears here only to say what the app is based on, never
-> as the name of the repository or of the app (in filex it is the "Office
-> editor").
+> **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
+> SIA, the original developer of the editor it runs, and this version may
+> have been modified. The ONLYOFFICE code it carries or builds on is
+> Copyright © Ascensio System SIA and licensed under the GNU Affero General
+> Public License version 3, with the additional terms of its section 7 (see
+> [License](#license) and [NOTICE](NOTICE)).
+>
+> ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks
+> of Ascensio System SIA. This project is not affiliated with, endorsed by
+> or sponsored by Ascensio System SIA. The names appear here only to say
+> what the app is based on, never as the name of the repository or of the
+> app (in filex it is the "Office editor").
 
 > **Status: prototype, not installable.** This repository holds the part of
 > the design that runs next to the editor - the bridge that stands in for the
@@ -203,5 +207,8 @@ ONLYOFFICE as the original developer, says this version may have been
 modified, and links to this repository at the exact tag it was built from
 ([NOTICE](NOTICE)).
 
-"ONLYOFFICE" is a trademark of Ascensio System SIA. This project is not
-affiliated with, endorsed by or sponsored by Ascensio System SIA.
+The ONLYOFFICE code is Copyright © Ascensio System SIA, licensed under the
+GNU AGPL version 3 with the additional terms of its section 7. ONLYOFFICE®
+and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio
+System SIA. This project is not affiliated with, endorsed by or sponsored
+by Ascensio System SIA.

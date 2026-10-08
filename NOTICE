@@ -24,6 +24,15 @@ This program works with ONLYOFFICE Docs, by Ascensio System SIA
 the original developer of the editor this app runs and of the rules some of
 its code carries over.
 
+Copyright (C) Ascensio System SIA. ONLYOFFICE Docs, and the ONLYOFFICE code
+this program carries, translates or builds on, belong to Ascensio System
+SIA and are licensed under the GNU Affero General Public License version 3,
+with the additional terms of its section 7 (below).
+
+ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of
+Ascensio System SIA. This project is not affiliated with, endorsed by or
+sponsored by Ascensio System SIA.
+
 1. src/locks.ts is a modified version of ONLYOFFICE Docs: the lock rules of
    the server's DocService/sources/DocsCoServer.js (Docs 9.4.0: getLock,
    _checkLockExcel, _checkLockPresentation, compareExcelBlock,
@@ -67,10 +76,11 @@ a modified version:
        the GNU Affero General Public License version 3; source code:
        <the exact tag of this repository>."
 
-  - grants no trademark rights: "ONLYOFFICE" is a trademark of Ascensio
-    System SIA. This project is not affiliated with, endorsed by or
-    sponsored by Ascensio System SIA, and the app does not use the name as
-    its own (in filex it is the "Office editor");
+  - grants no trademark rights: ONLYOFFICE® and ONLYOFFICE Docs™ are
+    registered trademarks or trademarks of Ascensio System SIA. This project
+    is not affiliated with, endorsed by or sponsored by Ascensio System SIA,
+    and the app does not use the names as its own (in filex it is the
+    "Office editor");
   - leaves non-code content (icons, illustrations, documents) under
     CC BY-SA 4.0.
 The terms themselves are in ONLYOFFICE's LICENSE files (sdkjs, web-apps,

@@ -8,8 +8,8 @@
     "tr": "Ofis düzenleyici"
   },
   "description": {
-    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server - also inside encrypted folders, where no server ever reads the document. Based on ONLYOFFICE Docs by Ascensio System SIA.",
-    "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin - şifreli klasörlerde de; orada belgeyi hiçbir sunucu okumaz. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır."
+    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server - also inside encrypted folders, where no server ever reads the document. Based on ONLYOFFICE Docs by Ascensio System SIA. ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio System SIA; this app is not affiliated with or endorsed by Ascensio System SIA.",
+    "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin - şifreli klasörlerde de; orada belgeyi hiçbir sunucu okumaz. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır. ONLYOFFICE® ve ONLYOFFICE Docs™, Ascensio System SIA'nın tescilli markaları ya da ticari markalarıdır; bu uygulama Ascensio System SIA ile bağlantılı değildir ve onun tarafından onaylanmamıştır."
   },
   "homepage": "https://github.com/BRF-Tech/filex-office-editor",
   "permissions": [

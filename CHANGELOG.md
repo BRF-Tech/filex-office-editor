@@ -24,6 +24,11 @@ update.
   xlsx and pptx, and the platform permissions the app will ask filex for.
 - `NOTICE`: the licensing, what is based on ONLYOFFICE, the legal notice
   the editor will show, the trademark line.
+- ONLYOFFICE's credit, in the README, NOTICE and the manifest's
+  description: the ONLYOFFICE code is Copyright © Ascensio System SIA under
+  the AGPL version 3; ONLYOFFICE® and ONLYOFFICE Docs™ are registered
+  trademarks or trademarks of Ascensio System SIA, and this project is not
+  affiliated with or endorsed by it.
 - `upstream/onlyoffice.json` pins the ONLYOFFICE Docs release the editor
   files are taken from: 9.4.0 (build 9.4.0.129), the official Document
   Server image `onlyoffice/documentserver:9.4.0.1` by its digest.
