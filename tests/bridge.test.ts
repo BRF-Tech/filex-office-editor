@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Tests for packages/office-e2e (AGPL-3.0-only, see its README.md).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Tests for filex-onlyoffice (see README.md and NOTICE).
 //
 // The bridge (task #189): a Document Server for one ONLYOFFICE editor, whose
 // "database" is the session's log. Two things are under test:
@@ -13,7 +13,7 @@
 //      built on a document that lacks somebody else's changes (the lease).
 //
 // The relay here is a stand-in with the real relay's rules
-// (backend/internal/e2eoffice): one order, changes only under the lease, the
+// (filex's backend/internal/e2eoffice): one order, changes only under the lease, the
 // lease only for a member that has seen every change.
 import { describe, expect, it } from 'vitest';
 

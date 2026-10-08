@@ -1,7 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 BRF Tech. Part of filex's encrypted office editing
-// (packages/office-e2e, see README.md); not part of the MIT-licensed filex
-// core.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 BRF Tech. Part of filex-onlyoffice, the office editor
+// app for filex (see README.md and NOTICE).
 //
 // The messages between the ONLYOFFICE editor (sdkjs common/docscoapi.js) and
 // a Document Server (server DocService/sources/DocsCoServer.js, 9.4), as far

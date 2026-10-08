@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 BRF Tech. Part of filex's encrypted office editing
-// (packages/office-e2e, see README.md).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 BRF Tech. Part of filex-onlyoffice, the office editor
+// app for filex (see README.md and NOTICE).
 //
 // x2t, ONLYOFFICE's document converter, compiled to WebAssembly: it turns a
 // docx/xlsx/pptx into the editor's own format (Editor.bin, with the images
@@ -8,7 +8,7 @@
 // server; here it runs in the browser, so the document is never converted
 // anywhere else.
 //
-// The wasm build is not in this package: it is built from ONLYOFFICE core at
+// The wasm build is not in this repository yet: it is built from ONLYOFFICE core at
 // the same tag as the editor files it serves (core v9.4.0.129 for Docs 9.4)
 // and loaded into a Worker; this file drives a loaded module. The calling
 // convention (an in-memory file system under /working, a params.xml, main1)

@@ -1,0 +1,95 @@
+filex-onlyoffice
+Copyright (C) 2026 BRF Tech
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. It is distributed WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See LICENSE for the license text.
+
+Exception, one file: src/locks.ts is AGPL-3.0-only (see below).
+
+The code in this repository moved here from filex (packages/office-e2e and
+web/tests/officeE2e, filex commit 45e7bab7, 2026-10-08), where it was
+written; filex itself is MIT licensed and keeps the MIT-licensed half of
+the protocol (the relay, the keys and the log reader).
+
+
+Based on ONLYOFFICE
+-------------------
+
+This program works with ONLYOFFICE Docs, by Ascensio System SIA
+(https://www.onlyoffice.com, https://github.com/ONLYOFFICE). ONLYOFFICE is
+the original developer of the editor this app runs and of the rules some of
+its code carries over.
+
+1. src/locks.ts is a modified version of ONLYOFFICE Docs: the lock rules of
+   the server's DocService/sources/DocsCoServer.js (Docs 9.4.0: getLock,
+   _checkLockExcel, _checkLockPresentation, compareExcelBlock,
+   comparePresentationBlock, _recalcLockArray, _addRecalcIndex,
+   CRecalcIndex, and the in-memory editorData's addLocksNX), translated to
+   TypeScript and changed to run on a session log instead of a database.
+   Modified by BRF Tech on 2026-10-08.
+   Portions Copyright (C) Ascensio System SIA. ONLYOFFICE licenses that code
+   under the GNU AGPL version 3 only, with additional terms under section 7,
+   so this file is AGPL-3.0-only.
+
+2. src/bridge.ts and src/protocol.ts answer the editor in the Document
+   Server's protocol (the names and numbers of sdkjs common/docscoapi.js and
+   DocsCoServer.js, 9.4), so the editor runs unchanged.
+
+3. The editor files a release bundle will carry (web-apps, sdkjs, the fonts)
+   and the x2t WebAssembly build (ONLYOFFICE core) are ONLYOFFICE's, built
+   from their published sources at a pinned tag, under ONLYOFFICE's license
+   (AGPL-3.0 with additional terms). The bundle will name each with its tag
+   and checksum, keep every copyright, license and origin notice they ship,
+   and list here every file this project changes, with the date. No release
+   bundle exists yet.
+
+ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
+a modified version:
+  - keeps the copyright, license and origin notices;
+  - carries a prominent notice, with the dates of the changes, saying it is
+    based on ONLYOFFICE by Ascensio System SIA (this file, and the header of
+    src/locks.ts);
+  - shows, in its interactive interface, an appropriate legal notice that
+    names ONLYOFFICE as the original developer, says the version may have
+    been modified, and links to the license. The editor's own "About" is
+    therefore never hidden, and the app adds this notice where the editor
+    opens:
+
+      "This editor is based on ONLYOFFICE Docs by Ascensio System SIA,
+       and this version may have been modified. It is free software under
+       the GNU Affero General Public License version 3; source code:
+       <the exact tag of this repository>."
+
+  - grants no trademark rights: "ONLYOFFICE" is a trademark of Ascensio
+    System SIA. This project is not affiliated with, endorsed by or
+    sponsored by Ascensio System SIA, and the app does not use the name as
+    its own (in filex it is the "Office editor");
+  - leaves non-code content (icons, illustrations, documents) under
+    CC BY-SA 4.0.
+The terms themselves are in ONLYOFFICE's LICENSE files (sdkjs, web-apps,
+server, core), which the release bundle will carry unchanged.
+
+
+The approach
+------------
+
+Running ONLYOFFICE's editor in the browser without a Document Server, with
+the server's side answered in the editor's frame and the document converted
+by x2t built to WebAssembly, is the approach CryptPad takes for its office
+documents (https://github.com/cryptpad/cryptpad,
+https://github.com/cryptpad/onlyoffice-editor,
+https://github.com/cryptpad/onlyoffice-x2t-wasm; AGPL-3.0-or-later). This
+project follows that approach; its bridge differs on purpose (the Document
+Server's lock and save rules, kept as Docs 9.4 has them).
+
+
+Source code (AGPL section 13)
+-----------------------------
+
+Whoever serves this app's interface to users over a network offers them its
+Corresponding Source. The app does that itself: the legal notice above names
+the exact tag of this repository the running bundle was built from.

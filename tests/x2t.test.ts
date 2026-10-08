@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Tests for packages/office-e2e (AGPL-3.0-only, see its README.md).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Tests for filex-onlyoffice (see README.md and NOTICE).
 //
 // Driving x2t (ONLYOFFICE's converter, built to WebAssembly) in the browser
 // (task #189). The module here is a stand-in with the emscripten file system

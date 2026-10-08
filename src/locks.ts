@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 BRF Tech. Part of filex's encrypted office editing
-// (packages/office-e2e, see README.md).
+// Copyright (C) 2026 BRF Tech. Part of filex-onlyoffice, the office editor
+// app for filex (see README.md and NOTICE).
+// Portions Copyright (C) Ascensio System SIA (ONLYOFFICE Docs).
 //
 // The Document Server's lock rules, carried over from ONLYOFFICE Docs 9.4
 // (server DocService/sources/DocsCoServer.js: getLock, _checkLockExcel,
 // _checkLockPresentation, compareExcelBlock, comparePresentationBlock,
 // _recalcLockArray, _addRecalcIndex, CRecalcIndex; the in-memory
-// editorData's addLocksNX). The server is AGPL-3.0, which is one reason this
-// package is.
+// editorData's addLocksNX).
+//
+// This file is based on ONLYOFFICE Docs by Ascensio System SIA and is a
+// modified version of it: those functions were translated to TypeScript and
+// changed to run on the session's log instead of the server's database by
+// BRF Tech on 2026-10-08. ONLYOFFICE licenses that code under the GNU AGPL
+// version 3 only, with the additional terms of its section 7 (NOTICE), so
+// this file is AGPL-3.0-only while the rest of the repository is
+// AGPL-3.0-or-later. No trademark rights in ONLYOFFICE are granted.
 //
 // Nobody arbitrates locks centrally here. Every editor's bridge reads the
 // same lock requests in the same order (the relay's log) and runs these
