@@ -7,3 +7,4 @@ export * from './locks';
 export * from './bridge';
 export * from './shim';
 export * from './x2t';
+export * from './session';

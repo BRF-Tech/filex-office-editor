@@ -1,0 +1,384 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 BRF Tech. Part of filex-office-editor, the office editor
+// app for filex (see README.md and NOTICE).
+//
+// The app page (index.html): what filex opens.
+//
+//   1. connect to filex (@brftech/filex-app-ui) and read the file;
+//   2. convert it to the editor's format with x2t, in a worker;
+//   3. start ONLYOFFICE's editor (api.js, DocsAPI.DocEditor) from the
+//      package - its page runs in a frame of its own, where frame.ts answers
+//      it in place of a Document Server - and hand that frame the document;
+//   4. save: the editor's Save, filex's Save, Ctrl+S, and every ten minutes
+//      while there are changes - the document as the editor holds it, back
+//      through x2t to the file's own format, as a new version of the file.
+//
+// One person, one document (plan step A3). Nothing leaves the browser but
+// the saves, and those go to filex through the SDK.
+
+import { connect, type FilexApp } from '@brftech/filex-app-ui';
+
+import {
+  FRAME_PORT,
+  FRAME_VERSION,
+  isFrameHello,
+  type FromFrame,
+  type OpenMessage,
+  type SnapshotResult,
+  type ToFrame,
+} from '../frame-protocol';
+import { adaptOpaqueOrigin } from '../origin';
+import { editorConfig, kindOf, uiLang, type Kind } from './config';
+import { STRINGS, type Strings } from './strings';
+import { X2tClient } from './x2t-client';
+
+declare const __OO_BUILD__: { version: string; number: number };
+declare const __OO_SOURCE_TAG__: string;
+declare const __APP_VERSION__: string;
+
+/** A save every ten minutes while there are changes (the policy of #189). */
+const AUTOSAVE_MS = 10 * 60 * 1000;
+/** How long a save waits for the editor to hand its last changes to the bridge. */
+const SETTLE_MS = 3000;
+
+const BASE = new URL('.', document.baseURI).href;
+
+interface DocsApiWindow {
+  DocsAPI?: { DocEditor: new (placeholder: string, config: Record<string, unknown>) => unknown };
+}
+
+// ---------------------------------------------------------------------------
+// The page
+// ---------------------------------------------------------------------------
+
+/**
+ * Where the opening is: on <html data-fx-phase>, and with its time in
+ * window.__fxPhases, for the measurements (e2e/run.mjs) and anyone looking
+ * at a page that does not open.
+ */
+function phase(name: string): void {
+  document.documentElement.dataset.fxPhase = name;
+  const w = window as unknown as { __fxPhases?: [string, number][] };
+  (w.__fxPhases ??= []).push([name, Math.round(performance.now())]);
+}
+
+function el(id: string): HTMLElement {
+  const e = document.getElementById(id);
+  if (!e) throw new Error(`index.html has no #${id}`);
+  return e;
+}
+
+function setStatus(text: string | null, error = false): void {
+  const box = el('fx-status');
+  if (text === null) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.classList.toggle('fx-error', error);
+  el('fx-status-text').textContent = text;
+}
+
+function setLegal(t: Strings): void {
+  const box = el('fx-legal');
+  box.setAttribute('aria-label', t.legalLabel);
+  box.textContent = t.legal({ version: __OO_BUILD__.version, build: __OO_BUILD__.number, tag: __OO_SOURCE_TAG__, app: __APP_VERSION__ });
+}
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`${src} did not load`));
+    document.head.appendChild(s);
+  });
+}
+
+function randomKey(): string {
+  const b = new Uint8Array(12);
+  crypto.getRandomValues(b);
+  return `fx${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function reason(e: unknown): string {
+  const code = (e as { code?: unknown })?.code;
+  const msg = String((e as Error)?.message ?? e);
+  return typeof code === 'string' && code !== msg ? `${msg} (${code})` : msg;
+}
+
+// ---------------------------------------------------------------------------
+// The editor's frame
+// ---------------------------------------------------------------------------
+
+function editorFrame(): HTMLIFrameElement | null {
+  return document.querySelector<HTMLIFrameElement>('#fx-editor-box iframe');
+}
+
+/** api.js hears the editor frame's messages (origin.ts says why this is needed under filex). */
+function adaptEditorOrigin(): void {
+  adaptOpaqueOrigin(
+    window,
+    () => editorFrame()?.contentWindow,
+    () => {
+      const f = editorFrame();
+      try {
+        return f ? new URL(f.src, document.baseURI).origin : null;
+      } catch {
+        return null;
+      }
+    },
+  );
+}
+
+/** The link to the editor's frame: its hello, then a MessagePort only the two hold. */
+class FrameLink {
+  private port: MessagePort | null = null;
+  private readonly outbox: { m: ToFrame; transfer: Transferable[] }[] = [];
+  private seq = 0;
+  private readonly snapshots = new Map<number, (r: SnapshotResult) => void>();
+  onMessage: (m: FromFrame) => void = () => {};
+
+  constructor() {
+    window.addEventListener('message', (ev: MessageEvent) => {
+      const f = editorFrame();
+      if (!f || ev.source !== f.contentWindow || !f.contentWindow || !isFrameHello(ev.data)) return;
+      if (this.port) {
+        // The editor's page loaded again: the document it had is gone with it.
+        this.onMessage({ t: 'state', state: 'closed' });
+        return;
+      }
+      const ch = new MessageChannel();
+      this.port = ch.port1;
+      ch.port1.onmessage = (e: MessageEvent) => this.receive(e.data as FromFrame);
+      f.contentWindow.postMessage({ type: FRAME_PORT, v: FRAME_VERSION }, '*', [ch.port2]);
+      for (const o of this.outbox.splice(0)) ch.port1.postMessage(o.m, o.transfer);
+    });
+  }
+
+  send(m: ToFrame, transfer: Transferable[] = []): void {
+    if (this.port) this.port.postMessage(m, transfer);
+    else this.outbox.push({ m, transfer });
+  }
+
+  snapshot(): Promise<SnapshotResult> {
+    const id = ++this.seq;
+    return new Promise((resolve) => {
+      this.snapshots.set(id, resolve);
+      this.send({ t: 'snapshot', id });
+    });
+  }
+
+  private receive(m: FromFrame): void {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'snapshot') {
+      const done = this.snapshots.get(m.id);
+      this.snapshots.delete(m.id);
+      done?.(m);
+      return;
+    }
+    this.onMessage(m);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The app
+// ---------------------------------------------------------------------------
+
+class OfficeApp {
+  readonly link = new FrameLink();
+  private frameDirty = false;
+  /** The editor has changes it has not handed to the bridge yet (api.js onDocumentStateChange). */
+  private editorDirty = false;
+  private shownDirty = false;
+  private saving: Promise<void> | null = null;
+  private lastSave = Date.now();
+  private settleWaiters: (() => void)[] = [];
+
+  constructor(
+    private readonly fx: FilexApp,
+    private readonly t: Strings,
+    private readonly kind: Kind,
+    private readonly x2t: X2tClient,
+    private readonly canEdit: boolean,
+  ) {
+    this.link.onMessage = (m) => this.onFrame(m);
+  }
+
+  private onFrame(m: FromFrame): void {
+    switch (m.t) {
+      case 'save':
+        void this.save().catch(() => {});
+        return;
+      case 'dirty':
+        this.frameDirty = m.dirty;
+        this.updateDirty();
+        return;
+      case 'state':
+        if (m.state === 'closed') setStatus(this.t.openFailed('the editor page reloaded'), true);
+        return;
+      case 'notice':
+        console.warn('[office-editor]', m.what, m.detail ?? '');
+        return;
+    }
+  }
+
+  /** api.js onDocumentStateChange: true while the editor holds changes not yet sent. */
+  onEditorState(dirty: boolean): void {
+    this.editorDirty = dirty;
+    if (!dirty) for (const w of this.settleWaiters.splice(0)) w();
+    this.updateDirty();
+  }
+
+  private updateDirty(): void {
+    const dirty = this.canEdit && (this.frameDirty || this.editorDirty);
+    if (dirty === this.shownDirty) return;
+    this.shownDirty = dirty;
+    this.fx.dirty(dirty);
+  }
+
+  /** Wait (a little) for the editor to send what it holds, so the save and "saved" agree. */
+  private settle(): Promise<void> {
+    if (!this.editorDirty) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, SETTLE_MS);
+      this.settleWaiters.push(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  /** Write the document as the editor holds it now, as a new version of the file. One at a time. */
+  save(): Promise<void> {
+    if (!this.canEdit) return Promise.resolve();
+    if (this.saving) return this.saving;
+    const run = (async () => {
+      let through = 0;
+      try {
+        await this.settle();
+        const snap = await this.link.snapshot();
+        if (snap.error || typeof snap.bin !== 'string') throw new Error(snap.error ?? 'no document');
+        through = snap.through ?? 0;
+        const out = await this.x2t.convert('bin', this.kind.ext, snap.bin, snap.media ?? []);
+        await this.fx.save(out.bytes, { mime: this.kind.mime });
+        this.lastSave = Date.now();
+        this.link.send({ t: 'saved', ok: true, through });
+      } catch (e) {
+        this.link.send({ t: 'saved', ok: false, through: 0 });
+        this.fx.toast(this.t.saveFailed(reason(e)), 'error');
+        throw e;
+      }
+    })();
+    this.saving = run.finally(() => {
+      this.saving = null;
+    });
+    return this.saving;
+  }
+
+  /** The ten-minute save, while there are changes. */
+  tick(): void {
+    if (this.shownDirty && !this.saving && Date.now() - this.lastSave >= AUTOSAVE_MS) void this.save().catch(() => {});
+  }
+}
+
+async function readDocument(fx: FilexApp, kind: Kind): Promise<ArrayBuffer> {
+  const file = await fx.open(0);
+  const bytes = await file.bytes();
+  if (bytes.byteLength > 0 || !kind.blank) return bytes;
+  // An empty file opens as a blank document of its kind (filex's New menu
+  // copies the same blank, so this is only a file made empty elsewhere).
+  const res = await fetch(new URL(kind.blank, BASE).href);
+  if (!res.ok) throw new Error(`the blank ${kind.ext} is missing from the package`);
+  return res.arrayBuffer();
+}
+
+async function main(): Promise<void> {
+  let fx: FilexApp;
+  try {
+    fx = await connect();
+  } catch {
+    setLegal(STRINGS[uiLang(navigator.language)]);
+    setStatus(STRINGS[uiLang(navigator.language)].notInFilex, true);
+    return;
+  }
+  phase('connected');
+  const s = fx.session;
+  const t = STRINGS[uiLang(s.locale)];
+  setLegal(t);
+  const info = s.files?.[0];
+  const kind = kindOf(info?.ext);
+  if (!info || !kind) {
+    setStatus(t.unsupported(info?.ext ?? '?'), true);
+    return;
+  }
+  setStatus(t.opening(info.name));
+  const canEdit = !info.readOnly;
+
+  const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
+  const app = new OfficeApp(fx, t, kind, x2t, canEdit);
+  const key = randomKey();
+
+  // The document is read and converted while the editor loads.
+  void x2t.started().then(() => phase('x2t-ready'), () => {});
+  const converted = readDocument(fx, kind).then((bytes) => {
+    phase('read');
+    return x2t.convert(kind.ext, 'bin', bytes);
+  });
+
+  try {
+    adaptEditorOrigin();
+    await loadScript(new URL('editor/web-apps/apps/api/documents/api.js', BASE).href);
+    const docsApi = (window as unknown as DocsApiWindow).DocsAPI;
+    if (!docsApi) throw new Error('api.js did not define DocsAPI');
+    const config = editorConfig({
+      kind,
+      title: info.name,
+      key,
+      locale: s.locale,
+      dark: s.theme?.mode === 'dark',
+      userName: s.user?.name || 'filex',
+      canEdit,
+      events: {
+        onAppReady: () => phase('editor-app-ready'),
+        onDocumentReady: () => {
+          phase('ready');
+          setStatus(null);
+        },
+        onDocumentStateChange: (e) => app.onEditorState(e.data === true),
+        onError: (e) => {
+          const d = e.data as { errorCode?: number; errorDescription?: string } | undefined;
+          console.warn('[office-editor] editor error', d);
+        },
+      },
+    });
+    new docsApi.DocEditor('fx-editor', config);
+    fx.on('theme', (th) => app.link.send({ t: 'theme', dark: (th as { mode?: string })?.mode === 'dark' }));
+
+    const doc = await converted;
+    phase('converted');
+    const open: OpenMessage = {
+      t: 'open',
+      editorType: kind.editorType,
+      bin: doc.bytes,
+      media: doc.media,
+      name: s.user?.name || 'filex',
+      canEdit,
+      key,
+    };
+    app.link.send(open, [doc.bytes, ...doc.media.map((m) => m.bytes)]);
+  } catch (e) {
+    phase('failed');
+    setStatus(t.openFailed(reason(e)), true);
+    return;
+  }
+
+  if (canEdit) {
+    fx.onSave(async () => {
+      await app.save();
+    });
+    setInterval(() => app.tick(), 30_000);
+  }
+}
+
+void main();

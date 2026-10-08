@@ -35,14 +35,14 @@ export interface X2tModule {
   ccall(name: string, returnType: string, argTypes: string[], args: unknown[]): unknown;
 }
 
-/** What x2t converts between here: the three office formats and the editor's own. */
-export type X2tFormat = 'docx' | 'xlsx' | 'pptx' | 'bin';
+/** What x2t converts between here: the office formats (OOXML and their OpenDocument kin) and the editor's own. */
+export type X2tFormat = 'docx' | 'xlsx' | 'pptx' | 'odt' | 'ods' | 'odp' | 'bin';
 
 export const X2T_DIR = '/working';
 const MEDIA_DIR = `${X2T_DIR}/media`;
 const PARAMS = `${X2T_DIR}/params.xml`;
 const MEDIA_NAME = /^[A-Za-z0-9._-]{1,128}$/;
-const FORMATS: readonly string[] = ['docx', 'xlsx', 'pptx', 'bin'];
+const FORMATS: readonly string[] = ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'bin'];
 
 export class X2tError extends Error {
   constructor(

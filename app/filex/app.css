@@ -1,0 +1,93 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 BRF Tech. Part of filex-office-editor (see README.md and NOTICE).
+   The app page around ONLYOFFICE's editor: the editor fills it, a thin line
+   at the bottom says whose work the editor is. Colours are filex's (the SDK
+   puts --fe-* on <html>), with plain fallbacks. */
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--fe-bg, #fff);
+  color: var(--fe-text, #1f2328);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+html[data-theme="dark"] {
+  background: var(--fe-bg, #1b1b1f);
+  color: var(--fe-text, #e6e6e6);
+}
+#fx-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+#fx-editor-box {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#fx-editor-box iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+#fx-legal {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--fe-text-muted, #6e7781);
+  border-top: 1px solid var(--fe-border, rgba(127, 127, 127, 0.25));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+#fx-legal:hover, #fx-legal:focus-within {
+  white-space: normal;
+}
+#fx-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--fe-bg, #fff);
+  text-align: center;
+  z-index: 2;
+}
+html[data-theme="dark"] #fx-status {
+  background: var(--fe-bg, #1b1b1f);
+}
+#fx-status[hidden] {
+  display: none;
+}
+#fx-status p {
+  margin: 0;
+  max-width: 40em;
+}
+#fx-status.fx-error .fx-spin {
+  display: none;
+}
+#fx-status.fx-error p {
+  color: var(--fe-danger, #cf222e);
+}
+.fx-spin {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--fe-border, rgba(127, 127, 127, 0.3));
+  border-top-color: var(--fe-accent, #2f6feb);
+  animation: fx-spin 0.9s linear infinite;
+}
+@keyframes fx-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-spin { animation-duration: 3s; }
+}

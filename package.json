@@ -10,9 +10,14 @@
     "test:x2t": "node scripts/fetch-x2t.mjs && vitest run tests/x2t-wasm.test.ts",
     "typecheck": "tsc -p tsconfig.json",
     "x2t": "node scripts/fetch-x2t.mjs",
-    "editor": "bash scripts/extract-editor.sh"
+    "editor": "bash scripts/extract-editor.sh",
+    "build": "node scripts/build-app.mjs",
+    "e2e": "node e2e/run.mjs"
   },
   "devDependencies": {
+    "@brftech/filex-app-ui": "0.53.0",
+    "esbuild": "0.25.11",
+    "playwright-core": "1.59.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   },

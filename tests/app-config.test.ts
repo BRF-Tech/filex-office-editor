@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Tests for filex-office-editor (see README.md and NOTICE).
+//
+// What the app page tells ONLYOFFICE's editor (src/app/config.ts), and the
+// small rules of the editor page's script (src/frame): the template names,
+// the themes path, the Save kept while the editor is busy, the workers.
+import { describe, expect, it, vi } from 'vitest';
+
+import { editorConfig, editorLang, editorRegion, kindOf, uiLang, THEME_DARK, THEME_LIGHT } from '../src/app/config';
+import { STRINGS } from '../src/app/strings';
+import { EDITOR_USER_ID, isFrameHello, isFramePort, mediaType, FRAME_HELLO, FRAME_PORT } from '../src/frame-protocol';
+import { SaveRetry } from '../src/frame/save-retry';
+import { templateUrl } from '../src/frame/text';
+import { trimThemesPath } from '../src/frame/themes-path';
+import { InertWorker, SPELL_ENGINE } from '../src/frame/workers';
+
+describe('the kind of document', () => {
+  it('by extension, with or without the dot, in any case', () => {
+    expect(kindOf('docx')).toMatchObject({ documentType: 'word', editorType: 0 });
+    expect(kindOf('.XLSX')).toMatchObject({ documentType: 'cell', editorType: 1 });
+    expect(kindOf('pptx')).toMatchObject({ documentType: 'slide', editorType: 2 });
+    expect(kindOf('odt')).toMatchObject({ documentType: 'word', blank: '' });
+    for (const no of ['pdf', 'doc', '', null, undefined, 'docx.exe', 'constructor', '__proto__']) expect(kindOf(no as string)).toBeNull();
+  });
+
+  it('a blank document for each OOXML kind, in the bundle as the manifest names it', () => {
+    expect(kindOf('docx')!.blank).toBe('editor/document-templates/new/default/new.docx.bin');
+    expect(kindOf('xlsx')!.blank).toBe('editor/document-templates/new/default/new.xlsx.bin');
+    expect(kindOf('pptx')!.blank).toBe('editor/document-templates/new/default/new.pptx.bin');
+  });
+});
+
+describe('languages', () => {
+  it("the app's words: Turkish for tr*, English otherwise", () => {
+    expect(uiLang('tr')).toBe('tr');
+    expect(uiLang('tr-TR')).toBe('tr');
+    expect(uiLang('en-GB')).toBe('en');
+    expect(uiLang('trk')).toBe('en');
+    expect(uiLang(undefined)).toBe('en');
+  });
+
+  it("the editor's language and region", () => {
+    expect(editorLang('tr')).toBe('tr');
+    expect(editorLang('pt-BR')).toBe('pt');
+    expect(editorLang('')).toBe('en');
+    expect(editorRegion('tr')).toBe('tr-TR');
+    expect(editorRegion('pt-br')).toBe('pt-BR');
+    expect(editorRegion('en')).toBe('en-US');
+    expect(editorRegion('nonsense!')).toBe('en-US');
+  });
+
+  it('the legal line names ONLYOFFICE, says the version is modified, and where the source is - in both languages', () => {
+    const o = { version: '9.4.0', build: 129, tag: 'v9.4.0.129', app: '0.1.0' };
+    for (const t of [STRINGS.en, STRINGS.tr]) {
+      const line = t.legal(o);
+      expect(line).toMatch(/ONLYOFFICE Docs/);
+      expect(line).toMatch(/Ascensio System SIA/);
+      expect(line).toMatch(/v9\.4\.0\.129/);
+      expect(line).toMatch(/github\.com\/BRF-Tech\/filex-office-editor/);
+      expect(line).toMatch(/ONLYOFFICE®/);
+      expect(line).toMatch(/AGPL/);
+      expect(line).toContain('github.com/BRF-Tech/filex-office-editor/tree/v0.1.0');
+    }
+    // A build between releases has no tag of its own: the repository.
+    expect(STRINGS.en.legal({ ...o, app: '0.0.0' })).toMatch(/source code: github\.com\/BRF-Tech\/filex-office-editor\. /);
+    expect(STRINGS.tr.legal(o)).toMatch(/değiştirilmiş olabilir/);
+    expect(STRINGS.en.legal(o)).toMatch(/may have been modified/);
+  });
+});
+
+describe('the editor configuration', () => {
+  const base = { kind: kindOf('docx')!, title: 'Rapor.docx', key: 'k1', locale: 'tr', dark: false, userName: 'Ayşe', canEdit: true };
+
+  it('edits in fast co-editing with Save going to the bridge, as the user the bridge expects', () => {
+    const c = editorConfig(base) as any;
+    expect(c.documentType).toBe('word');
+    expect(c.document).toMatchObject({ fileType: 'docx', key: 'k1', title: 'Rapor.docx' });
+    expect(c.document.url).toBe('filex:document');
+    expect(c.editorConfig).toMatchObject({ mode: 'edit', lang: 'tr', region: 'tr-TR', coEditing: { mode: 'fast', change: false } });
+    expect(c.editorConfig.user).toEqual({ id: EDITOR_USER_ID, name: 'Ayşe' });
+    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: false, help: false, feedback: false, goback: false, uiTheme: THEME_LIGHT });
+    expect(c.editorConfig.customization.features.spellcheck).toEqual({ mode: false, change: false });
+    expect(c.document.permissions).toMatchObject({ edit: true, download: false, chat: false });
+    expect(c.editorConfig.customization.chat).toBeUndefined();
+  });
+
+  it('a file that cannot be saved opens to read, and the dark theme follows filex', () => {
+    const c = editorConfig({ ...base, canEdit: false, dark: true }) as any;
+    expect(c.editorConfig.mode).toBe('view');
+    expect(c.document.permissions).toMatchObject({ edit: false, review: false, comment: false });
+    expect(c.editorConfig.customization.uiTheme).toBe(THEME_DARK);
+  });
+});
+
+describe('the frame protocol', () => {
+  it('knows its hello and its port, and nothing else', () => {
+    expect(isFrameHello({ type: FRAME_HELLO, v: 1 })).toBe(true);
+    expect(isFrameHello({ type: FRAME_HELLO, v: 2 })).toBe(false);
+    expect(isFrameHello({ type: 'filex:hello', v: 1 })).toBe(false);
+    expect(isFramePort({ type: FRAME_PORT, v: 1 })).toBe(true);
+    expect(isFramePort('x')).toBe(false);
+  });
+
+  it('gives an image blob its type by extension', () => {
+    expect(mediaType('image1.png')).toBe('image/png');
+    expect(mediaType('a.JPEG')).toBe('image/jpeg');
+    expect(mediaType('x.emf')).toBe('image/emf');
+    expect(mediaType('noext')).toBe('application/octet-stream');
+  });
+});
+
+describe('the editor page', () => {
+  it('asks for an interface template under the name the bundle serves it with', () => {
+    expect(templateUrl('../../documenteditor/main/app/template/X.template')).toBe('../../documenteditor/main/app/template/X.template.txt');
+    expect(templateUrl('a/X.template?_dc=1')).toBe('a/X.template.txt?_dc=1');
+    expect(templateUrl('a/X.template.txt')).toBe('a/X.template.txt');
+    expect(templateUrl('a/locale/tr.json')).toBe('a/locale/tr.json');
+  });
+
+  it('gives the presentation editor its themes folder without the trailing slash', () => {
+    const calls: unknown[] = [];
+    const win: Record<string, unknown> = {};
+    trimThemesPath(win);
+    const api = { SetThemesPath: (p: unknown) => calls.push(p) };
+    win.editor = api;
+    (win.editor as typeof api).SetThemesPath('../../../../sdkjs/slide/themes/');
+    expect(calls).toEqual(['../../../../sdkjs/slide/themes']);
+    expect(win.editor).toBe(api);
+  });
+
+  it('keeps a Save the editor dropped and makes it when the editor is free', () => {
+    vi.useFakeTimers();
+    try {
+      const r = new SaveRetry();
+      const calls: (boolean | undefined)[] = [];
+      const api = {
+        canSave: false,
+        asc_Save(isAutoSave?: boolean) {
+          calls.push(isAutoSave);
+        },
+      };
+      r.attach(api);
+      api.asc_Save(); // dropped by the editor: a hand-over runs
+      vi.advanceTimersByTime(1000);
+      expect(calls).toEqual([undefined]);
+      api.canSave = true;
+      r.seen('unSaveLock');
+      vi.advanceTimersByTime(60);
+      expect(calls).toEqual([undefined, undefined]);
+      r.sent('forceSaveStart');
+      vi.advanceTimersByTime(5000);
+      expect(calls.length).toBe(2);
+      // An autosave is not the person's: nothing is kept for it.
+      api.asc_Save(true);
+      vi.advanceTimersByTime(5000);
+      expect(calls).toEqual([undefined, undefined, true]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives the spell checker's engine a worker that does nothing", () => {
+    expect(SPELL_ENGINE.test('https://f.example/_appui/office-editor/abc/editor/sdkjs/common/spell/spell/spell.js')).toBe(true);
+    expect(SPELL_ENGINE.test('https://f.example/_appui/office-editor/abc/x2t/x2t.js')).toBe(false);
+    const w = new InertWorker();
+    expect(() => w.postMessage()).not.toThrow();
+    expect(() => w.terminate()).not.toThrow();
+  });
+});
