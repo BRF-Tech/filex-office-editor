@@ -17,7 +17,10 @@
 //      asked for (frame/export.ts), x2t writes it, filex hands it to the
 //      person (ui.download) or prints it;
 //   6. the editor's settings: kept in filex's store for this app
-//      (state.get/set, settings.ts) and given back at the next opening.
+//      (state.get/set, settings.ts) and given back at the next opening;
+//   7. on a phone: ONLYOFFICE's phone app to read (it only reads, see
+//      config.ts phoneLayout), and "Edit" / "Reading view" to switch to the
+//      editor (folded) and back, with the document as it is.
 //
 // One person, one document (plan step A3). Nothing leaves the browser but
 // the saves, the files the person asks for and the settings, and those go
@@ -38,9 +41,9 @@ import {
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
-import { NARROW_PX, editorConfig, kindOf, uiLang, type Kind } from './config';
+import { NARROW_PX, editorConfig, isPhone, kindOf, uiLang, type Kind, type View } from './config';
 import { STRINGS, type Strings } from './strings';
-import { X2tClient } from './x2t-client';
+import { X2tClient, type Converted } from './x2t-client';
 
 declare const __OO_BUILD__: { version: string; number: number };
 declare const __OO_SOURCE_TAG__: string;
@@ -57,8 +60,13 @@ const NOT_OFFERED = new Set(['unknown_method', 'unavailable']);
 
 const BASE = new URL('.', document.baseURI).href;
 
+/** What api.js's DocsAPI.DocEditor gives back: the app uses only its end. */
+interface DocEditor {
+  destroyEditor?: () => void;
+}
+
 interface DocsApiWindow {
-  DocsAPI?: { DocEditor: new (placeholder: string, config: Record<string, unknown>) => unknown };
+  DocsAPI?: { DocEditor: new (placeholder: string, config: Record<string, unknown>) => DocEditor };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +183,23 @@ class FrameLink {
     else this.outbox.push({ m, transfer });
   }
 
+  /**
+   * The editor's frame is being replaced (the person switched between the
+   * phone app and the editor): forget its port and what was waiting for it,
+   * so the next frame's hello gets a port of its own.
+   */
+  reset(): void {
+    try {
+      this.port?.close();
+    } catch {
+      // Closed already.
+    }
+    this.port = null;
+    this.outbox.splice(0);
+    for (const [id, done] of [...this.snapshots]) done({ t: 'snapshot', id, error: 'the editor was closed' });
+    this.snapshots.clear();
+  }
+
   snapshot(): Promise<SnapshotResult> {
     const id = ++this.seq;
     return new Promise((resolve) => {
@@ -212,6 +237,8 @@ class OfficeApp {
   private keptSettings: Settings = {};
   private nextSettings: Settings | null = null;
   private settingsTimer: ReturnType<typeof setTimeout> | null = null;
+  /** What the app shows (config.ts View): the phone app only reads; the editor edits a file that can be written. */
+  view: View = 'editor';
 
   constructor(
     private readonly fx: FilexApp,
@@ -228,6 +255,40 @@ class OfficeApp {
   giveSettings(values: Settings): void {
     this.keptSettings = values;
     this.link.send({ t: 'settings', values });
+  }
+
+  /** The kept settings again, as they are now, for the next editor page (after a switch). */
+  resendSettings(): void {
+    this.keepSettings();
+    this.link.send({ t: 'settings', values: this.keptSettings });
+  }
+
+  /** A save can be made: the file can be written and the editor (not the phone app, which reads) holds it. */
+  private get editing(): boolean {
+    return this.canEdit && this.view === 'editor';
+  }
+
+  /** The editor's frame was replaced by one showing `view`: what the old one had in hand is gone with it. */
+  frameReplaced(view: View): void {
+    this.view = view;
+    this.frameDirty = false;
+    this.editorDirty = false;
+    for (const w of this.settleWaiters.splice(0)) w();
+    this.updateDirty();
+  }
+
+  /**
+   * The document as the editor holds it now, as Editor.bin again - what the
+   * phone app opens when the person goes back to reading. Unsaved changes
+   * are saved first (the editor that holds them is about to go).
+   */
+  async current(): Promise<Converted> {
+    if (this.shownDirty || this.editorDirty) await this.save();
+    await this.settle();
+    const snap = await this.link.snapshot();
+    if (snap.error || typeof snap.bin !== 'string') throw new Error(snap.error ?? 'no document');
+    const file = await this.x2t.convert('bin', this.kind.ext, snap.bin, snap.media ?? []);
+    return this.x2t.convert(this.kind.ext, 'bin', file.bytes);
   }
 
   private settingsChanged(values: Settings): void {
@@ -267,6 +328,9 @@ class OfficeApp {
         return;
       case 'notice':
         console.warn('[office-editor]', m.what, m.detail ?? '');
+        // A format x2t does not write here, or a server command: the phone
+        // app's Download lists every format a Document Server writes.
+        if (m.what === 'export-refused') this.fx.toast(this.t.notAvailable, 'info');
         return;
     }
   }
@@ -279,7 +343,7 @@ class OfficeApp {
   }
 
   private updateDirty(): void {
-    const dirty = this.canEdit && (this.frameDirty || this.editorDirty);
+    const dirty = this.editing && (this.frameDirty || this.editorDirty);
     if (dirty === this.shownDirty) return;
     this.shownDirty = dirty;
     this.fx.dirty(dirty);
@@ -299,7 +363,7 @@ class OfficeApp {
 
   /** Write the document as the editor holds it now, as a new version of the file. One at a time. */
   save(): Promise<void> {
-    if (!this.canEdit) return Promise.resolve();
+    if (!this.editing) return Promise.resolve();
     if (this.saving) return this.saving;
     const run = (async () => {
       let through = 0;
@@ -404,7 +468,15 @@ async function main(): Promise<void> {
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
-  const key = randomKey();
+  const userName = s.user?.name || 'filex';
+  let dark = s.theme?.mode === 'dark';
+  // A phone opens ONLYOFFICE's phone app, to read (config.ts phoneLayout);
+  // "Edit" switches to the editor, folded. Decided once, at the opening.
+  const phone = isPhone({
+    width: window.innerWidth,
+    coarsePointer: typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
+    touchPoints: typeof navigator.maxTouchPoints === 'number' ? navigator.maxTouchPoints : 0,
+  });
 
   // The editor's kept settings: the editor page holds the editor's start for them.
   fx.state
@@ -421,23 +493,39 @@ async function main(): Promise<void> {
     return x2t.convert(kind.ext, 'bin', bytes);
   });
 
+  let docsApi: NonNullable<DocsApiWindow['DocsAPI']>;
   try {
     adaptEditorOrigin();
     await loadScript(new URL('editor/web-apps/apps/api/documents/api.js', BASE).href);
-    const docsApi = (window as unknown as DocsApiWindow).DocsAPI;
-    if (!docsApi) throw new Error('api.js did not define DocsAPI');
+    const api = (window as unknown as DocsApiWindow).DocsAPI;
+    if (!api) throw new Error('api.js did not define DocsAPI');
+    docsApi = api;
+  } catch (e) {
+    phase('failed');
+    setStatus(t.openFailed(reason(e)), true);
+    return;
+  }
+
+  /** The editor (or the phone app) on screen now. */
+  let editor: DocEditor | null = null;
+
+  /** Start ONLYOFFICE's editor (`view` "editor") or its phone app ("reader"); returns the document key of this frame. */
+  const start = (view: View): string => {
+    const key = randomKey();
+    document.documentElement.dataset.fxView = view;
     const config = editorConfig({
       kind,
       title: info.name,
       key,
       locale: s.locale,
-      dark: s.theme?.mode === 'dark',
-      userName: s.user?.name || 'filex',
+      dark,
+      userName,
       canEdit,
       canDownload,
       // Print needs filex's print or, where filex has none, a download.
       canPrint: canDownload,
       narrow: window.innerWidth > 0 && window.innerWidth < NARROW_PX,
+      phone: view === 'reader',
       events: {
         onAppReady: () => phase('editor-app-ready'),
         onDocumentReady: () => {
@@ -451,26 +539,99 @@ async function main(): Promise<void> {
         },
       },
     });
-    new docsApi.DocEditor('fx-editor', config);
-    fx.on('theme', (th) => app.link.send({ t: 'theme', dark: (th as { mode?: string })?.mode === 'dark' }));
+    editor = new docsApi.DocEditor('fx-editor', config);
+    return key;
+  };
 
-    const doc = await converted;
-    phase('converted');
+  /** Hand the editor page of this frame a copy of the document (the app keeps its own for a switch). */
+  const handOver = (doc: Converted, key: string): void => {
+    const media = doc.media.map((m) => ({ name: m.name, bytes: m.bytes.slice(0) }));
     const open: OpenMessage = {
       t: 'open',
       editorType: kind.editorType,
-      bin: doc.bytes,
-      media: doc.media,
-      name: s.user?.name || 'filex',
-      canEdit,
+      bin: doc.bytes.slice(0),
+      media,
+      name: userName,
+      // The phone app reads only; the bridge then lets no change in either.
+      canEdit: canEdit && app.view === 'editor',
       key,
     };
-    app.link.send(open, [doc.bytes, ...doc.media.map((m) => m.bytes)]);
+    app.link.send(open, [open.bin, ...media.map((m) => m.bytes)]);
+  };
+
+  app.frameReplaced(phone ? 'reader' : 'editor');
+  let key: string;
+  /** The document as the app last converted it: what the next frame is given. */
+  let latest: Converted;
+  try {
+    key = start(app.view);
+    fx.on('theme', (th) => {
+      dark = (th as { mode?: string })?.mode === 'dark';
+      app.link.send({ t: 'theme', dark });
+    });
+    latest = await converted;
+    phase('converted');
+    handOver(latest, key);
   } catch (e) {
     phase('failed');
     setStatus(t.openFailed(reason(e)), true);
     return;
   }
+
+  // ---- The switch between the phone app and the editor (a phone, a file that can be written).
+  const button = el('fx-switch') as HTMLButtonElement;
+  const showSwitch = (): void => {
+    if (!phone || !canEdit) {
+      button.hidden = true;
+      return;
+    }
+    const reading = app.view === 'reader';
+    button.hidden = false;
+    button.dataset.view = app.view;
+    button.textContent = reading ? t.edit : t.read;
+    button.title = reading ? t.editHint : t.readHint;
+  };
+  let switching = false;
+  const switchTo = async (view: View): Promise<void> => {
+    if (switching || view === app.view) return;
+    switching = true;
+    button.disabled = true;
+    let doc: Converted;
+    try {
+      // Back to reading: the document as the editor holds it, saved first.
+      // To the editor: the phone app changed nothing, the last one stands.
+      doc = view === 'reader' ? await app.current() : latest;
+    } catch (e) {
+      fx.toast(t.switchFailed(reason(e)), 'error');
+      switching = false;
+      button.disabled = false;
+      return;
+    }
+    phase('switching');
+    setStatus(t.opening(info.name));
+    try {
+      app.keepSettings();
+      editor?.destroyEditor?.();
+      editor = null;
+      app.link.reset();
+      app.frameReplaced(view);
+      latest = doc;
+      key = start(view);
+      app.resendSettings();
+      handOver(latest, key);
+      showSwitch();
+    } catch (e) {
+      phase('failed');
+      setStatus(t.openFailed(reason(e)), true);
+    } finally {
+      switching = false;
+      button.disabled = false;
+    }
+  };
+  button.addEventListener('click', () => {
+    void switchTo(app.view === 'reader' ? 'editor' : 'reader');
+  });
+  showSwitch();
 
   if (canEdit) {
     fx.onSave(async () => {

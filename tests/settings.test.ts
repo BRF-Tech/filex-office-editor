@@ -18,6 +18,20 @@ describe('which settings are kept', () => {
     }
   });
 
+  it("the phone app's settings too (all under mobile-), but its theme, its dark document and its direction", () => {
+    for (const k of ['mobile-de-settings-zoom', 'mobile-de-mobile-settings-unit', 'mobile-sse-settings-zoom', 'mobile-de-view-review-mode']) {
+      expect(keptSetting(k), k).toBe(true);
+    }
+    for (const k of ['mobile-ui-theme-client', 'mobile-content-theme', 'mobile-mode-direction']) expect(keptSetting(k), k).toBe(false);
+    // One set for both apps: a page reports the other app's kept keys with its own.
+    const both = pickSettings([
+      ['de-settings-unit', '1'],
+      ['mobile-de-settings-zoom', '120'],
+      ['mobile-ui-theme-client', '{"id":"theme-dark","type":"dark"}'],
+    ]);
+    expect(both).toEqual({ 'de-settings-unit': '1', 'mobile-de-settings-zoom': '120' });
+  });
+
   it('only short values, in key order, so the same settings are the same JSON', () => {
     const got = pickSettings([
       ['de-z', '1'],

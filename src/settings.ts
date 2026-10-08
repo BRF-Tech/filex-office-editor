@@ -35,9 +35,24 @@ export const SETTING_MAX_CHARS = 1024;
  *     over filex's;
  *   - the right-to-left switch, which the editor page reads in its first
  *     lines, before kept settings can reach it;
- *   - the probes the editor and its page write to see whether storage works.
+ *   - the probes the editor and its page write to see whether storage works;
+ *   - the same for ONLYOFFICE's phone app, whose keys all start with
+ *     "mobile-": its theme (its page reads mobile-ui-theme-client first),
+ *     the document's dark colours, the right-to-left switch.
+ * Every other key of either app is kept, in the one set: the phone app's
+ * page and the editor's page are given the same settings and report all of
+ * them, so neither drops the other's.
  */
-const NOT_KEPT = new Set(['ui-theme', 'ui-theme-id', 'content-theme', 'test', 'settings-ui-rtl']);
+const NOT_KEPT = new Set([
+  'ui-theme',
+  'ui-theme-id',
+  'content-theme',
+  'test',
+  'settings-ui-rtl',
+  'mobile-ui-theme-client',
+  'mobile-content-theme',
+  'mobile-mode-direction',
+]);
 
 /** Whether the editor's `key` is a setting worth keeping. */
 export function keptSetting(key: string): boolean {

@@ -6,9 +6,24 @@
 // the themes path, the Save kept while the editor is busy, the workers.
 import { describe, expect, it, vi } from 'vitest';
 
-import { NARROW_PX, editorConfig, editorLang, editorRegion, kindOf, narrowLayout, uiLang, THEME_DARK, THEME_LIGHT } from '../src/app/config';
+import {
+  NARROW_PX,
+  PHONE_THEME_DARK,
+  PHONE_THEME_LIGHT,
+  editorConfig,
+  editorLang,
+  editorRegion,
+  isPhone,
+  kindOf,
+  narrowLayout,
+  phoneLayout,
+  uiLang,
+  THEME_DARK,
+  THEME_LIGHT,
+} from '../src/app/config';
 import { STRINGS } from '../src/app/strings';
 import { EDITOR_USER_ID, isFrameHello, isFramePort, mediaType, FRAME_HELLO, FRAME_PORT } from '../src/frame-protocol';
+import { HELD_SCRIPTS, holdScripts } from '../src/frame/hold';
 import { SaveRetry } from '../src/frame/save-retry';
 import { templateUrl } from '../src/frame/text';
 import { trimThemesPath } from '../src/frame/themes-path';
@@ -116,6 +131,49 @@ describe('the editor configuration', () => {
   });
 });
 
+describe('on a phone', () => {
+  const base = { kind: kindOf('docx')!, title: 'Rapor.docx', key: 'k1', locale: 'tr', dark: false, userName: 'Ayşe', canEdit: true };
+
+  it('a narrow touch screen is a phone; a narrow window with a mouse, or a wide tablet, is not', () => {
+    expect(isPhone({ width: 390, coarsePointer: true, touchPoints: 5 })).toBe(true);
+    expect(isPhone({ width: 390, coarsePointer: false, touchPoints: 1 })).toBe(true);
+    expect(isPhone({ width: 390, coarsePointer: true, touchPoints: 0 })).toBe(true);
+    expect(isPhone({ width: 390, coarsePointer: false, touchPoints: 0 })).toBe(false);
+    expect(isPhone({ width: NARROW_PX, coarsePointer: true, touchPoints: 5 })).toBe(false);
+    expect(isPhone({ width: 820, coarsePointer: true, touchPoints: 5 })).toBe(false);
+    expect(isPhone({ width: 0, coarsePointer: true, touchPoints: 5 })).toBe(false);
+  });
+
+  it("opens ONLYOFFICE's phone app, to read, with its own theme names", () => {
+    const c = editorConfig({ ...base, phone: true, narrow: true, canDownload: true, canPrint: true }) as any;
+    expect(c.type).toBe('mobile');
+    // The open-source phone app only reads: in edit mode it says a commercial licence is needed.
+    expect(c.editorConfig.mode).toBe('view');
+    expect(c.document.permissions).toMatchObject({ edit: false, review: false, comment: false, download: true, print: true });
+    expect(c.document.permissions.userInfoGroups).toEqual(['']);
+    expect(c.editorConfig.customization.uiTheme).toBe(PHONE_THEME_LIGHT);
+    expect(c.editorConfig.customization.mobile).toEqual({ forceView: true, disableForceDesktop: true });
+    expect(c.editorConfig.customization).toMatchObject(phoneLayout());
+    // Not folded: that is the editor's, and the phone app has its own layout.
+    for (const k of Object.keys(narrowLayout())) expect(c.editorConfig.customization[k]).toBeUndefined();
+    // Nothing that would reach a server, as for the editor.
+    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: false, help: false, feedback: false, goback: false });
+    const night = editorConfig({ ...base, phone: true, dark: true }) as any;
+    expect(night.editorConfig.customization.uiTheme).toBe(PHONE_THEME_DARK);
+  });
+
+  it('the editor stays the desktop one everywhere else, folded when narrow (a phone after "Edit" too)', () => {
+    const wide = editorConfig(base) as any;
+    const narrow = editorConfig({ ...base, narrow: true, phone: false }) as any;
+    expect(wide.type).toBe('desktop');
+    expect(narrow.type).toBe('desktop');
+    expect(narrow.editorConfig.mode).toBe('edit');
+    expect(narrow.editorConfig.customization).toMatchObject(narrowLayout());
+    expect(narrow.editorConfig.customization.mobile).toBeUndefined();
+    expect(narrow.editorConfig.customization.uiTheme).toBe(THEME_LIGHT);
+  });
+});
+
 describe('the frame protocol', () => {
   it('knows its hello and its port, and nothing else', () => {
     expect(isFrameHello({ type: FRAME_HELLO, v: 1 })).toBe(true);
@@ -181,6 +239,51 @@ describe('the editor page', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("holds the phone app's sdkjs scripts until the kept settings are in, in order, and lets the rest through", async () => {
+    const added: string[] = [];
+    const proto = {
+      appendChild<T>(n: T): T {
+        const x = n as unknown as { src?: string; tagName: string };
+        added.push(x.src ?? x.tagName);
+        return n;
+      },
+    };
+    const body = Object.create(proto) as typeof proto;
+    let open: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const B = 'https://f.example/_appui/office-editor/abc/editor/';
+    expect(holdScripts(body as never, ready)).toBe(true);
+    body.appendChild({ tagName: 'script', src: `${B}web-apps/vendor/xregexp/xregexp-all-min.js` });
+    body.appendChild({ tagName: 'SCRIPT', src: `${B}sdkjs/common/AllFonts.js` });
+    body.appendChild({ tagName: 'DIV' });
+    body.appendChild({ tagName: 'script', src: `${B}sdkjs/word/sdk-all-min.js` });
+    expect(added).toEqual([`${B}web-apps/vendor/xregexp/xregexp-all-min.js`, 'DIV']);
+    open();
+    await ready;
+    await Promise.resolve();
+    expect(added).toEqual([`${B}web-apps/vendor/xregexp/xregexp-all-min.js`, 'DIV', `${B}sdkjs/common/AllFonts.js`, `${B}sdkjs/word/sdk-all-min.js`]);
+    // The page's own appendChild is back.
+    expect(Object.prototype.hasOwnProperty.call(body, 'appendChild')).toBe(false);
+    body.appendChild({ tagName: 'script', src: `${B}sdkjs/slide/sdk-all-min.js` });
+    expect(added[added.length - 1]).toBe(`${B}sdkjs/slide/sdk-all-min.js`);
+  });
+
+  it('lets the held scripts go when the wait fails too, and holds nothing without a parent', async () => {
+    const added: string[] = [];
+    const body = { appendChild: <T>(n: T): T => (added.push((n as unknown as { src: string }).src), n) };
+    const ready = Promise.reject(new Error('no settings'));
+    holdScripts(body as never, ready);
+    body.appendChild({ tagName: 'script', src: 'x/sdkjs/cell/sdk-all-min.js' });
+    expect(added).toEqual([]);
+    await ready.catch(() => {});
+    await Promise.resolve();
+    expect(added).toEqual(['x/sdkjs/cell/sdk-all-min.js']);
+    expect(holdScripts(null, Promise.resolve())).toBe(false);
+    expect(HELD_SCRIPTS.test('https://f.example/editor/web-apps/vendor/socketio/socket.io.min.js')).toBe(false);
   });
 
   it("gives the spell checker's engine a worker that does nothing", () => {
