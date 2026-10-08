@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Once a week: is there an ONLYOFFICE Docs release newer than the one the
+# editor files are taken from (upstream/onlyoffice.json)? If there is, one
+# issue is opened for it, and never a second one for the same version, even
+# after the first is closed. The logic is scripts/upstream-watch.mjs; it runs
+# the same way on a laptop with --dry-run.
+#
+# The only credential is the run's own GITHUB_TOKEN, allowed to read the
+# repository and to write issues - nothing else.
+#
+# GitHub turns a scheduled workflow off after 60 days without activity in a
+# public repository; the Actions tab turns it back on.
+
+name: Upstream watch
+
+on:
+  schedule:
+    # Mondays 06:23 UTC (an odd minute: the top of the hour is GitHub's busiest).
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Read everything, open no issue
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+jobs:
+  onlyoffice:
+    name: ONLYOFFICE Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare with upstream/onlyoffice.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          node --version
+          node scripts/upstream-watch.mjs

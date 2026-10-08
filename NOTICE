@@ -40,12 +40,15 @@ its code carries over.
    DocsCoServer.js, 9.4), so the editor runs unchanged.
 
 3. The editor files a release bundle will carry (web-apps, sdkjs, the fonts)
-   and the x2t WebAssembly build (ONLYOFFICE core) are ONLYOFFICE's, built
-   from their published sources at a pinned tag, under ONLYOFFICE's license
-   (AGPL-3.0 with additional terms). The bundle will name each with its tag
-   and checksum, keep every copyright, license and origin notice they ship,
-   and list here every file this project changes, with the date. No release
-   bundle exists yet.
+   are ONLYOFFICE's, taken from ONLYOFFICE's official Document Server image
+   (docker.io/onlyoffice/documentserver) at the release, image tag and
+   digest pinned in upstream/onlyoffice.json - today ONLYOFFICE Docs 9.4.0,
+   build 9.4.0.129; their source is ONLYOFFICE's sdkjs and web-apps at tag
+   v9.4.0.129. The x2t WebAssembly build is ONLYOFFICE's too (ONLYOFFICE
+   core). All of it is under ONLYOFFICE's license (AGPL-3.0 with additional
+   terms). The bundle will name each with its tag and checksum, keep every
+   copyright, license and origin notice they ship, and list here every file
+   this project changes, with the date. No release bundle exists yet.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:

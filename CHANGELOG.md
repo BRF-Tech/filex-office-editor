@@ -24,6 +24,13 @@ update.
   xlsx and pptx, and the platform permissions the app will ask filex for.
 - `NOTICE`: the licensing, what is based on ONLYOFFICE, the legal notice
   the editor will show, the trademark line.
+- `upstream/onlyoffice.json` pins the ONLYOFFICE Docs release the editor
+  files are taken from: 9.4.0 (build 9.4.0.129), the official Document
+  Server image `onlyoffice/documentserver:9.4.0.1` by its digest.
+- A weekly GitHub Actions workflow, the upstream watch
+  (`scripts/upstream-watch.mjs`), compares the pin with ONLYOFFICE's newest
+  release and opens one issue per newer version, never a second one for the
+  same version. It uses only the run's own `GITHUB_TOKEN` (issues: write).
 
 ### Changed
 

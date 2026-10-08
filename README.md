@@ -24,10 +24,11 @@ server ever reads it.
 > WebAssembly build, the app's page and the release bundle come with the next
 > steps, and the app needs platform features filex gains in 0.55
 > ([What filex provides](#what-filex-provides)). `filex-app.json` is a draft.
+> The first release, 0.1.0, brings all of it at once ([Roadmap](#roadmap)).
 
 | | |
 |---|---|
-| Based on | ONLYOFFICE Docs 9.4 (editor: web-apps + sdkjs; converter: x2t from ONLYOFFICE core), by Ascensio System SIA - see [NOTICE](NOTICE) |
+| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, from ONLYOFFICE core - see [NOTICE](NOTICE) |
 | filex | **0.55.0** or later (draft: `"filex": ">=0.55.0"`) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
@@ -52,9 +53,12 @@ opens it, and back when it is saved.
 
 This app gives the editor all of that in the browser:
 
-- **The editor's files** come from the app's own package, as ONLYOFFICE
-  builds them from source at a pinned tag, unchanged except one: the
-  socket.io client is replaced by a stand-in (`src/shim.ts`).
+- **The editor's files** come from the app's own package. The build takes
+  them from ONLYOFFICE's official Document Server image, at the version and
+  digest pinned in `upstream/onlyoffice.json`, and leaves them as ONLYOFFICE
+  ships them except where the app has to: the socket.io client is replaced
+  by a stand-in (`src/shim.ts`) and inline scripts move into files. NOTICE
+  lists every file changed, with the date.
 - **The "server"** is a bridge in the editor's frame (`src/bridge.ts`). It
   answers every message the way the Document Server does (Docs 9.4,
   `DocsCoServer.js`); whatever the other people need - a batch of changes, a
@@ -127,6 +131,8 @@ does not have yet. Their names below are proposals; filex decides them.
 | `src/shim.ts` | A `socket.io` stand-in served in place of `web-apps/vendor/socketio/socket.io.min.js`: the editor's socket is plugged into the bridge |
 | `src/x2t.ts` | Drives x2t (WebAssembly) to turn a docx/xlsx/pptx into the editor's format and back |
 | `src/protocol.ts` | The messages and numbers both sides use |
+| `upstream/onlyoffice.json` | The ONLYOFFICE Docs release the editor files are taken from: version, build, image tag and digest, source tag, the date it was pinned |
+| `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node) |
 | `filex-app.json` | The app's manifest - a **draft** until the platform features above exist |
 
@@ -136,19 +142,51 @@ npm test            # vitest run
 npm run typecheck   # tsc
 ```
 
+## Keeping up with ONLYOFFICE
+
+The editor files come from one ONLYOFFICE Docs release, written down in
+[`upstream/onlyoffice.json`](upstream/onlyoffice.json): the version and
+build, the official image's tag and its digest (`docker pull
+onlyoffice/documentserver@<digest>` gets exactly those files), and the
+source tag of ONLYOFFICE's repositories that matches them.
+
+Once a week the [upstream watch](.github/workflows/upstream-watch.yml)
+compares that with the newest release on Docker Hub. When ONLYOFFICE has
+published a newer one, it opens an issue with what changed and what an
+update involves (the lock rules in `src/locks.ts` and the protocol in
+`src/bridge.ts` are compared with the new server and sdkjs). It opens one
+issue per version and never a second one, even after the first is closed;
+a version announced on GitHub whose image is not out yet waits for the
+image. The workflow uses only its own `GITHUB_TOKEN`, with permission to
+write issues. Run it by hand from the Actions tab (with "dry run" to only
+look), or on your machine:
+
+```bash
+node scripts/upstream-watch.mjs --dry-run
+```
+
+The pin changes only together with a bundle built from the new release.
+
 ## Roadmap
 
-1. The editor bundle: ONLYOFFICE web-apps + sdkjs built from source at a
-   pinned tag, without help pages, dictionaries and the PDF and diagram
-   editors; inline scripts moved to files; the socket.io stand-in in place.
-2. x2t built to WebAssembly from ONLYOFFICE core at the same tag, run in a
-   Worker.
+The first release, **0.1.0**, brings all of the following at once - there
+is no earlier, partial release:
+
+1. The editor bundle: ONLYOFFICE web-apps + sdkjs from the official Document
+   Server image (`upstream/onlyoffice.json`), without help pages,
+   dictionaries and the PDF and diagram editors; inline scripts moved to
+   files; the socket.io stand-in in place.
+2. x2t built to WebAssembly from ONLYOFFICE core at the same version, run
+   in a Worker.
 3. The app's page: the editor frame, the port to filex, a single person
    editing (also in an unencrypted folder), saving as a new version.
 4. Encrypted folders (filex's `files:e2e-plaintext`).
 5. Editing together (filex's `files:co-edit` and the relay).
 6. A release bundle pinned by its SHA-256, the legal notice in the editor,
    the store listing.
+
+The platform features it needs ([What filex provides](#what-filex-provides))
+come with filex 0.55.
 
 ## License
 

@@ -1,0 +1,12 @@
+{
+  "about": "The ONLYOFFICE Docs release this app takes its editor files from. scripts/upstream-watch.mjs compares it with the newest one every week; change it only together with the bundle built from it.",
+  "product": "ONLYOFFICE Docs Community Edition (Document Server)",
+  "version": "9.4.0",
+  "build": "9.4.0.129",
+  "image": "docker.io/onlyoffice/documentserver",
+  "tag": "9.4.0.1",
+  "digest": "sha256:3ab6ebc7c605e5a32b7ae3ff19daed4925090245acc8100ce2230bd766c88212",
+  "source_tag": "v9.4.0.129",
+  "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
+  "pinned": "2026-10-08"
+}
