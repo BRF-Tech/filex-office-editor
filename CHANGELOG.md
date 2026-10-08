@@ -36,6 +36,22 @@ update.
   (`scripts/upstream-watch.mjs`), compares the pin with ONLYOFFICE's newest
   release and opens one issue per newer version, never a second one for the
   same version. It uses only the run's own `GITHUB_TOKEN` (issues: write).
+  The issue says how to rebuild: the new pin, `bash
+  scripts/extract-editor.sh --update`, the lock file's diff.
+- The editor bundle's build, `scripts/extract-editor.sh`: from the pinned
+  Document Server image (by digest, no network after the pull) it generates
+  the fonts from ONLYOFFICE's core-fonts, keeps the document, spreadsheet
+  and presentation editors, moves every HTML page's inline scripts into
+  files, loads an in-memory storage stand-in first, checks filex's limits
+  for an app's bundle and writes a reproducible zip. Measured for 9.4.0:
+  2,180 files, 271.6 MiB unpacked, 91.8 MiB zipped; two builds give the
+  same zip. `upstream/editor.lock.json` records every file's SHA-256; a
+  build that differs from it fails.
+- x2t: CryptPad's WebAssembly build `v9.3.2+3`, pinned under `x2t` in
+  `upstream/onlyoffice.json` by its SHA-512 and its files' SHA-256, fetched
+  and checked by `scripts/fetch-x2t.mjs`. `npm run test:x2t` takes a docx,
+  an xlsx and a pptx with Turkish text through it to Editor.bin and back
+  with `src/x2t.ts`; nothing is lost.
 
 ### Changed
 

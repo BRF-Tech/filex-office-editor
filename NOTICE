@@ -48,16 +48,47 @@ sponsored by Ascensio System SIA.
    Server's protocol (the names and numbers of sdkjs common/docscoapi.js and
    DocsCoServer.js, 9.4), so the editor runs unchanged.
 
-3. The editor files a release bundle will carry (web-apps, sdkjs, the fonts)
-   are ONLYOFFICE's, taken from ONLYOFFICE's official Document Server image
+3. The editor files the bundle carries (web-apps, sdkjs, the fonts) are
+   ONLYOFFICE's, taken from ONLYOFFICE's official Document Server image
    (docker.io/onlyoffice/documentserver) at the release, image tag and
    digest pinned in upstream/onlyoffice.json - today ONLYOFFICE Docs 9.4.0,
    build 9.4.0.129; their source is ONLYOFFICE's sdkjs and web-apps at tag
-   v9.4.0.129. The x2t WebAssembly build is ONLYOFFICE's too (ONLYOFFICE
-   core). All of it is under ONLYOFFICE's license (AGPL-3.0 with additional
-   terms). The bundle will name each with its tag and checksum, keep every
-   copyright, license and origin notice they ship, and list here every file
-   this project changes, with the date. No release bundle exists yet.
+   v9.4.0.129. scripts/extract-editor.sh builds the bundle from that image;
+   upstream/editor.lock.json lists every file in it with its SHA-256. The
+   fonts are generated from ONLYOFFICE's core-fonts the way the image does
+   on its first start; each font family's license files, and the notices
+   inside its fonts, travel with them (core-fonts-licenses/ in the bundle).
+   All of it is under ONLYOFFICE's license (AGPL-3.0 with additional terms)
+   and the fonts' own licenses; every copyright, license and origin notice
+   they ship is kept.
+
+   Changes this project makes to those files, by BRF Tech, 2026-10-08
+   (each one listed with its file in upstream/editor.lock.json, "changed"
+   and "added", and in the bundle as filex/CHANGES.txt):
+     - the HTML pages of web-apps: each inline script moved, unchanged, into
+       a file next to its page (index.inline-1.js, ...) and loaded from the
+       same place; the stylesheet loaded as media="print" with an onload
+       handler loaded as media="all"; a first script added that gives the
+       page an in-memory localStorage where the browser refuses one
+       (filex/storage.js, this project's own);
+     - web-apps/apps/api/documents/api.js is api.js.tpl, with the cache tag
+       left as a placeholder;
+     - ONLYOFFICE's license/*.license files carry a .txt extension; their
+       content is unchanged;
+     - parts the app does not use are left out (help pages, the PDF and
+       Visio editors, the mobile, embedded and forms apps, the macro editor,
+       dictionaries, asm.js fallbacks, the server's script snapshots, some
+       fonts); the lock file names each kind and how many files.
+
+4. The x2t WebAssembly build is ONLYOFFICE's converter (ONLYOFFICE core),
+   pinned under "x2t" in upstream/onlyoffice.json. Today it is CryptPad's
+   build, https://github.com/cryptpad/onlyoffice-x2t-wasm release v9.3.2+3
+   (commit 7debf5e6d6d4f19874d764cd34446f7e63c6bc32; AGPL-3.0-or-later):
+   ONLYOFFICE core with CryptPad's changes for WebAssembly, whose core/ was
+   pulled from Euro-Office's copy of ONLYOFFICE core at v9.3.2. This
+   project does not change it; scripts/fetch-x2t.mjs checks it against the
+   pinned SHA-512 and SHA-256 sums. Before 0.1.0 this project's own build
+   from ONLYOFFICE core at the editor files' tag replaces it.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:
