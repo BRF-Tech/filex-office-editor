@@ -79,19 +79,23 @@ sponsored by Ascensio System SIA.
        (document-templates/new/default/new.docx, .xlsx, .pptx) a .bin one;
        their content is unchanged;
      - parts the app does not use are left out (help pages, the PDF and
-       Visio editors, the mobile, embedded and forms apps, the macro editor,
+       Visio editors, the embedded and forms apps, the macro editor,
        dictionaries, asm.js fallbacks, the server's script snapshots, the
        per-theme thumbnails, some fonts); the lock file names each kind and
-       how many files.
+       how many files. The three editors' phone apps
+       (web-apps/apps/*/mobile, ONLYOFFICE's open-source build, which opens
+       documents to read) are kept, their pages changed like the others.
 
    The app's build (scripts/build-app.mjs) changes one more file, in the
-   app's bundle only, and adds one, both listed in the bundle's
+   app's bundle only, and adds two, all listed in the bundle's
    editor/filex/CHANGES.txt (BRF Tech, 2026-10-08):
      - web-apps/vendor/socketio/socket.io.min.js, ONLYOFFICE's copy of the
        socket.io client (Socket.IO 4.5.3, MIT), is replaced by this
        project's editor-page script (src/frame/main.ts, bundled): the
        editor's socket is answered in the page, by the bridge;
-     - themes.json, an empty list of custom themes, is added.
+     - themes.json, an empty list of custom themes, is added;
+     - plugins.json, an empty list of plugins (the phone apps ask for it),
+       is added.
    The editor page's script also changes, while it runs, how the editor
    reaches a few things under filex's sandbox (README.md, "The app"): the
    messages between api.js and the editor's Gateway, the interface
@@ -104,7 +108,11 @@ sponsored by Ascensio System SIA.
    writes here; the editor's storage is watched so its settings are kept
    between openings, and the editor's start waits for the kept ones; the
    bridge's own participant is named in a group the editor is configured
-   not to show. ONLYOFFICE's files are not edited for any of these.
+   not to show; and, for the phone apps (BRF Tech, 2026-10-08), the phone
+   app's start waits for the kept settings the same way (its sdkjs scripts
+   are appended once they are in) and its Download and Print go to the app
+   page like the editor's. ONLYOFFICE's files are not edited for any of
+   these.
 
 4. The x2t WebAssembly build is ONLYOFFICE's converter (ONLYOFFICE core),
    pinned under "x2t" in upstream/onlyoffice.json. Today it is CryptPad's

@@ -95,6 +95,23 @@ update.
   most 5 seconds.
 - On a narrow screen (a frame under 600 px) the editor starts folded: the
   ribbon's tabs only, no rulers, the side panel closed.
+- **On a phone** (a frame under 600 px on a touch screen) the document
+  opens in **ONLYOFFICE's phone app**: the three editors' `mobile` apps of
+  the pinned 9.4 image are now in the bundle (723 files, 24 MB unpacked;
+  the zip grows by an estimated 6-8 MiB, measured with the next build). It
+  is touch-sized, with its own search, navigation, settings, Download (PDF
+  and the other formats through x2t, as on a computer; a format x2t does
+  not write here is refused and the person told) and Print. ONLYOFFICE's
+  open-source phone apps open a document **to read only** - editing on a
+  phone is a commercial ONLYOFFICE feature, and their editing controller is
+  a stub in this build - so they open in view mode, and **"Edit"** under
+  them opens the editor, folded, with the document; **"Reading view"** goes
+  back with what was written, saving it first. The phone app's start waits
+  for the kept settings like the editor's, and its settings (all under
+  `mobile-`) are kept with the editor's in the one value. The build adds an
+  empty `plugins.json`, which the phone apps ask for. `npm run e2e`
+  measures it on a phone in the three browsers (`--no-phone` leaves it
+  out).
 - `npm run e2e` measures all of it in the three browsers: the people the
   editor counts, Download as from the File menu (the offered formats, an
   OpenDocument copy holding the typed text, a PDF with pages and fonts),
@@ -103,6 +120,9 @@ update.
 
 ### Fixed
 
+- A setting the editor wrote before the kept ones had reached its page was
+  reported on its own, and the app page would have kept that smaller set
+  in place of the kept one; such a write now waits for the kept settings.
 - One person editing was shown as two: the bridge's own participant (which
   keeps the editor sending its changes as it makes them) is now in a group
   of its own that the editor is configured not to show
