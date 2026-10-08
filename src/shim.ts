@@ -275,14 +275,40 @@ interface ShimWindow {
   define?: unknown;
 }
 
+/** The RequireJS loader plugin installSocketIo defines to hold the module back (see there). */
+export const WAIT_PLUGIN = 'filex-office-editor-wait';
+
+type AmdDefine = ((...args: unknown[]) => void) & { amd?: unknown };
+
 /**
  * Put `io` where the editor looks: window.io, and as the AMD module the
  * editor's loader asks for (socket.io.min.js is a UMD module).
+ *
+ * With `ready`, the module is given only once `ready` settles. The editor's
+ * pages load the "socketio" module before anything of the editor runs (it is
+ * a dependency of sdkjs in their RequireJS configuration), so holding it
+ * holds the editor's start - which is how the editor page gets its kept
+ * settings (settings.ts) into its storage before the editor reads them. The
+ * hold is a loader plugin (RequireJS's way to wait for something that is not
+ * a script), defined by name in this same script.
  */
-export function installSocketIo(win: ShimWindow, io: ShimIo): void {
+export function installSocketIo(win: ShimWindow, io: ShimIo, ready?: Promise<unknown>): void {
   win.io = io;
-  const define = win.define as ((factory: () => unknown) => void) & { amd?: unknown };
-  if (typeof define === 'function' && define.amd) define(() => io);
+  const define = win.define as AmdDefine;
+  if (typeof define !== 'function' || !define.amd) return;
+  if (!ready) {
+    define(() => io);
+    return;
+  }
+  define(WAIT_PLUGIN, [], () => ({
+    load: (_name: string, _req: unknown, onload: (value: unknown) => void) => {
+      ready.then(
+        () => onload(true),
+        () => onload(true),
+      );
+    },
+  }));
+  define([`${WAIT_PLUGIN}!ready`], () => io);
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   BridgeSocketPort,
   createSocketIo,
   installSocketIo,
+  WAIT_PLUGIN,
   type EditorLink,
   type ShimConnector,
 } from '../src/shim';
@@ -196,6 +197,31 @@ describe('installSocketIo', () => {
     expect(define).toHaveBeenCalledTimes(1);
     const factory = define.mock.calls[0][0] as () => unknown;
     expect(factory()).toBe(io);
+  });
+
+  it('with a promise, gives the module only once the promise settles (a RequireJS loader plugin)', async () => {
+    const io = createSocketIo(recorder().connector);
+    const define = Object.assign(vi.fn(), { amd: {} });
+    const win: { io?: unknown; define?: unknown } = { define };
+    let open: () => void = () => {};
+    const ready = new Promise<void>((r) => (open = r));
+    installSocketIo(win, io, ready);
+    expect(win.io).toBe(io);
+    expect(define).toHaveBeenCalledTimes(2);
+    const [name, deps, pluginFactory] = define.mock.calls[0] as [string, string[], () => { load: (n: string, r: unknown, onload: (v: unknown) => void) => void }];
+    expect(name).toBe(WAIT_PLUGIN);
+    expect(deps).toEqual([]);
+    const [moduleDeps, moduleFactory] = define.mock.calls[1] as [string[], () => unknown];
+    expect(moduleDeps).toEqual([`${WAIT_PLUGIN}!ready`]);
+    expect(moduleFactory()).toBe(io);
+    const loaded = vi.fn();
+    pluginFactory().load('ready', null, loaded);
+    await Promise.resolve();
+    expect(loaded).not.toHaveBeenCalled();
+    open();
+    await ready;
+    await Promise.resolve();
+    expect(loaded).toHaveBeenCalledWith(true);
   });
 });
 
