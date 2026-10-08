@@ -537,6 +537,8 @@ async function phoneRun(browser, server, engine, o) {
   const shot = async (name) => {
     if (!o.shots) return;
     mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+    // The phone app's "loading" layer stays a moment after the document is ready.
+    await sleep(1500);
     await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-tr.docx-phone-${name}.png`) });
   };
   try {
@@ -625,6 +627,7 @@ async function phoneRun(browser, server, engine, o) {
         else if (/Community version|commercial license/i.test(await f.evaluate(() => document.body.innerText || ''))) r.problems.push(`${doc}: the phone app shows its open-source licence message`);
         const shown = await appFrame(other).evaluate(() => !document.getElementById('fx-switch')?.hidden);
         if (!shown) r.problems.push(`${doc}: no "Edit"`);
+        if (o.shots) await sleep(1500);
         if (o.shots) await other.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-${doc}-phone-reader.png`) });
       } catch (e) {
         r.problems.push(`${doc}: ${String(e?.message ?? e).slice(0, 300)}`);
