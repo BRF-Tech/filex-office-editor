@@ -133,7 +133,7 @@ does not have yet. Their names below are proposals; filex decides them.
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
-| Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | `ui.print`: the app hands filex a PDF and filex prints it from its own page (a hidden frame of a `blob:` PDF, the browser's print dialog), on a gesture - the same kind of grant as `ui:download`. Until filex has it, the app hands the PDF over as a download and says so |
+| Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | **in filex 0.55:** `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`) and filex prints it from its own print page (`/_print/`: a frame of a `blob:` PDF, the browser's print dialog), on a gesture or after asking - the same kind of grant as `ui:download`. `filex-app.json` asks for it; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
 | No inline scripts | `script-src` is the package only | in the app: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
 | A large package (measured: 92.7 MiB zipped with x2t, 1,889 files, 300.5 MiB unpacked, 37 MiB for `x2t.wasm`; with the phone apps an estimated 100 MiB and about 2,640 files) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
 
@@ -392,9 +392,10 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    `src/formats.ts`, and PDF from the pages as the editor laid them out
    with the fonts it drew them with - and filex hands the file to the
    person (`ui.download`, named after the document) or prints the PDF
-   (`ui.print`, proposed for filex 0.55: a sandboxed frame may not open the
-   browser's print dialog). A filex without `ui.print` gets the PDF as a
-   download, and the person is told so.
+   (`ui.print`, filex 0.55, with the `ui:print` grant: a sandboxed frame may
+   not open the browser's print dialog, so filex prints it from its own
+   page). Without that grant, or on a filex without `ui.print`, the PDF goes
+   to the person as a download, and they are told so.
 7. **The editor's settings** (units, zoom, the ribbon folded or not, the
    "New" hints the person closed...) are kept in filex's store for this app
    (`state.set`, under one key, at most 8 KiB, `src/settings.ts`) a moment
@@ -478,7 +479,8 @@ shape, the headers and the policy built from the grant
 `feat/189-p1-app-frame`), filex's bootstrap first in every page - with a
 host page that draws the sandboxed frame and answers the app's bridge the
 way filex's `AppFrame` does (`e2e/harness/`: `state.get/set` with filex
-0.54's limits, `ui.download`, and a stand-in for the proposed `ui.print`).
+0.54's limits, `ui.download`, and `ui.print` as filex 0.55 checks it - the
+`ui:print` grant, a PDF - recording the PDF instead of printing it).
 Then, headless, in Chromium, Firefox and WebKit: it opens a blank docx, xlsx
 and pptx (the ones filex's New menu makes) and the Turkish documents of the
 x2t smoke test, types `Merhaba dünya: ğüşıöç İĞÜŞÖÇ` into each, saves with
@@ -583,7 +585,7 @@ is no earlier, partial release:
    one person counting one, and on a phone ONLYOFFICE's phone app to read
    with "Edit" to the folded editor (**built, not yet measured**: [On a
    phone](#on-a-phone)); still to come: the measurements in filex 0.55
-   itself and filex's `ui.print`.
+   itself, with filex's `ui.print` printing for real.
 4. Encrypted folders (filex's `files:e2e-plaintext`).
 5. Editing together (filex's `files:co-edit` and the relay).
 6. A release bundle pinned by its SHA-256, the legal notice in the editor,

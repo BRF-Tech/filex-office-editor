@@ -390,7 +390,8 @@ async function runOne(browser, server, engine, doc, o) {
 /**
  * Once per engine, in one browser context (one person): a "New" hint closed
  * in one opening is kept and does not show in the next; Print where filex
- * has no print hands the PDF over as a download.
+ * has no print (an older filex), and where the app has no ui:print grant,
+ * hands the PDF over as a download.
  */
 async function settingsRun(browser, server, engine) {
   const r = { engine, doc: 'tr.docx (settings, print fallback)', ok: false, steps: [], problems: [], notes: [] };
@@ -430,7 +431,8 @@ async function settingsRun(browser, server, engine) {
     if (!toasts.some((t) => t && t.tone === 'info')) r.problems.push('Print without filex\'s print did not say what it did');
     await first.close();
 
-    const second = await open('');
+    // The next opening without the ui:print grant: Print hands the PDF over too.
+    const second = await open('&grants=-ui:print');
     step('opened again');
     await sleep(3000);
     const shown = await hint(second).evaluateAll((els) => els.filter((e) => e.offsetParent).length);
@@ -443,6 +445,14 @@ async function settingsRun(browser, server, engine) {
     const missing = r.kept.filter((k) => storage[k] !== kept[k]);
     if (missing.length) r.problems.push(`the next opening lacks the kept ${missing.join(', ')}`);
     if (shown) r.problems.push(`the closed hint shows again (${shown})`);
+    const before2 = server.files.filter((f) => f.tag === tag).length;
+    await editorFrame(second).evaluate(() => {
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
+    });
+    const got2 = await nextFile(server, tag, before2, 'the PDF handed over without the ui:print grant');
+    step('print without ui:print', { how: got2.how, bytes: got2.size });
+    if (got2.how !== 'download' || !pdfFacts(readFileSync(got2.file)).pdf) r.problems.push(`Print without the ui:print grant gave ${got2.how} ${got2.name}`);
     await second.close();
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));

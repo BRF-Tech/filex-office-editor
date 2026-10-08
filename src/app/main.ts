@@ -56,7 +56,7 @@ const SETTLE_MS = 3000;
 /** The editor's settings are kept this long after its last write (a burst of writes is one write to filex). */
 const KEEP_SETTINGS_MS = 2000;
 /** filex's answer when it has no such method (an older filex) or no handler for it here. */
-const NOT_OFFERED = new Set(['unknown_method', 'unavailable']);
+const NOT_OFFERED = new Set(['unknown_method', 'unavailable', 'not_granted']);
 
 const BASE = new URL('.', document.baseURI).href;
 
@@ -239,6 +239,8 @@ class OfficeApp {
   private settingsTimer: ReturnType<typeof setTimeout> | null = null;
   /** What the app shows (config.ts View): the phone app only reads; the editor edits a file that can be written. */
   view: View = 'editor';
+  /** What filex granted for handing files over: ui:download, ui:print (filex 0.55). */
+  grants = { download: false, print: false };
 
   constructor(
     private readonly fx: FilexApp,
@@ -409,20 +411,26 @@ class OfficeApp {
   }
 
   /**
-   * Print a PDF. filex prints it from its own page (ui.print); a filex that
-   * does not (yet) hands it to the person instead, to print from their PDF
-   * viewer - a sandboxed frame like this one may not open the browser's
-   * print dialog (window.print needs allow-modals, which filex does not give).
+   * Print a PDF. With the ui:print grant (filex 0.55, `ui.print` in the
+   * manifest), filex prints it from its own print page; without it, or where
+   * filex cannot (an older filex: unknown_method; a host with no print page:
+   * unavailable), the PDF goes to the person as a download (ui:download), to
+   * print from their PDF viewer, and they are told - a sandboxed frame like
+   * this one may not open the browser's print dialog (window.print needs
+   * allow-modals, which filex does not give).
    */
   private async print(name: string, bytes: ArrayBuffer): Promise<void> {
-    try {
-      const copy = bytes.slice(0);
-      await this.fx.request('ui.print' as never, { name, data: copy, mime: 'application/pdf' }, [copy]);
-    } catch (e) {
-      if (!(e instanceof FilexError && NOT_OFFERED.has(e.code))) throw e;
-      await this.fx.download(name, bytes, 'application/pdf');
-      this.fx.toast(this.t.printAsDownload, 'info');
+    if (this.grants.print) {
+      try {
+        const copy = bytes.slice(0);
+        await this.fx.request('ui.print' as never, { name, data: copy, mime: 'application/pdf' }, [copy]);
+        return;
+      } catch (e) {
+        if (!(e instanceof FilexError && NOT_OFFERED.has(e.code)) || !this.grants.download) throw e;
+      }
     }
+    await this.fx.download(name, bytes, 'application/pdf');
+    this.fx.toast(this.t.printAsDownload, 'info');
   }
 
   /** The ten-minute save, while there are changes. */
@@ -465,9 +473,13 @@ async function main(): Promise<void> {
   const canEdit = !info.readOnly;
   const grants = Array.isArray(s.grants) ? s.grants : [];
   const canDownload = grants.includes('ui:download');
+  // filex 0.55 prints a PDF the app hands it (ui:print); without that grant
+  // Print hands the PDF over as a download (print()).
+  const canPrintPdf = grants.includes('ui:print');
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
+  app.grants = { download: canDownload, print: canPrintPdf };
   const userName = s.user?.name || 'filex';
   let dark = s.theme?.mode === 'dark';
   // A phone opens ONLYOFFICE's phone app, to read (config.ts phoneLayout);
@@ -522,8 +534,8 @@ async function main(): Promise<void> {
       userName,
       canEdit,
       canDownload,
-      // Print needs filex's print or, where filex has none, a download.
-      canPrint: canDownload,
+      // Print needs filex's print (ui:print) or, where filex has none, a download.
+      canPrint: canPrintPdf || canDownload,
       narrow: window.innerWidth > 0 && window.innerWidth < NARROW_PX,
       phone: view === 'reader',
       events: {

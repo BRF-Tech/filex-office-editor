@@ -85,9 +85,13 @@ update.
   write them right: txt and csv (every letter outside ASCII is cut to its
   low byte), html, md, epub, fb2 and images.
 - **Print**: the document as a PDF, handed to filex to print (`ui.print`,
-  proposed for filex 0.55); a filex without it gets the PDF as a download,
-  and the person is told so - a sandboxed frame may not open the browser's
-  print dialog.
+  filex 0.55: `filex-app.json` asks for it with `"ui": {"print": true}`,
+  the permission `ui:print`, its reason in English and Turkish); without
+  that grant, or on a filex without `ui.print` (`unknown_method`,
+  `unavailable`), the PDF goes to the person as a download, and they are
+  told so - a sandboxed frame may not open the browser's print dialog.
+  The e2e harness answers `ui.print` as filex 0.55 checks it (the grant, a
+  PDF, `{printed, size}`).
 - **The editor's settings are kept between openings** in filex's store for
   the app (`state.set`, one value of at most 8 KiB): units, zoom, the
   ribbon folded or not, the "New" hints the person closed. filex keeps

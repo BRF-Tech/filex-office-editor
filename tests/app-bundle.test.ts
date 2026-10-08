@@ -31,6 +31,15 @@ describe('the manifest and the locked editor files', () => {
     }
   });
 
+  it('asks filex to print (ui.print, filex 0.55) and to hand files over, and says why in both languages', () => {
+    expect(manifest.ui.print).toBe(true);
+    expect(manifest.ui.download).toBe(true);
+    for (const p of ['ui:print', 'ui:download']) {
+      expect(manifest.permission_reasons[p]?.en, p).toBeTruthy();
+      expect(manifest.permission_reasons[p]?.tr, p).toBeTruthy();
+    }
+  });
+
   it('the editor pages load socket.io from where the bridge goes', () => {
     expect(lock.files[SOCKET_IO]).toBeTruthy();
   });

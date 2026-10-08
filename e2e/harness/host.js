@@ -7,15 +7,16 @@
 // answers the bridge's requests and keeps what the measurement reads in
 // window.__fx. The query string chooses the file and the person's setup:
 //
-//   ?doc=<name>&locale=tr&theme=dark&ro=1&tag=<run>&print=none&grants=-ui:download
+//   ?doc=<name>&locale=tr&theme=dark&ro=1&tag=<run>&print=none&grants=-ui:download,-ui:print
 //
 // The app's store (state.get/set) is filex's as 0.54 keeps it - 8 KiB a
 // value, 16 KiB an app as JSON - and lasts across the pages of one browser
 // context (this page's own localStorage stands in for the person's
 // preferences). ui.download records the file with the server (/__file).
-// ui.print is a stand-in for a method filex does not have yet (see the
-// README, "Print"): it records the PDF the same way; print=none answers
-// unknown_method, as filex 0.55 does.
+// ui.print answers as filex 0.55's AppFrame does (the ui:print grant, a
+// name, a PDF - "%PDF-" - and {printed, size}) but records the PDF the same
+// way instead of printing it; print=none answers unknown_method, as filex
+// 0.54 and older do.
 'use strict';
 
 (function () {
@@ -27,7 +28,7 @@
   const readOnly = q.get('ro') === '1';
   const tag = q.get('tag') || 'run';
   const canPrint = q.get('print') !== 'none';
-  const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download'];
+  const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download', 'ui:print'];
   const without = (q.get('grants') || '').split(',').filter((g) => g.startsWith('-')).map((g) => g.slice(1));
   const grants = GRANTS.filter((g) => !without.includes(g));
   const STATE = 'fx-app-state:office-editor';
@@ -118,10 +119,15 @@
     if (!(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) return fail(id, 'invalid');
     const fname = String((params && params.name) || '');
     if (!fname || /[\\/]/.test(fname)) return fail(id, 'invalid', 'a name, not a path');
+    if (how === 'print') {
+      const head = ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, Math.min(5, data.byteLength)) : new Uint8Array(data, 0, Math.min(5, data.byteLength));
+      if (String.fromCharCode(...head) !== '%PDF-') return fail(id, 'invalid', 'the data is not a PDF');
+      if (params.mime !== undefined && params.mime !== 'application/pdf') return fail(id, 'invalid', 'print takes a PDF (application/pdf)');
+    }
     const res = await fetch(`/__file?how=${how}&name=${encodeURIComponent(fname)}&tag=${encodeURIComponent(tag)}`, { method: 'POST', body: data });
     const r = await res.json();
     fx.files.push({ how, name: fname, mime: params.mime || '', size: r.size });
-    return reply(id, how === 'print' ? { printed: true } : { saved: true, size: r.size });
+    return reply(id, how === 'print' ? { printed: true, size: r.size } : { saved: true, size: r.size });
   }
 
   async function onRequest(ev) {
@@ -176,6 +182,7 @@
           return handOver(id, params, 'download');
         case 'ui.print':
           if (!canPrint) return fail(id, 'unknown_method');
+          if (!grants.includes('ui:print')) return fail(id, 'not_granted');
           return handOver(id, params, 'print');
         case 'license.get':
           return reply(id, { status: 'free' });
