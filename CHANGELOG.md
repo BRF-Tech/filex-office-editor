@@ -101,8 +101,9 @@ update.
   ribbon's tabs only, no rulers, the side panel closed.
 - **On a phone** (a frame under 600 px on a touch screen) the document
   opens in **ONLYOFFICE's phone app**: the three editors' `mobile` apps of
-  the pinned 9.4 image are now in the bundle (723 files, 24 MB unpacked;
-  the zip grows by an estimated 6-8 MiB, measured with the next build). It
+  the pinned 9.4 image are now in the bundle (743 files with their pages'
+  moved inline scripts, 22.9 MiB unpacked, 5.5 MiB zipped: `ui.zip` is
+  97.7 MiB, 2,633 files). It
   is touch-sized, with its own search, navigation, settings, Download (PDF
   and the other formats through x2t, as on a computer; a format x2t does
   not write here is refused and the person told) and Print. ONLYOFFICE's
@@ -124,6 +125,13 @@ update.
 
 ### Fixed
 
+- Every page of the editor logged an error at opening, its service worker
+  failing to register in filex's sandbox; in Chromium even reading
+  `navigator.serviceWorker` throws there, which stopped the phone apps
+  (Framework7 reads it while it starts). The storage stand-in
+  (`filex/storage.js`, the first script of every page) now takes the
+  attribute away where reading it throws, and the editors go on without
+  one.
 - A setting the editor wrote before the kept ones had reached its page was
   reported on its own, and the app page would have kept that smaller set
   in place of the kept one; such a write now waits for the kept settings.

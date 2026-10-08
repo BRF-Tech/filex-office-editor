@@ -69,7 +69,8 @@ sponsored by Ascensio System SIA.
        a file next to its page (index.inline-1.js, ...) and loaded from the
        same place; the stylesheet loaded as media="print" with an onload
        handler loaded as media="all"; a first script added that gives the
-       page an in-memory localStorage where the browser refuses one
+       page an in-memory localStorage where the browser refuses one, and
+       takes navigator.serviceWorker away where reading it throws
        (filex/storage.js, this project's own);
      - web-apps/apps/api/documents/api.js is api.js.tpl, with the cache tag
        left as a placeholder;

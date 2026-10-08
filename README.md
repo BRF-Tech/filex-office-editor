@@ -135,7 +135,7 @@ does not have yet. Their names below are proposals; filex decides them.
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
 | Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | **in filex 0.55:** `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`) and filex prints it from its own print page (`/_print/`: a frame of a `blob:` PDF, the browser's print dialog), on a gesture or after asking - the same kind of grant as `ui:download`. `filex-app.json` asks for it; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
 | No inline scripts | `script-src` is the package only | in the app: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (measured: 92.7 MiB zipped with x2t, 1,889 files, 300.5 MiB unpacked, 37 MiB for `x2t.wasm`; with the phone apps an estimated 100 MiB and about 2,640 files) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
+| A large package (measured: 97.7 MiB zipped with x2t and the phone apps, 2,633 files, 323.4 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -233,19 +233,15 @@ the per-theme thumbnails out, below):
 | web-apps locales (46 languages, three editors) | 138 | 43.8 | 8.3 |
 | sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.3 | 3.4 |
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
-| **The editor bundle** | **1,880** | **263.3** | **83.0** |
-| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **1,889** | **300.5** | **92.7** |
-
-The three phone apps (`web-apps/apps/*/mobile`), taken in after this table
-was measured, add 723 files and 24.0 MB unpacked (read from the image,
-2026-10-08) - an estimated 6-8 MiB zipped, so about 100 MiB for `ui.zip`;
-the next build's lock file has the exact numbers.
+| The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
+| **The editor bundle** | **2,623** | **286.1** | **88.5** |
+| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **2,633** | **323.4** | **97.7** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
 `sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part was within the 2,000
 files and 100 MB aimed for; with the phone apps it stays under 100 MB
-(estimated) and goes over the file count (about 2,630), which the build
+(92.8 MB) and goes over the file count (2,623), which the build
 only notes - filex's limits are what refuse.
 
 Two corrections came from the browser measurement (2026-10-08):
@@ -276,7 +272,11 @@ the lock file (`changed`, `added`) and in the bundle itself
 - **The storage stand-in** (`filex/storage.js`) is the first script of
   every page: in filex's sandboxed frame the browser refuses
   `localStorage`, where the editor keeps its settings; the page gets an
-  in-memory one instead.
+  in-memory one instead. It also takes `navigator.serviceWorker` away where
+  reading it throws (Chromium, in a sandboxed page): ONLYOFFICE's phone
+  apps read it while Framework7 starts, and the throw stopped them before
+  anything showed (measured 2026-10-08); the editors ask
+  `'serviceWorker' in navigator` first and now go on without one.
 - `web-apps/apps/api/documents/api.js` is `api.js.tpl`, as the Document
   Server's first start makes it, with the cache tag left as a placeholder so
   the editor's paths are not rewritten; ONLYOFFICE's `.license` files and
@@ -517,19 +517,43 @@ title bold, its body regular, its italic line italic (Liberation Serif in
 three faces), the workbook's total `39,5` as the Turkish locale writes it.
 Firefox splits a typed line into one run per letter outside ASCII in the
 saved docx (the text is whole; Playwright types those letters as text
-input). Every page logs one error that is the editor's own and harmless:
-its service worker cannot register in a sandboxed page; WebKit adds, for a
-presentation, that fullscreen is not allowed (filex's policy turns it off).
-At 390 px the editor is ONLYOFFICE's desktop one, folded (the ribbon's tabs
-only, no rulers, at 100 %): usable, not made for a phone. These
-measurements were made before the phone apps came in; `npm run e2e` now
-also opens the Turkish docx on a phone in each browser (390 x 844, a
-phone's user agent, touch: [On a phone](#on-a-phone)) - the phone app opens
-it to read, without its licence message; its Download (PDF) and Print reach
-filex; a format x2t does not write is refused and said; "Edit" opens the
-folded editor and its save holds the typed text; "Reading view" goes
-back. `--shots` adds the phone app at 390 px, light and dark. That run has
-not been made yet. The harness differs from filex 0.55 in one line, on
+input). Every page logged one error that is the editor's own and harmless:
+its service worker cannot register in a sandboxed page. Since the phone
+apps, the storage stand-in takes the service worker away where reading it
+throws (Chromium), so there the editor no longer tries and logs nothing;
+Firefox, where reading it does not throw, still logs the failed
+registration. WebKit adds, for a presentation, that fullscreen is not
+allowed (filex's policy turns it off).
+At 390 px on a computer (a mouse, no touch) the editor is ONLYOFFICE's
+desktop one, folded (the ribbon's tabs only, no rulers, at 100 %): usable,
+not made for a phone.
+
+**On a phone** (measured 2026-10-08 on Linux, in Playwright 1.59's image:
+Chromium 147, Firefox 148, WebKit 26.4; 390 x 844, a phone's user agent,
+touch; [On a phone](#on-a-phone)), 3 of 3, in a run that passed the 21
+above again as well (24 of 24):
+
+| | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| The Turkish docx opens in the phone app, to read, with "Edit" (from the host page's load) | 1.1 s | 1.7 s | 2.2 s |
+| The phone app's "commercial license" message | not shown | not shown | not shown |
+| Its Download (PDF) and Print reach filex; FB2, which x2t does not write here, is refused and the person told | yes | yes | yes |
+| "Edit": the folded editor with the document; typed text saved (Ctrl+S) and in the file | yes | yes | yes |
+| "Reading view": back in the phone app, nothing left unsaved | yes | yes | yes |
+| The xlsx and pptx open in their phone apps | yes | yes | yes |
+| Requests outside the package / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
+| Screenshots: the phone app light and dark, the editor, the way back, xlsx, pptx | 7/7 | 7/7 | 7/7 |
+
+Two things the browsers showed before it passed, both fixed in this
+project's own files: Chromium refuses even to read `navigator.serviceWorker`
+in a sandboxed page, and Framework7 reads it while it starts, so the phone
+app stopped before showing anything (the storage stand-in now takes the
+attribute away there); and filex's bootstrap makes
+`Node.prototype.appendChild` read-only, so the phone app's held start
+(`src/frame/hold.ts`) defines its `appendChild` on `<body>` instead of
+assigning it. The phone app draws the page fitted to the screen; the
+editor after "Edit" shows its "New" hints to a person who has not closed
+them yet, as on a computer. The harness differs from filex 0.55 in one line, on
 purpose: it sends no `frame-ancestors` (see
 [What filex provides](#what-filex-provides); `FX_FRAME_ANCESTORS=star`
 puts it back and Chromium refuses the editor page).
@@ -584,9 +608,9 @@ is no earlier, partial release:
    [Measured in the browsers](#measured-in-the-browsers)), with Download as
    and Print through x2t, the editor's settings kept between openings and
    one person counting one, and on a phone ONLYOFFICE's phone app to read
-   with "Edit" to the folded editor (**built, not yet measured**: [On a
-   phone](#on-a-phone)); still to come: the measurements in filex 0.55
-   itself, with filex's `ui.print` printing for real.
+   with "Edit" to the folded editor (**built and measured** in the three
+   browsers: [On a phone](#on-a-phone)); still to come: the measurements in
+   filex 0.55 itself, with filex's `ui.print` printing for real.
 4. Encrypted folders (filex's `files:e2e-plaintext`).
 5. Editing together (filex's `files:co-edit` and the relay).
 6. A release bundle pinned by its SHA-256, the legal notice in the editor,
