@@ -52,6 +52,40 @@ update.
   and checked by `scripts/fetch-x2t.mjs`. `npm run test:x2t` takes a docx,
   an xlsx and a pptx with Turkish text through it to Editor.bin and back
   with `src/x2t.ts`; nothing is lost.
+- The app (plan step A3): `npm run build` (`scripts/build-app.mjs`) makes
+  `dist/ui.zip`, the bundle filex installs - the locked editor files, the
+  pinned x2t, the app page and the editor page's script in place of
+  socket.io (92.7 MiB zipped, 1,889 files). The app page reads the file
+  through filex's SDK, converts it with x2t in a worker, starts
+  ONLYOFFICE's editor in its own frame and hands it the document; one
+  person edits it, the session's log stays in the page
+  (`src/session.ts`), and the editor's Save, filex's Save and a save every
+  ten minutes while there are changes write a new version of the file in
+  its own format. filex is told about unsaved changes. The editor follows
+  filex's language and light or dark theme; a file that cannot be saved
+  opens to read; an empty file opens as a blank one. The legal notice
+  ONLYOFFICE's terms ask for is shown under the editor, in English and
+  Turkish.
+- New documents: the Document Server's blank docx, xlsx and pptx are in the
+  bundle (`editor/document-templates/new/default/new.*.bin`), and
+  `filex-app.json` names them.
+- `npm run e2e` (`e2e/run.mjs`): the bundle, served the way filex 0.55
+  serves an app (`e2e/harness/`), opened in Chromium, Firefox and WebKit;
+  blank and Turkish docx, xlsx and pptx are typed in and saved twice, and
+  the written files read back. All pass in all three; no request leaves
+  the package; the storage stand-in takes the place of the storage none of
+  the three gives the sandboxed pages.
+
+### Fixed
+
+- The bridge told an editor that had not yet received every change it
+  could save when it said it knew none (`isSaveLock` with
+  `syncChangesIndex` 0): 0 is now checked like any other count. The
+  Document Server lets 0 through "for compatibility"; the pinned editor
+  always sends its count.
+- The editor's interface templates are kept (as `.template.txt`): they are
+  not built into the apps, and the editor stopped without them. The
+  per-theme thumbnails, which the editor never asks for, are left out.
 
 ### Changed
 

@@ -73,12 +73,31 @@ sponsored by Ascensio System SIA.
        (filex/storage.js, this project's own);
      - web-apps/apps/api/documents/api.js is api.js.tpl, with the cache tag
        left as a placeholder;
-     - ONLYOFFICE's license/*.license files carry a .txt extension; their
-       content is unchanged;
+     - ONLYOFFICE's license/*.license files and the editors' interface
+       templates (web-apps/apps/*/main/{app,lib}/template/*.template) carry
+       a .txt extension, and the Document Server's blank documents
+       (document-templates/new/default/new.docx, .xlsx, .pptx) a .bin one;
+       their content is unchanged;
      - parts the app does not use are left out (help pages, the PDF and
        Visio editors, the mobile, embedded and forms apps, the macro editor,
-       dictionaries, asm.js fallbacks, the server's script snapshots, some
-       fonts); the lock file names each kind and how many files.
+       dictionaries, asm.js fallbacks, the server's script snapshots, the
+       per-theme thumbnails, some fonts); the lock file names each kind and
+       how many files.
+
+   The app's build (scripts/build-app.mjs) changes one more file, in the
+   app's bundle only, and adds one, both listed in the bundle's
+   editor/filex/CHANGES.txt (BRF Tech, 2026-10-08):
+     - web-apps/vendor/socketio/socket.io.min.js, ONLYOFFICE's copy of the
+       socket.io client (Socket.IO 4.5.3, MIT), is replaced by this
+       project's editor-page script (src/frame/main.ts, bundled): the
+       editor's socket is answered in the page, by the bridge;
+     - themes.json, an empty list of custom themes, is added.
+   The editor page's script also changes, while it runs, how the editor
+   reaches a few things under filex's sandbox (README.md, "The app"): the
+   messages between api.js and the editor's Gateway, the interface
+   templates' names, the spell checker's worker, the presentation themes'
+   folder, a Save the editor would drop, and pictures inserted from the
+   computer. ONLYOFFICE's files are not edited for any of these.
 
 4. The x2t WebAssembly build is ONLYOFFICE's converter (ONLYOFFICE core),
    pinned under "x2t" in upstream/onlyoffice.json. Today it is CryptPad's
@@ -102,10 +121,15 @@ a modified version:
     therefore never hidden, and the app adds this notice where the editor
     opens:
 
-      "This editor is based on ONLYOFFICE Docs by Ascensio System SIA,
-       and this version may have been modified. It is free software under
-       the GNU Affero General Public License version 3; source code:
-       <the exact tag of this repository>."
+      "Based on ONLYOFFICE Docs by Ascensio System SIA; this version may
+       have been modified (Docs <version>, build <build>, ONLYOFFICE source
+       tag <tag>). Free software under the GNU AGPL version 3; source code:
+       github.com/BRF-Tech/filex-office-editor/tree/v<this app's version>.
+       ONLYOFFICE® is a registered trademark of Ascensio System SIA; this
+       app is not affiliated with or endorsed by it."
+
+    (src/app/strings.ts, in English and Turkish; a build between releases
+    names the repository instead of a tag.)
 
   - grants no trademark rights: ONLYOFFICE® and ONLYOFFICE Docs™ are
     registered trademarks or trademarks of Ascensio System SIA. This project
@@ -116,6 +140,16 @@ a modified version:
     CC BY-SA 4.0.
 The terms themselves are in ONLYOFFICE's LICENSE files (sdkjs, web-apps,
 server, core), which the release bundle will carry unchanged.
+
+
+Other software in the app's bundle
+----------------------------------
+
+  - filex/app.js carries @brftech/filex-app-ui (filex's interface SDK, MIT,
+    BRF Tech) and esbuild's small runtime helpers (MIT).
+  - The browser measurement's stand-in for filex (e2e/harness/server.mjs)
+    carries filex's interface bootstrap and policy, as filex builds them
+    (backend/internal/wasmplugin/uipolicy.go, MIT, BRF Tech).
 
 
 The approach

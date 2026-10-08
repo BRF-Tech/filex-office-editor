@@ -68,28 +68,33 @@ This app gives the editor all of that in the browser:
 - **The "server"** is a bridge in the editor's frame (`src/bridge.ts`). It
   answers every message the way the Document Server does (Docs 9.4,
   `DocsCoServer.js`); whatever the other people need - a batch of changes, a
-  lock request, a released lock - it hands to filex, which seals it and sends
-  it through its relay. The relay puts the sealed entries in one order
-  without reading them, and every editor's bridge applies the same entries in
-  the same order with the Document Server's lock rules (`src/locks.ts`), so
-  the first request for a paragraph or a range wins everywhere.
+  lock request, a released lock - goes into the session's log. With one
+  person (`src/session.ts`) the log stays in the page; editing together,
+  filex seals each entry and sends it through its relay, which puts the
+  sealed entries in one order without reading them, and every editor's
+  bridge applies the same entries in the same order with the Document
+  Server's lock rules (`src/locks.ts`), so the first request for a paragraph
+  or a range wins everywhere.
 - **The conversion** runs in the browser: x2t, ONLYOFFICE's converter,
-  compiled to WebAssembly (`src/x2t.ts` drives it).
+  compiled to WebAssembly, in a worker (`src/x2t.ts` drives it).
 
 ```
-filex page (keys, network)              the app's frame (this repository)
-+-----------------------------+  port   +--------------------------------+
-| decrypts and encrypts       |<------->| bridge (the "Document Server") |
-| seals and opens log entries |         |   ^ socket.io stand-in         |
-| relay connection, saving    |         | ONLYOFFICE editor, unchanged   |
-+--------------+--------------+         | x2t (WebAssembly)              |
-               | sealed only            +--------------------------------+
-               v
-+-----------------------------+
-| filex relay                 |   no Document Server: nothing reads
-| order, lease, members,      |   the document, its changes, its
-| sealed log, sealed blobs    |   images or its conversion
-+-----------------------------+
+filex page (keys, network)        the app: two sandboxed pages (this repository)
++---------------------------+port +-------------------------------------------+
+| reads and saves the file  |<--->| app page (index.html): x2t in a worker,   |
+| (decrypts and encrypts    |     |   api.js, saving, the legal notice        |
+|  it in encrypted folders; |     |      | port (bytes, never addresses)      |
+|  seals and opens the log  |     |      v                                    |
+|  entries, editing         |     | editor page: ONLYOFFICE's editor as it    |
+|  together)                |     |   ships; in socket.io's place the bridge  |
++-------------+-------------+     |   and the session                         |
+              | sealed only       +-------------------------------------------+
+              v
++---------------------------+
+| filex relay (editing      |   no Document Server: nothing reads
+| together): order, lease,  |   the document, its changes, its
+| sealed log, sealed blobs  |   images or its conversion
++---------------------------+
 ```
 
 The app never holds a key and never touches the network: filex hands it the
@@ -121,12 +126,13 @@ does not have yet. Their names below are proposals; filex decides them.
 | The app needs | filex today | Proposed (filex 0.55) |
 |---|---|---|
 | ONLYOFFICE's `DocsAPI.DocEditor` opens the editor page in a frame of its own | `frame-src 'none'` | `ui.frame_package` → permission `ui:frame-package`: frames from the app's own package only, in the same sandbox |
+| The editor page may be framed by the app page | package pages carry `frame-ancestors *` | ⚠ **measured, Chromium:** `*` never matches an opaque origin, so the editor page is refused ("Framing ... violates frame-ancestors *"); a package page needs no `frame-ancestors` at all (filex's own page decides what it frames) |
 | The editor loads the document from a `blob:` address | `connect-src 'none'` or the package | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` |
 | The plaintext of a document in an encrypted folder | apps are never given one | `files:e2e-plaintext`: the explorer decrypts and hands the bytes over, encrypts the save (a conditional write); a separate permission with a stern warning in the review |
 | Editing together | - | `files:co-edit`: the relay's routes and WebSocket, its tables, the sealed blob store, and a bridge method for the app to append and read the log |
-| `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`); still to be measured in every browser |
+| `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | No inline scripts | `script-src` is the package only | in the app: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (measured: about 101 MiB zipped with x2t, 2,182 files, 309 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
+| A large package (measured: 92.7 MiB zipped with x2t, 1,889 files, 300.5 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -134,9 +140,17 @@ does not have yet. Their names below are proposals; filex decides them.
 |---|---|
 | `src/bridge.ts` | `OfficeBridge`: answers the editor's Document Server protocol (license, auth, authChanges, documentOpen, getLock, isSaveLock, saveChanges, unLockDocument, cursor, forceSaveStart) and turns what has to be shared into entries of the session's log; applies the log's entries, in order, to its changes, locks and participants |
 | `src/locks.ts` | The Document Server's lock rules (text, spreadsheet, presentation) and the spreadsheet's lock recalculation after inserted or deleted rows and columns, kept as Docs 9.4 has them |
-| `src/shim.ts` | A `socket.io` stand-in served in place of `web-apps/vendor/socketio/socket.io.min.js`: the editor's socket is plugged into the bridge |
-| `src/x2t.ts` | Drives x2t (WebAssembly) to turn a docx/xlsx/pptx into the editor's format and back |
+| `src/shim.ts` | A `socket.io` stand-in: the editor's socket is plugged into the bridge |
+| `src/session.ts` | `LocalSession`: the session's log for one person, in the editor page, with the relay's rules (one order, changes only under the lease, the lease only for a member that has seen every change) |
+| `src/x2t.ts` | Drives x2t (WebAssembly) to turn a docx/xlsx/pptx (or odt/ods/odp) into the editor's format and back |
 | `src/protocol.ts` | The messages and numbers both sides use |
+| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`), saving, the legal notice ([The app](#the-app)) |
+| `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
+| `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
+| `src/worker/x2t-worker.ts` | The converter's worker |
+| `app/` | The app page itself: `index.html` and `filex/app.css` |
+| `scripts/build-app.mjs` | Builds the app's bundle, `dist/ui/` and `dist/ui.zip`, from the editor files (checked against the lock), x2t (checked against the pin) and the app ([The app](#the-app)) |
+| `e2e/` | The browser measurement: a stand-in for filex 0.55 that serves the bundle the way filex serves an app (`e2e/harness/`), and the run in Chromium, Firefox and WebKit (`e2e/run.mjs`) ([Measured in the browsers](#measured-in-the-browsers)) |
 | `upstream/onlyoffice.json` | The one place the upstream versions are pinned: the ONLYOFFICE Docs release the editor files are taken from (version, build, image tag and digest, source tag, the date it was pinned) and, under `x2t`, the converter build (release, address, SHA-512, each file's SHA-256) |
 | `upstream/editor.lock.json` | What the editor bundle built from that release holds: every file with its SHA-256 and size, what was left out and why, what was changed and why, the zip's size and SHA-256 |
 | `scripts/extract-editor.sh` | Builds the editor bundle from the pinned image ([The editor bundle](#the-editor-bundle)); `scripts/editor/` holds its steps: `in-image.sh` (in the image), `rules.mjs` (what is kept, filex's limits), `html.mjs` (no inline code), `storage.js` (the storage stand-in), `bundle.mjs`, `fontnames.mjs`, `config.mjs` |
@@ -152,6 +166,8 @@ npm test              # vitest run (the x2t round trips are skipped without the 
 npm run typecheck     # tsc
 npm run test:x2t      # fetch the pinned x2t build (39 MB, checked), then its round trips
 npm run editor        # bash scripts/extract-editor.sh: the editor bundle (needs docker)
+npm run build         # node scripts/build-app.mjs: the app's bundle, dist/ui.zip
+npm run e2e           # node e2e/run.mjs: the bundle in Chromium, Firefox and WebKit
 ```
 
 ## The editor bundle
@@ -189,35 +205,48 @@ in three containers, none of them with network access after the pull:
    difference fails the build, and `--update` writes it.
 
 The build is **reproducible**: two complete runs, from the image to the
-zip, gave the same `editor.zip` (SHA-256 `e8f8b2e1...0404771`, recorded in
-the lock file). The image is pulled by digest, the generators give the same
-bytes every time, and the zip is written sorted, with one date and no extra
-fields, by `scripts/lib/zip.mjs` in the pinned Node image (deflate's bytes
-depend on the zlib that makes them).
+zip, gave the same `editor.zip` (the first measurement, SHA-256
+`e8f8b2e1...0404771`; the lock file records the current one). The image is
+pulled by digest, the generators give the same bytes every time, and the
+zip is written sorted, with one date and no extra fields, by
+`scripts/lib/zip.mjs` in the pinned Node image (deflate's bytes depend on
+the zlib that makes them).
 
 Measured with ONLYOFFICE Docs 9.4.0 (build 9.4.0.129), on an x86-64 Linux
-machine (about three minutes, most of it the font and theme generators):
+machine (about three minutes, most of it the font and theme generators),
+after the browser measurement of 2026-10-08 (the interface templates in,
+the per-theme thumbnails out, below):
 
 | Part | Files | Unpacked (MiB) | Zipped (MiB) |
 |---|---:|---:|---:|
-| Presentation themes (36, with thumbnails at 11 scales) | 540 | 29.5 | 22.5 |
 | Web fonts (generated from core-fonts) | 157 | 38.5 | 19.4 |
 | sdkjs `sdk-all.js` + `sdk-all-min.js` (word, cell, slide) | 6 | 94.7 | 15.7 |
+| Presentation themes (36) | 144 | 20.7 | 13.8 |
 | sdkjs images (font and theme thumbnails, cursors, icons) | 217 | 14.0 | 11.9 |
-| web-apps: the three editors, common, vendor | 876 | 34.4 | 10.0 |
+| web-apps: the three editors, common, vendor, the interface templates | 969 | 34.9 | 10.0 |
 | web-apps locales (46 languages, three editors) | 138 | 43.8 | 8.3 |
 | sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.3 | 3.4 |
-| Licenses, notices, `filex/` | 76 | 0.4 | 0.1 |
-| **The editor bundle** | **2,180** | **271.6** | **91.8** |
-| x2t (`x2t.wasm` + `x2t.js`, deflated) | 2 | 37.1 | 9.6 |
-| **With x2t** | **2,182** | **308.7** | **101.4** |
+| Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
+| **The editor bundle** | **1,880** | **263.3** | **83.0** |
+| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **1,889** | **300.5** | **92.7** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
-`sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part is 2,180 files, more
-than the 2,000 aimed for: the per-theme thumbnails (396 files, 8.8 MiB) are the
-first to go if the editor never asks for them (to be measured in the
-browser).
+`sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part is within the 2,000
+files and 100 MB aimed for.
+
+Two corrections came from the browser measurement (2026-10-08):
+
+- **The interface templates are not built into the apps.** The editor
+  pages load 93 of them while they run (RequireJS's `text!`
+  `.../template/ParagraphSettings.template`) and stopped with "HTTP status:
+  404" without them. filex serves no `.template` file, so they are carried
+  as `.template.txt` and the editor page's script asks for that name
+  (`src/frame/text.ts`, through the text plugin's own `createXhr` setting).
+- **The per-theme thumbnails are never asked for** (396 files at 11
+  scales): opening a presentation and its Design tab fetches one sprite,
+  `sdkjs/common/Images/themes_thumbnail.png`, and no code in web-apps or
+  sdkjs names the per-theme files. They are left out.
 
 **What the bundle changes in ONLYOFFICE's files**, every change listed in
 the lock file (`changed`, `added`) and in the bundle itself
@@ -237,15 +266,21 @@ the lock file (`changed`, `added`) and in the bundle itself
   in-memory one instead.
 - `web-apps/apps/api/documents/api.js` is `api.js.tpl`, as the Document
   Server's first start makes it, with the cache tag left as a placeholder so
-  the editor's paths are not rewritten; ONLYOFFICE's `.license` files get a
-  `.txt` extension so filex serves them. Their content is unchanged.
+  the editor's paths are not rewritten; ONLYOFFICE's `.license` files and
+  the interface templates get a `.txt` extension, and the Document Server's
+  three blank documents (`document-templates/new/default/new.docx` ...,
+  what filex's New menu copies) a `.bin` one, so filex serves them. Their
+  content is unchanged.
 - `core-fonts-licenses/` carries each font family's license files and, in
   `FONTS.txt`, the copyright and license each font states in its own name
   table (several families ship without a license file).
 
-Not yet in the bundle: the socket.io stand-in in place of
-`web-apps/vendor/socketio/socket.io.min.js` (it needs the bridge, which the
-app's page brings) and x2t, which joins the release bundle with the page.
+The app's build ([The app](#the-app)) then makes one more change, and only
+in the app's bundle: `web-apps/vendor/socketio/socket.io.min.js`, ONLYOFFICE's
+copy of the socket.io client, is replaced by the editor page's script, and
+an empty `themes.json` (the Document Server's list of custom themes, which
+the editor asks for on every opening) is added. `editor/filex/CHANGES.txt`
+in the bundle says so.
 
 ## x2t, the converter
 
@@ -284,6 +319,112 @@ workbooks, not those bytes; editing together does not depend on it either
 build's documents also name their application `ONLYOFFICE/2.5.565.0`, not
 the release; both are for this project's own build to look at.
 
+## The app
+
+`npm run build` (`node scripts/build-app.mjs`) makes the bundle filex
+installs, `dist/ui.zip` (and the tree, `dist/ui/`): the editor files from
+`dist/editor/`, each checked against `upstream/editor.lock.json`; x2t from
+`dist/x2t/`, checked against the pin; this project's three scripts, bundled
+with esbuild (pinned in `package-lock.json`); the app page; `LICENSE` and
+`NOTICE`. It checks filex's limits, that the app page has no inline code
+and that every file `filex-app.json` names is in it.
+
+Under filex both pages of the app are sandboxed, each an opaque origin of
+its own (`sandbox allow-scripts`): neither can reach into the other, a
+`blob:` address one makes the other may not read, and neither has storage.
+
+**The app page** (`index.html`, `src/app/`) is what filex opens:
+
+1. It connects to filex with filex's SDK (`@brftech/filex-app-ui`) and reads
+   the file. An empty file opens as the blank document of its kind.
+2. It starts x2t in a worker - from a `blob:` address whose one line imports
+   the worker from the package, the only way an opaque origin may start one
+   - and converts the file to the editor's format while the editor loads.
+3. It loads ONLYOFFICE's `api.js` from the package and starts
+   `DocsAPI.DocEditor`, which frames the editor page. The configuration
+   (`src/app/config.ts`) follows filex: the person's language and region,
+   filex's light or dark theme (ONLYOFFICE's `theme-white` /
+   `theme-night`), a file that cannot be saved opens to read. Everything
+   that would reach a Document Server is off: plugins, macros, chat, the
+   spell checker, help, and - until x2t does them here - Download as and
+   Print.
+4. It hands the editor page the converted document over a `MessagePort`,
+   as bytes (transferred, not copied).
+5. It saves: the editor's Save (its button, Ctrl+S in the editor), filex's
+   Save (and Ctrl+S outside the editor, through the SDK), and every ten
+   minutes while there are changes. A save asks the editor page for the
+   document as the editor holds it (`asc_nativeGetFile`, with its images),
+   converts it back to the file's own format with x2t and writes it as a
+   new version (`file.save`). filex is told "unsaved changes" while there
+   are and asks before the person leaves them.
+6. It shows, under the editor, the notice ONLYOFFICE's terms ask for: based
+   on ONLYOFFICE Docs by Ascensio System SIA, this version may have been
+   modified, the Docs version and ONLYOFFICE's source tag, the AGPL and this
+   repository at the app's tag, the trademark line. The editor's own About
+   is not touched.
+
+**The editor page** is ONLYOFFICE's, as it ships. Its script
+(`src/frame/main.ts`) is served at the address the editor page loads
+socket.io from, so it is the editor's socket: the shim, the bridge and, for
+one person, the session (`src/session.ts`) - a Document Server answered in
+the page. It makes the editor's `blob:` addresses itself, from the bytes it
+was handed. It also does what the editor needs under filex's sandbox, each
+measured in the browser before it was written:
+
+| What | Why | How |
+|---|---|---|
+| The two pages hear each other | `api.js` and the editor's Gateway take a message only from the origin of the other's address; a sandboxed page's messages carry the origin `"null"`, so the editor never got its configuration | `src/origin.ts`: a message that comes from the one window it should come from is handed on with the origin they expect (the window is a stronger check than the origin was); everything else is left as it is |
+| The interface templates | served as `.template.txt` (above) | `src/frame/text.ts`: the text plugin's `createXhr` setting |
+| The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening; spell checking has no dictionaries here anyway | `src/frame/workers.ts`: the spell engine gets a worker that does nothing; any other worker from the package starts from a `blob:` address |
+| The presentation themes | the editor loads `sdkjs/slide/themes//themes.js`; nginx merges the two slashes, filex refuses an empty path segment | `src/frame/themes-path.ts`: the editor is given its themes folder without the trailing slash |
+| Save while the editor hands over its changes | the editor's Save does nothing while a hand-over runs, and keeps nothing for later (sdkjs `asc_Save`); a Ctrl+S right after typing was lost | `src/frame/save-retry.ts`: the Save is kept until the editor has started it, and asked again when the editor is free |
+| Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture |
+
+The editor still shows one person besides the one editing, named "filex":
+the bridge's keeper, which keeps the editor sending its changes as it makes
+them (an editor that thinks it is alone does not). The editor's settings
+live in the storage stand-in for as long as the page lives, so its "New"
+feature tips show at every opening.
+
+## Measured in the browsers
+
+`npm run e2e` (`node e2e/run.mjs`, `--shots` for screenshots) serves the
+built bundle the way filex 0.55 serves an app's interface - the address
+shape, the headers and the policy built from the grant
+(`backend/internal/wasmplugin/uipolicy.go` on filex's branch
+`feat/189-p1-app-frame`), filex's bootstrap first in every page - with a
+host page that draws the sandboxed frame and answers the app's bridge the
+way filex's `AppFrame` does (`e2e/harness/`). Then, headless, in Chromium,
+Firefox and WebKit: it opens a blank docx, xlsx and pptx (the ones filex's
+New menu makes) and the Turkish documents of the x2t smoke test, types
+`Merhaba dünya: ğüşıöç İĞÜŞÖÇ` into each, saves with the editor's Ctrl+S
+and with filex's Save, and reads the written files back.
+
+Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
+148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
+reads aside):
+
+| | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| Opens (from the host page's load to the document on screen) | 1.6-2.1 s | 4.0-4.6 s | 3.6-5.7 s |
+| docx, xlsx, pptx: typed text in both saves, the Turkish documents' text kept | 6/6 | 6/6 | 6/6 |
+| "Unsaved changes" on typing, off after the save | yes | yes | yes |
+| Requests outside the package (and its own `blob:` addresses) | 0 | 0 | 0 |
+| Package files missing (404) | 0 | 0 | 0 |
+| Storage given to the sandboxed pages | none: the stand-in takes its place in both pages, works, and holds the editor's settings (`ui-theme`, zoom, recent languages, comment order) | the same | the same |
+| Screenshots, 1280 and 390 px, light and dark | 4/4 | 4/4 | 4/4 |
+
+Firefox splits a typed line into one run per letter outside ASCII in the
+saved docx (the text is whole; Playwright types those letters as text
+input). Every page logs one error that is the editor's own and harmless:
+its service worker cannot register in a sandboxed page; WebKit adds, for a
+presentation, that fullscreen is not allowed (filex's policy turns it off).
+At 390 px the editor is ONLYOFFICE's desktop one, its toolbar folded
+("More"): usable, not made for a phone. The harness differs
+from filex 0.55 in one line, on purpose: it sends no `frame-ancestors`
+(see [What filex provides](#what-filex-provides); `FX_FRAME_ANCESTORS=star`
+puts it back and Chromium refuses the editor page).
+
 ## Keeping up with ONLYOFFICE
 
 The editor files come from one ONLYOFFICE Docs release, written down in
@@ -320,14 +461,19 @@ is no earlier, partial release:
 1. The editor bundle: ONLYOFFICE web-apps + sdkjs from the official Document
    Server image (`upstream/onlyoffice.json`), without help pages,
    dictionaries and the PDF and diagram editors; inline scripts moved to
-   files - **built** ([The editor bundle](#the-editor-bundle)); still to
-   come: the socket.io stand-in in place.
+   files - **built** ([The editor bundle](#the-editor-bundle)).
 2. x2t built to WebAssembly from ONLYOFFICE core at the same version, run
-   in a Worker - CryptPad's build is **pinned and passes the round trips**
-   ([x2t, the converter](#x2t-the-converter)); this project's own build
-   replaces it before 0.1.0.
+   in a Worker - CryptPad's build is **pinned, passes the round trips and
+   runs in the app's worker** ([x2t, the converter](#x2t-the-converter));
+   this project's own build replaces it before 0.1.0.
 3. The app's page: the editor frame, the port to filex, a single person
-   editing (also in an unencrypted folder), saving as a new version.
+   editing (also in an unencrypted folder), saving as a new version -
+   **built and measured in Chromium, Firefox and WebKit** against a
+   stand-in for filex 0.55 ([The app](#the-app),
+   [Measured in the browsers](#measured-in-the-browsers)); still to come:
+   in filex 0.55 itself, at 390 px (the editor is ONLYOFFICE's desktop
+   one), keeping the editor's settings between openings, Download as and
+   Print through x2t.
 4. Encrypted folders (filex's `files:e2e-plaintext`).
 5. Editing together (filex's `files:co-edit` and the relay).
 6. A release bundle pinned by its SHA-256, the legal notice in the editor,
