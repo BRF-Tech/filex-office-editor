@@ -6,7 +6,7 @@
 // the themes path, the Save kept while the editor is busy, the workers.
 import { describe, expect, it, vi } from 'vitest';
 
-import { editorConfig, editorLang, editorRegion, kindOf, uiLang, THEME_DARK, THEME_LIGHT } from '../src/app/config';
+import { NARROW_PX, editorConfig, editorLang, editorRegion, kindOf, narrowLayout, uiLang, THEME_DARK, THEME_LIGHT } from '../src/app/config';
 import { STRINGS } from '../src/app/strings';
 import { EDITOR_USER_ID, isFrameHello, isFramePort, mediaType, FRAME_HELLO, FRAME_PORT } from '../src/frame-protocol';
 import { SaveRetry } from '../src/frame/save-retry';
@@ -80,8 +80,32 @@ describe('the editor configuration', () => {
     expect(c.editorConfig.user).toEqual({ id: EDITOR_USER_ID, name: 'Ayşe' });
     expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: false, help: false, feedback: false, goback: false, uiTheme: THEME_LIGHT });
     expect(c.editorConfig.customization.features.spellcheck).toEqual({ mode: false, change: false });
-    expect(c.document.permissions).toMatchObject({ edit: true, download: false, chat: false });
+    expect(c.document.permissions).toMatchObject({ edit: true, download: false, print: false, chat: false });
     expect(c.editorConfig.customization.chat).toBeUndefined();
+    // "Suggest a feature" opens ONLYOFFICE's site, which the sandbox cannot.
+    expect(c.editorConfig.customization.suggestFeature).toBe(false);
+  });
+
+  it('lists only people without a group, so the bridge keeper is not counted', () => {
+    const c = editorConfig({ ...base, userName: `Ayşe${String.fromCharCode(160)}Yılmaz` }) as any;
+    expect(c.document.permissions.userInfoGroups).toEqual(['']);
+    expect(c.editorConfig.user.name).toBe('Ayşe Yılmaz');
+  });
+
+  it('Download as and Print where filex can hand the file over', () => {
+    const c = editorConfig({ ...base, canDownload: true, canPrint: true }) as any;
+    expect(c.document.permissions).toMatchObject({ download: true, print: true });
+  });
+
+  it('a narrow frame folds the editor, and nothing else changes', () => {
+    expect(NARROW_PX).toBe(600);
+    const wide = editorConfig(base) as any;
+    const narrow = editorConfig({ ...base, narrow: true }) as any;
+    expect(narrow.editorConfig.customization).toMatchObject(narrowLayout());
+    expect(narrowLayout()).toMatchObject({ compactToolbar: true, hideRulers: true });
+    expect(narrowLayout().zoom).toBeUndefined();
+    expect(narrowLayout().compactHeader).toBeUndefined();
+    for (const k of Object.keys(narrowLayout())) expect(wide.editorConfig.customization[k]).toBeUndefined();
   });
 
   it('a file that cannot be saved opens to read, and the dark theme follows filex', () => {

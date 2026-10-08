@@ -6,6 +6,7 @@
 // configuration), from what filex tells the app (session.get). Pure: no
 // document, no window, so the tests read it as it is.
 
+import { personName } from '../bridge';
 import { EDITOR_USER_ID } from '../frame-protocol';
 
 export type DocumentType = 'word' | 'cell' | 'slide';
@@ -114,8 +115,40 @@ export interface ConfigInput {
   dark: boolean;
   userName: string;
   canEdit: boolean;
+  /** filex hands the person a file (the app's ui:download grant): "Download as" is on. */
+  canDownload?: boolean;
+  /** Print is on (it needs filex's print, or a download to fall back to). */
+  canPrint?: boolean;
+  /** The app's frame is a phone's width: the editor starts folded (see narrowLayout). */
+  narrow?: boolean;
   /** The events the app page listens to. */
   events?: Record<string, (e: { data?: unknown }) => void>;
+}
+
+/** Narrower than this (CSS px), the app's frame is a phone's: the editor starts folded. */
+export const NARROW_PX = 600;
+
+/**
+ * The editor on a narrow screen. ONLYOFFICE's phone editors (each editor's
+ * "mobile" app) are not in the bundle (scripts/editor/rules.mjs; telephones
+ * come after filex's PWA work, #190), so a phone gets the desktop editor,
+ * folded where its own options allow: the ribbon shows its tabs only (a tap
+ * on one opens it), no rulers, the side panel closed. Every one of them
+ * stays the person's to change, and the editor keeps their choice
+ * (settings.ts) over this.
+ *
+ * Measured at 390 px (2026-10-08, Chromium): compactHeader puts the tabs
+ * behind two arrows with no name showing, and a page fitted to the width
+ * (zoom -2) is drawn at 32 % - unreadable - so neither is used; the page
+ * stays at the person's zoom and scrolls sideways.
+ */
+export function narrowLayout(): Record<string, unknown> {
+  return {
+    compactToolbar: true,
+    toolbarHideFileName: true,
+    hideRulers: true,
+    hideRightMenu: true,
+  };
 }
 
 /**
@@ -123,10 +156,12 @@ export interface ConfigInput {
  * Server, in "fast" co-editing (changes go to the bridge as they are made),
  * with Save asking the bridge (forcesave). Everything that would reach a
  * server the bridge does not answer is off: plugins, macros, chat, the
- * spell checker's server, the help pages (not in the bundle), the feedback
- * and "go back" links, and - for now - Download as and Print (a Document
- * Server converts for both). ONLYOFFICE's logo and About stay (its terms ask the
- * logo to be kept; About names the version and its authors).
+ * spell checker's server, the help pages (not in the bundle), the feedback,
+ * "suggest a feature" and "go back" links. Download as and Print are x2t's
+ * in the browser (frame/export.ts) and on when filex can hand the result
+ * over. The editor lists only people without a group, which hides the
+ * bridge's keeper (bridge.ts). ONLYOFFICE's logo and About stay (its terms
+ * ask the logo to be kept; About names the version and its authors).
  */
 export function editorConfig(o: ConfigInput): Record<string, unknown> {
   const edit = o.canEdit;
@@ -149,20 +184,20 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
         fillForms: edit,
         modifyFilter: edit,
         modifyContentControl: edit,
-        download: false,
-        // A Document Server prints by converting to PDF on the server; here
-        // that is x2t's job, which the app does not do yet.
-        print: false,
+        download: o.canDownload === true,
+        print: o.canPrint === true,
         copy: true,
         chat: false,
         protect: false,
+        // Show only people without a group: everyone but the keeper.
+        userInfoGroups: [''],
       },
     },
     editorConfig: {
       mode: edit ? 'edit' : 'view',
       lang: editorLang(o.locale),
       region: editorRegion(o.locale),
-      user: { id: EDITOR_USER_ID, name: o.userName },
+      user: { id: EDITOR_USER_ID, name: personName(o.userName) },
       coEditing: { mode: 'fast', change: false },
       plugins: { autostart: [], pluginsData: [] },
       customization: {
@@ -172,11 +207,13 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
         comments: true,
         help: false,
         feedback: false,
+        suggestFeature: false,
         goback: false,
         plugins: false,
         macros: false,
         mentionShare: false,
         features: { spellcheck: { mode: false, change: false } },
+        ...(o.narrow ? narrowLayout() : {}),
       },
     },
     events: o.events ?? {},

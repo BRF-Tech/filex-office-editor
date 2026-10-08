@@ -18,9 +18,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GROUP_SEPARATOR,
+  KEEPER_GROUP,
   KEEPER_INDEX,
   KEEPER_USER,
   OfficeBridge,
+  personName,
   type BridgeAppend,
   type BridgeEntry,
   type BridgeMember,
@@ -252,6 +255,17 @@ describe('opening', () => {
     const people = last(a, 'auth')!.participants as { id: string; idOriginal: string; indexUser: number; view: boolean }[];
     expect(people[0]).toMatchObject({ id: `${KEEPER_USER}${KEEPER_INDEX}`, indexUser: 0, view: false });
     expect(people[1]).toMatchObject({ id: 'u1-1', idOriginal: 'u1-', indexUser: 1, view: false });
+  });
+
+  it("the keeper's name carries a group of its own, so the editor shows only the people", () => {
+    const s = new Session();
+    const a = s.join(`Ayşe${GROUP_SEPARATOR}Yılmaz`);
+    const people = last(a, 'auth')!.participants as { username: string }[];
+    expect(GROUP_SEPARATOR).toBe(String.fromCharCode(160));
+    expect(people[0].username).toBe(`${KEEPER_GROUP}${GROUP_SEPARATOR}filex`);
+    // A person's name never reads as groups: the no-break space becomes a space.
+    expect(people[1].username).toBe('Ayşe Yılmaz');
+    expect(personName(`a${GROUP_SEPARATOR}b${GROUP_SEPARATOR}c`)).toBe('a b c');
   });
 
   it('an auth that comes before the log is read waits for it', () => {

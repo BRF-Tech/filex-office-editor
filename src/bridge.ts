@@ -22,7 +22,11 @@
 //
 // A pseudo participant, the keeper, is always in the list: an editor that
 // sees itself alone stops sending its changes as it makes them, and somebody
-// may join at any moment. CryptPad's bridge does the same ("History").
+// may join at any moment. CryptPad's bridge does the same ("History"). The
+// person does not see it: its name carries a group of its own (the editor's
+// "group<NBSP>name" form), and the app configures the editor to show only
+// people without a group (permissions.userInfoGroups [""], app/config.ts) -
+// alone, the editor counts one person, not two.
 
 import { LockTable } from './locks';
 import {
@@ -144,6 +148,23 @@ export interface BridgeOptions {
 /** The keeper's ids. Its index is 0: the relay starts members at 1. */
 export const KEEPER_USER = 'filex-keeper-';
 export const KEEPER_INDEX = 0;
+
+/**
+ * The editor's separator between a user's groups and their name
+ * (AscCommon.UserInfoParser: a no-break space).
+ */
+export const GROUP_SEPARATOR = String.fromCharCode(160);
+
+/** The keeper's group: the editor shows nobody of it (see the top of the file). */
+export const KEEPER_GROUP = 'filex-keeper';
+
+/**
+ * A person's name as the editor may show it: a no-break space in it would
+ * make the editor read what comes before as groups, and hide the person.
+ */
+export function personName(name: string): string {
+  return String(name ?? '').split(GROUP_SEPARATOR).join(' ');
+}
 
 const DEFAULT_MAX_PAYLOAD = 1572864;
 /** The Document Server's image limits (limits_image_size; no SVG, which can carry script). */
@@ -270,7 +291,7 @@ export class OfficeBridge {
     const keeper: Participant = {
       id: editorUserId(KEEPER_USER, KEEPER_INDEX),
       idOriginal: KEEPER_USER,
-      username: this.o.keeperName ?? 'filex',
+      username: `${KEEPER_GROUP}${GROUP_SEPARATOR}${this.o.keeperName ?? 'filex'}`,
       indexUser: KEEPER_INDEX,
       view: false,
       connectionId: 'filex-keeper',
@@ -279,7 +300,7 @@ export class OfficeBridge {
     const people = [...this.members.values()].map((m) => ({
       id: editorUserId(m.user, m.indexUser),
       idOriginal: m.user,
-      username: m.name,
+      username: personName(m.name),
       indexUser: m.indexUser,
       view: !m.canEdit,
       connectionId: m.client,

@@ -13,22 +13,32 @@
 //      while there are changes - the document as the editor holds it, back
 //      through x2t to the file's own format, as a new version of the file.
 //
+//   5. "Download as" and Print: the editor page hands over what the editor
+//      asked for (frame/export.ts), x2t writes it, filex hands it to the
+//      person (ui.download) or prints it;
+//   6. the editor's settings: kept in filex's store for this app
+//      (state.get/set, settings.ts) and given back at the next opening.
+//
 // One person, one document (plan step A3). Nothing leaves the browser but
-// the saves, and those go to filex through the SDK.
+// the saves, the files the person asks for and the settings, and those go
+// to filex through the SDK.
 
-import { connect, type FilexApp } from '@brftech/filex-app-ui';
+import { connect, FilexError, type FilexApp } from '@brftech/filex-app-ui';
 
+import { exportFormat, exportName } from '../formats';
 import {
   FRAME_PORT,
   FRAME_VERSION,
   isFrameHello,
+  type ExportRequest,
   type FromFrame,
   type OpenMessage,
   type SnapshotResult,
   type ToFrame,
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
-import { editorConfig, kindOf, uiLang, type Kind } from './config';
+import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
+import { NARROW_PX, editorConfig, kindOf, uiLang, type Kind } from './config';
 import { STRINGS, type Strings } from './strings';
 import { X2tClient } from './x2t-client';
 
@@ -40,6 +50,10 @@ declare const __APP_VERSION__: string;
 const AUTOSAVE_MS = 10 * 60 * 1000;
 /** How long a save waits for the editor to hand its last changes to the bridge. */
 const SETTLE_MS = 3000;
+/** The editor's settings are kept this long after its last write (a burst of writes is one write to filex). */
+const KEEP_SETTINGS_MS = 2000;
+/** filex's answer when it has no such method (an older filex) or no handler for it here. */
+const NOT_OFFERED = new Set(['unknown_method', 'unavailable']);
 
 const BASE = new URL('.', document.baseURI).href;
 
@@ -194,6 +208,10 @@ class OfficeApp {
   private saving: Promise<void> | null = null;
   private lastSave = Date.now();
   private settleWaiters: (() => void)[] = [];
+  /** The settings filex holds for the editor, and the ones waiting to go there. */
+  private keptSettings: Settings = {};
+  private nextSettings: Settings | null = null;
+  private settingsTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly fx: FilexApp,
@@ -201,14 +219,44 @@ class OfficeApp {
     private readonly kind: Kind,
     private readonly x2t: X2tClient,
     private readonly canEdit: boolean,
+    private readonly title: string,
   ) {
     this.link.onMessage = (m) => this.onFrame(m);
+  }
+
+  /** The settings filex kept, for the editor page (its first word on the port). */
+  giveSettings(values: Settings): void {
+    this.keptSettings = values;
+    this.link.send({ t: 'settings', values });
+  }
+
+  private settingsChanged(values: Settings): void {
+    this.nextSettings = values;
+    if (this.settingsTimer) clearTimeout(this.settingsTimer);
+    this.settingsTimer = setTimeout(() => this.keepSettings(), KEEP_SETTINGS_MS);
+  }
+
+  /** Write the editor's settings to filex, if they changed. */
+  keepSettings(): void {
+    if (this.settingsTimer) clearTimeout(this.settingsTimer);
+    this.settingsTimer = null;
+    const next = this.nextSettings;
+    this.nextSettings = null;
+    if (!next || sameSettings(next, this.keptSettings)) return;
+    this.keptSettings = next;
+    this.fx.state.set(SETTINGS_KEY, next).catch((e) => console.warn('[office-editor] settings not kept:', reason(e)));
   }
 
   private onFrame(m: FromFrame): void {
     switch (m.t) {
       case 'save':
         void this.save().catch(() => {});
+        return;
+      case 'settings-changed':
+        this.settingsChanged(readSettings(m.values));
+        return;
+      case 'export':
+        void this.exportFor(m);
         return;
       case 'dirty':
         this.frameDirty = m.dirty;
@@ -276,6 +324,43 @@ class OfficeApp {
     return this.saving;
   }
 
+  /** Write what "Download as" or Print asked for, and hand it to filex. */
+  private async exportFor(m: ExportRequest): Promise<void> {
+    let ok = true;
+    try {
+      const f = exportFormat(m.format, this.kind.documentType);
+      if (!f) throw new Error(`format ${m.format} is not written here`);
+      const out = await this.x2t.export({ bin: m.bin, media: m.media ?? [], formatTo: f.id, ext: f.ext, pdf: m.pdf, fonts: m.fonts, json: m.json });
+      const name = exportName(m.title || this.title, f);
+      if (m.purpose === 'print') await this.print(name, out.bytes);
+      else await this.fx.download(name, out.bytes, f.mime);
+    } catch (e) {
+      // A no to filex's question is the person's answer, not a failure.
+      if (!(e instanceof FilexError && e.code === 'cancelled')) {
+        ok = false;
+        this.fx.toast(this.t.exportFailed(reason(e)), 'error');
+      }
+    }
+    this.link.send({ t: 'exported', id: m.id, ok });
+  }
+
+  /**
+   * Print a PDF. filex prints it from its own page (ui.print); a filex that
+   * does not (yet) hands it to the person instead, to print from their PDF
+   * viewer - a sandboxed frame like this one may not open the browser's
+   * print dialog (window.print needs allow-modals, which filex does not give).
+   */
+  private async print(name: string, bytes: ArrayBuffer): Promise<void> {
+    try {
+      const copy = bytes.slice(0);
+      await this.fx.request('ui.print' as never, { name, data: copy, mime: 'application/pdf' }, [copy]);
+    } catch (e) {
+      if (!(e instanceof FilexError && NOT_OFFERED.has(e.code))) throw e;
+      await this.fx.download(name, bytes, 'application/pdf');
+      this.fx.toast(this.t.printAsDownload, 'info');
+    }
+  }
+
   /** The ten-minute save, while there are changes. */
   tick(): void {
     if (this.shownDirty && !this.saving && Date.now() - this.lastSave >= AUTOSAVE_MS) void this.save().catch(() => {});
@@ -314,10 +399,20 @@ async function main(): Promise<void> {
   }
   setStatus(t.opening(info.name));
   const canEdit = !info.readOnly;
+  const grants = Array.isArray(s.grants) ? s.grants : [];
+  const canDownload = grants.includes('ui:download');
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
-  const app = new OfficeApp(fx, t, kind, x2t, canEdit);
+  const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
   const key = randomKey();
+
+  // The editor's kept settings: the editor page holds the editor's start for them.
+  fx.state
+    .get(SETTINGS_KEY)
+    .then(readSettings, () => ({}))
+    .then((values) => app.giveSettings(values));
+  fx.on('close.request', () => app.keepSettings());
+  window.addEventListener('pagehide', () => app.keepSettings());
 
   // The document is read and converted while the editor loads.
   void x2t.started().then(() => phase('x2t-ready'), () => {});
@@ -339,6 +434,10 @@ async function main(): Promise<void> {
       dark: s.theme?.mode === 'dark',
       userName: s.user?.name || 'filex',
       canEdit,
+      canDownload,
+      // Print needs filex's print or, where filex has none, a download.
+      canPrint: canDownload,
+      narrow: window.innerWidth > 0 && window.innerWidth < NARROW_PX,
       events: {
         onAppReady: () => phase('editor-app-ready'),
         onDocumentReady: () => {

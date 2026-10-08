@@ -15,7 +15,8 @@
 // addresses made HERE (a page may read only its own), and a save goes out
 // as the editor holds the document (asc_nativeGetFile) with its images.
 
-import { OfficeBridge, type BridgeEntry, type BridgeMember } from '../bridge';
+import { OfficeBridge, personName, type BridgeEntry, type BridgeMember } from '../bridge';
+import type { DocumentKind } from '../formats';
 import {
   EDITOR_USER_ID,
   FRAME_HELLO,
@@ -23,6 +24,7 @@ import {
   MEDIA_NAME,
   isFramePort,
   mediaType,
+  type ExportRequest,
   type FromFrame,
   type MediaFile,
   type OpenMessage,
@@ -32,9 +34,12 @@ import {
 import type { EditorMessage } from '../protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { LocalSession } from '../session';
+import { pickSettings, readSettings } from '../settings';
 import { BridgeSocketPort, createSocketIo, installSocketIo } from '../shim';
+import { loadedFonts, retry, takeOverDownloads, trimDownloadFormats, type ExportJob } from './export';
 import { keepImagesInPage } from './images';
 import { SaveRetry } from './save-retry';
+import { KeptStorage } from './storage';
 import { serveTemplatesAsTxt } from './text';
 import { trimThemesPath } from './themes-path';
 import { guardWorkers } from './workers';
@@ -56,6 +61,18 @@ let session: LocalSession | null = null;
 let lastDirty = false;
 /** documentOpen's map: filled when the document arrives, read when the bridge answers the editor's auth. */
 const documentUrls: Record<string, string> = {};
+/** How long the editor's start waits for its kept settings before it starts without them. */
+const SETTINGS_WAIT_MS = 5000;
+/** Exports the app page is writing: their end, by id. */
+const pendingExports = new Map<number, () => void>();
+let exportSeq = 0;
+
+/** Which editor this page is (its address: web-apps/apps/<editor>/main/index.html). */
+function pageKind(): DocumentKind {
+  const m = /\/apps\/(documenteditor|spreadsheeteditor|presentationeditor)\//.exec(location.pathname);
+  return m?.[1] === 'spreadsheeteditor' ? 'cell' : m?.[1] === 'presentationeditor' ? 'slide' : 'word';
+}
+const kind = pageKind();
 
 /** Where the editor page is (see the app page's phase()). */
 function phase(name: string): void {
@@ -84,6 +101,17 @@ function notice(what: string, detail?: unknown): void {
 
 const saveRetry = new SaveRetry();
 
+// The editor's settings: what it writes goes to the app page to keep
+// (settings.ts); what was kept comes in as the app page's first word, and
+// the editor's start waits for it (installSocketIo), a few seconds at most.
+const kept = new KeptStorage(win, (entries) => post({ t: 'settings-changed', values: pickSettings(entries) }));
+kept.install();
+let settingsArrived: () => void = () => {};
+const settingsReady = new Promise<void>((resolve) => {
+  settingsArrived = resolve;
+  setTimeout(resolve, SETTINGS_WAIT_MS);
+});
+
 const socketPort = new BridgeSocketPort(() => ({
   connect: () => {
     phase('socket');
@@ -100,7 +128,7 @@ const socketPort = new BridgeSocketPort(() => ({
   },
 }));
 
-installSocketIo(win as unknown as { io?: unknown; define?: unknown }, createSocketIo(socketPort.connector));
+installSocketIo(win as unknown as { io?: unknown; define?: unknown }, createSocketIo(socketPort.connector), settingsReady);
 serveTemplatesAsTxt(win);
 trimThemesPath(win);
 guardWorkers(win, document.baseURI);
@@ -118,7 +146,7 @@ adaptOpaqueOrigin(
 function begin(): void {
   if (bridge || !doc || !connected) return;
   const open = doc;
-  const me: BridgeMember = { client: 'local', user: EDITOR_USER_ID, name: open.name, indexUser: 1, canEdit: open.canEdit };
+  const me: BridgeMember = { client: 'local', user: EDITOR_USER_ID, name: personName(open.name), indexUser: 1, canEdit: open.canEdit };
   const s = new LocalSession({ me, notice });
   const b = new OfficeBridge({
     me,
@@ -247,6 +275,43 @@ async function onSnapshot(id: number): Promise<void> {
   }
 }
 
+/** "Download as" or Print in the editor: the app page writes it (frame/export.ts). */
+async function onExport(job: ExportJob, done: () => void): Promise<void> {
+  const api = editorApi();
+  const getFile = api?.asc_nativeGetFile as (() => unknown) | undefined;
+  try {
+    if (!api || typeof getFile !== 'function') throw new Error('the editor is not ready');
+    const bin = getFile.call(api);
+    if (typeof bin !== 'string' || bin.length === 0) throw new Error('the editor gave no document');
+    const media = await snapshotMedia();
+    const fonts = job.pdf ? loadedFonts(win) : undefined;
+    const id = ++exportSeq;
+    pendingExports.set(id, done);
+    const pdf = job.pdf ? (job.pdf.buffer.slice(job.pdf.byteOffset, job.pdf.byteOffset + job.pdf.byteLength) as ArrayBuffer) : undefined;
+    const m: ExportRequest = { t: 'export', id, format: job.format.id, purpose: job.purpose, title: job.title, bin, media, pdf, fonts, json: job.json };
+    post(m, [...media.map((f) => f.bytes), ...(fonts ?? []).map((f) => f.bytes), ...(pdf ? [pdf] : [])]);
+  } catch (e) {
+    notice('export', (e as Error)?.message ?? e);
+    done();
+  }
+}
+
+function onExported(id: number): void {
+  const done = pendingExports.get(id);
+  pendingExports.delete(id);
+  done?.();
+}
+
+retry(() => trimDownloadFormats(win, kind));
+retry(() =>
+  takeOverDownloads(
+    win,
+    kind,
+    (job, done) => void onExport(job, done),
+    (why) => notice('export-refused', why),
+  ),
+);
+
 function onSaved(ok: boolean, through: number): void {
   if (ok && through > 0) session?.saved(through);
   bridge?.saved(ok);
@@ -276,6 +341,13 @@ function onPortMessage(ev: MessageEvent): void {
       return;
     case 'theme':
       onTheme(m.dark === true);
+      return;
+    case 'settings':
+      kept.seed(readSettings(m.values));
+      settingsArrived();
+      return;
+    case 'exported':
+      onExported(m.id);
       return;
   }
 }

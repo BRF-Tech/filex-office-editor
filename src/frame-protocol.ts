@@ -68,7 +68,24 @@ export interface ThemeMessage {
   dark: boolean;
 }
 
-export type ToFrame = OpenMessage | SnapshotRequest | SavedMessage | ThemeMessage;
+/**
+ * The editor's settings kept from the openings before (settings.ts), the
+ * app page's first word on the port: the editor page holds the editor's
+ * start until it has them.
+ */
+export interface SettingsMessage {
+  t: 'settings';
+  values: Record<string, string>;
+}
+
+/** An export the editor page asked for is done (or failed: the app page told the person). */
+export interface ExportedMessage {
+  t: 'exported';
+  id: number;
+  ok: boolean;
+}
+
+export type ToFrame = OpenMessage | SnapshotRequest | SavedMessage | ThemeMessage | SettingsMessage | ExportedMessage;
 
 /** The document as the editor holds it: what x2t turns back into an office file. */
 export interface SnapshotResult {
@@ -106,7 +123,36 @@ export interface NoticeMessage {
   detail?: string;
 }
 
-export type FromFrame = SnapshotResult | SaveRequest | DirtyMessage | StateMessage | NoticeMessage;
+/** The editor wrote its settings: the ones worth keeping, all of them (settings.ts pickSettings). */
+export interface SettingsChanged {
+  t: 'settings-changed';
+  values: Record<string, string>;
+}
+
+/**
+ * "Download as" or Print in the editor: the app page writes the document in
+ * that format with x2t and hands it to filex (formats.ts). What a Document
+ * Server would have been sent, but to the page next door.
+ */
+export interface ExportRequest {
+  t: 'export';
+  id: number;
+  /** The editor's file type (formats.ts). */
+  format: number;
+  purpose: 'download' | 'print';
+  /** The name the editor gave the file (the document's, with the format's extension). */
+  title: string;
+  /** asc_nativeGetFile's answer and the images, as for a save. */
+  bin: string;
+  media: MediaFile[];
+  /** For PDF: the pages as the editor drew them, and the fonts it drew them with. */
+  pdf?: ArrayBuffer;
+  fonts?: MediaFile[];
+  /** The editor's json parameters for the conversion (printPages, watermark...). */
+  json?: string;
+}
+
+export type FromFrame = SnapshotResult | SaveRequest | DirtyMessage | StateMessage | NoticeMessage | SettingsChanged | ExportRequest;
 
 export function isFrameHello(v: unknown): boolean {
   return !!v && typeof v === 'object' && (v as { type?: unknown }).type === FRAME_HELLO && (v as { v?: unknown }).v === FRAME_VERSION;

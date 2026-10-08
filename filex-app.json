@@ -60,8 +60,8 @@
       "tr": "Belgeler düzenleyicinin biçimine ve geri, tarayıcınızda WebAssembly'ye derlenmiş ONLYOFFICE dönüştürücüsüyle (x2t) çevrilir."
     },
     "ui:download": {
-      "en": "Only for Download as in the editor's File menu: what you choose to keep goes to your computer.",
-      "tr": "Yalnızca düzenleyicinin Dosya menüsündeki Farklı indir için: saklamayı seçtiğiniz dosya bilgisayarınıza iner."
+      "en": "Only for Download as and Print in the editor's File menu: what you choose to keep goes to your computer; a PDF to print, too, where filex cannot print it for you.",
+      "tr": "Yalnızca düzenleyicinin Dosya menüsündeki Farklı indir ve Yazdır için: saklamayı seçtiğiniz dosya bilgisayarınıza iner; filex sizin için yazdıramadığında yazdırılacak PDF de."
     },
     "ui-viewer:.docx": {
       "en": "So a .docx document opens in the editor.",

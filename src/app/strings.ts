@@ -13,6 +13,10 @@ export interface Strings {
   unsupported: (ext: string) => string;
   openFailed: (reason: string) => string;
   saveFailed: (reason: string) => string;
+  /** "Download as" or Print could not be written. */
+  exportFailed: (reason: string) => string;
+  /** Print where filex cannot print yet: the PDF is handed over to print from the person's viewer. */
+  printAsDownload: string;
   /** The notice ONLYOFFICE's terms ask for: whose work it is, that it is modified, where the source is. */
   legal: (o: LegalFacts) => string;
   legalLabel: string;
@@ -42,6 +46,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     unsupported: (ext) => `This app does not open .${ext} files.`,
     openFailed: (reason) => `The document could not be opened: ${reason}`,
     saveFailed: (reason) => `The document could not be saved: ${reason}`,
+    exportFailed: (reason) => `The file could not be made: ${reason}`,
+    printAsDownload: 'filex cannot print from here yet: the PDF was handed to you to print from your PDF viewer.',
     legal: (o) =>
       `Based on ONLYOFFICE Docs by Ascensio System SIA; this version may have been modified (Docs ${o.version}, build ${o.build}, ONLYOFFICE source tag ${o.tag}). ` +
       `Free software under the GNU AGPL version 3; source code: ${sourceOf(o.app)}. ` +
@@ -54,6 +60,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     unsupported: (ext) => `Bu uygulama .${ext} dosyalarını açmaz.`,
     openFailed: (reason) => `Belge açılamadı: ${reason}`,
     saveFailed: (reason) => `Belge kaydedilemedi: ${reason}`,
+    exportFailed: (reason) => `Dosya hazırlanamadı: ${reason}`,
+    printAsDownload: "filex buradan henüz yazdıramıyor: PDF size verildi, PDF görüntüleyicinizden yazdırabilirsiniz.",
     legal: (o) =>
       `Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır; bu sürüm değiştirilmiş olabilir (Docs ${o.version}, yapı ${o.build}, ONLYOFFICE kaynak etiketi ${o.tag}). ` +
       `GNU AGPL sürüm 3 ile lisanslı özgür yazılımdır; kaynak kodu: ${sourceOf(o.app)}. ` +
