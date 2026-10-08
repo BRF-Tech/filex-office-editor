@@ -8,11 +8,15 @@
 // server; here it runs in the browser, so the document is never converted
 // anywhere else.
 //
-// The wasm build is not in this repository yet: it is built from ONLYOFFICE core at
-// the same tag as the editor files it serves (core v9.4.0.129 for Docs 9.4)
-// and loaded into a Worker; this file drives a loaded module. The calling
-// convention (an in-memory file system under /working, a params.xml, main1)
-// is the one the wasm build exports; CryptPad drives its build the same way.
+// The wasm build is pinned in upstream/onlyoffice.json ("x2t"): for now
+// CryptPad's v9.3.2+3, fetched and checked by scripts/fetch-x2t.mjs; before
+// 0.1.0, this project's own build from ONLYOFFICE core at the same tag as
+// the editor files (core v9.4.0.129 for Docs 9.4). It is loaded into a
+// Worker; this file drives a loaded module. The calling convention (an
+// in-memory file system under /working, a params.xml, main1) is the one the
+// wasm build exports; CryptPad drives its build the same way.
+// tests/x2t-wasm.test.ts runs this driver against the real build (`npm run
+// test:x2t`): docx, xlsx and pptx with Turkish text, to Editor.bin and back.
 //
 // ⚠ Measured in the research (2026-10-06): the editor (sdkjs 9.4) opens an
 // Editor.bin written without base64 ("DOCY;v10;0;...") and refuses the

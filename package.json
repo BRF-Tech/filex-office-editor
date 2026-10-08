@@ -7,7 +7,10 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "test:x2t": "node scripts/fetch-x2t.mjs && vitest run tests/x2t-wasm.test.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "x2t": "node scripts/fetch-x2t.mjs",
+    "editor": "bash scripts/extract-editor.sh"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
