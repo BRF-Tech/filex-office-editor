@@ -87,7 +87,13 @@ describe('what the bundle keeps', () => {
     ['web-apps/apps/common/main/resources/help/de/images/x.png', 'drop'],
     ['web-apps/apps/pdfeditor/main/index.html', 'drop'],
     ['web-apps/apps/visioeditor/main/app.js', 'drop'],
-    ['web-apps/apps/documenteditor/mobile/index.html', 'drop'],
+    // The phone editors stay (read-only in ONLYOFFICE's open-source build; rules.mjs APPS).
+    ['web-apps/apps/documenteditor/mobile/index.html', 'keep'],
+    ['web-apps/apps/spreadsheeteditor/mobile/dist/js/app.js', 'keep'],
+    ['web-apps/apps/presentationeditor/mobile/css/framework7.css', 'keep'],
+    ['web-apps/apps/spreadsheeteditor/mobile/locale/l10n/functions/tr_desc.json', 'keep'],
+    ['web-apps/apps/documenteditor/mobile/resources/img/charts/bar-normal.svg', 'keep'],
+    ['web-apps/apps/visioeditor/mobile/index.html', 'drop'],
     ['web-apps/apps/spreadsheeteditor/embed/index.html', 'drop'],
     ['web-apps/apps/documenteditor/forms/index.html', 'drop'],
     ['web-apps/apps/api/wopi/editor-wopi.ejs', 'drop'],
@@ -220,6 +226,27 @@ describe('the HTML pages: no inline code', () => {
   it('reads script types as HTML does', () => {
     for (const t of [undefined, '', 'text/javascript', 'application/javascript', 'module', 'TEXT/JavaScript']) expect(isExecutableType(t)).toBe(true);
     for (const t of ['text/template', 'text/x-template', 'application/json', 'application/ld+json']) expect(isExecutableType(t)).toBe(false);
+  });
+
+  it("a phone editor's page (web-apps/apps/*/mobile/index.html, 9.4): the deferred app, then its inline scripts in order", () => {
+    const phone = [
+      '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src * \'self\' \'unsafe-inline\' \'unsafe-eval\' data: blob:">',
+      '<style>.skl-navbar { height: calc(var(--skl-navbar-height) + 1px); }</style>',
+      '<script defer="defer" src="dist/js/app.js"></script><link href="css/app.css" rel="stylesheet"></head>',
+      '<body><script>window.Common = {Locale: {defaultLang: "en"}};</script>',
+      "<script>window.asceditor = 'word'; const load_stylesheet = reflink => {};</script>",
+      '<div id="app"></div>',
+      '<script>window.parentOrigin = params["parentOrigin"];</script>',
+      '<script src="../../../vendor/jquery/jquery.min.js"></script><div id="app"></div></body></html>',
+    ].join('');
+    const r = transformHtml(phone, { name: 'index.html', storage: '../../../../filex/storage.js' });
+    expect(r.scripts.map((s: { file: string }) => s.file)).toEqual(['index.inline-1.js', 'index.inline-2.js', 'index.inline-3.js']);
+    expect(r.scripts[2].body).toBe('window.parentOrigin = params["parentOrigin"];');
+    expect(r.html.indexOf('../../../../filex/storage.js')).toBeLessThan(r.html.indexOf('dist/js/app.js'));
+    expect(r.html).toContain('<script defer="defer" src="dist/js/app.js"></script>');
+    expect(r.html.indexOf('index.inline-3.js')).toBeLessThan(r.html.indexOf('jquery.min.js'));
+    expect(r.html).toContain('<meta http-equiv="Content-Security-Policy"');
+    expect(inlineCodeIn(r.html)).toEqual([]);
   });
 
   it('changes nothing in a page without inline code', () => {
