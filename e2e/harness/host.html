@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>filex stand-in</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; font: 13px system-ui, sans-serif; }
+  #bar { flex: 0 0 auto; padding: 4px 8px; border-bottom: 1px solid #8884; }
+  #frame-box { flex: 1 1 auto; min-height: 0; }
+  #frame-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+  html.dark { background: #1b1b1f; color: #e6e6e6; }
+</style>
+<script src="/host.js" defer></script>
+</head>
+<body>
+<div id="bar">filex stand-in: <span id="name"></span> <span id="dirty"></span></div>
+<div id="frame-box"></div>
+</body>
+</html>
