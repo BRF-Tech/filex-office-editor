@@ -105,6 +105,88 @@ export interface X2tOutput {
   media: Record<string, Uint8Array>;
 }
 
+/** A document written in another format ("Download as", Print): see ../formats.ts for what x2t writes here. */
+export interface X2tExport {
+  /** The editor's document: asc_nativeGetFile's answer ("DOCY;v5;<size>;<base64>"). */
+  bin: Uint8Array | string;
+  /** Its images, by name (without "media/"). */
+  media?: Record<string, Uint8Array>;
+  /** The target: the editor's file type (x2t's m_nFormatTo) and the extension x2t writes. */
+  formatTo: number;
+  ext: string;
+  /**
+   * For PDF: the pages as the editor laid them out (its renderer's drawing,
+   * what a Document Server receives to print), which x2t turns into PDF
+   * pages beside the document (pdf.bin) - x2t has no layout of its own.
+   */
+  pdf?: Uint8Array;
+  /** For PDF: the fonts the pages were drawn with, by file name. */
+  fonts?: Record<string, Uint8Array>;
+  /** The editor's json parameters (printPages, watermark...), as a Document Server passes them. */
+  json?: string;
+}
+
+const EXT = /^[a-z0-9]{2,5}$/;
+
+function xmlText(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** The conversion order for an export: x2tParams with the target's type, the fonts and the json parameters. */
+export function x2tExportParams(from: string, to: string, formatTo: number, o: { fonts: boolean; json?: string }): string {
+  const extra =
+    `<m_nFormatTo>${Math.trunc(formatTo)}</m_nFormatTo>` +
+    (o.fonts ? `<m_sFontDir>${X2T_DIR}/fonts/</m_sFontDir>` : '') +
+    (o.json ? `<m_sJsonParams>${xmlText(o.json)}</m_sJsonParams>` : '');
+  return x2tParams(from, to, false).replace('</TaskQueueDataConvert>', `${extra}</TaskQueueDataConvert>`);
+}
+
+/**
+ * Write the editor's document in another format. Leaves /working as it found
+ * it, like x2tConvert.
+ */
+export function x2tExport(m: X2tModule, e: X2tExport): Uint8Array {
+  if (!EXT.test(e.ext) || e.ext === 'bin' || !Number.isInteger(e.formatTo) || e.formatTo <= 0) {
+    throw new X2tError(null, `x2t: cannot write ${e.ext}`);
+  }
+  mkdirs(m);
+  for (const n of mediaNames(m)) remove(m, `${MEDIA_DIR}/${n}`);
+  const from = `${X2T_DIR}/input.bin`;
+  const out = `${X2T_DIR}/output.${e.ext}`;
+  const pdfBin = `${X2T_DIR}/pdf.bin`;
+  const fontsDir = `${X2T_DIR}/fonts`;
+  const fonts = Object.entries(e.fonts ?? {});
+  try {
+    m.FS.writeFile(from, e.bin);
+    for (const [name, bytes] of Object.entries(e.media ?? {})) {
+      if (!MEDIA_NAME.test(name)) throw new X2tError(null, `x2t: bad media name ${JSON.stringify(name)}`);
+      m.FS.writeFile(`${MEDIA_DIR}/${name}`, bytes);
+    }
+    if (e.pdf) m.FS.writeFile(pdfBin, e.pdf);
+    for (const [name, bytes] of fonts) {
+      if (!MEDIA_NAME.test(name)) throw new X2tError(null, `x2t: bad font name ${JSON.stringify(name)}`);
+      m.FS.writeFile(`${fontsDir}/${name}`, bytes);
+    }
+    m.FS.writeFile(PARAMS, x2tExportParams(from, out, e.formatTo, { fonts: fonts.length > 0, json: e.json }));
+    const rc = m.ccall('main1', 'number', ['string'], [PARAMS]);
+    if (typeof rc === 'number' && rc !== 0) throw new X2tError(rc, `x2t: conversion failed (${rc})`);
+    try {
+      const bytes = m.FS.readFile(out);
+      if (bytes.length === 0) throw new Error('empty');
+      return bytes;
+    } catch {
+      throw new X2tError(typeof rc === 'number' ? rc : null, 'x2t: no output');
+    }
+  } finally {
+    remove(m, from);
+    remove(m, out);
+    remove(m, pdfBin);
+    remove(m, PARAMS);
+    for (const n of mediaNames(m)) remove(m, `${MEDIA_DIR}/${n}`);
+    for (const [name] of fonts) remove(m, `${fontsDir}/${name}`);
+  }
+}
+
 /**
  * Convert one document. Leaves /working as it found it: every file it wrote
  * or x2t wrote is removed, so the next conversion sees nothing of this one.

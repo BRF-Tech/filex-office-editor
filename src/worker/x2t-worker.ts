@@ -12,7 +12,7 @@
 // then imports x2t.js the same way. Both are scripts of the package
 // (script-src), and x2t.wasm is read with fetch (connect-src: the package).
 
-import { X2tError, x2tConvert, type X2tFormat, type X2tModule } from '../x2t';
+import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../x2t';
 import type { WorkerReply, WorkerRequest } from '../app/x2t-messages';
 
 interface WorkerScope {
@@ -97,9 +97,35 @@ function convert(m: Extract<WorkerRequest, { t: 'convert' }>): void {
   }
 }
 
+function exportDocument(m: Extract<WorkerRequest, { t: 'export' }>): void {
+  if (!mod) {
+    reply({ t: 'result', id: m.id, error: 'x2t is not loaded' });
+    return;
+  }
+  const t0 = Date.now();
+  try {
+    const files = (list: { name: string; bytes: ArrayBuffer }[] | undefined) => Object.fromEntries((list ?? []).map((f) => [f.name, new Uint8Array(f.bytes)]));
+    const out = x2tExport(mod, {
+      bin: m.bin,
+      media: files(m.media),
+      formatTo: m.formatTo,
+      ext: m.ext,
+      pdf: m.pdf ? new Uint8Array(m.pdf) : undefined,
+      fonts: m.fonts ? files(m.fonts) : undefined,
+      json: m.json,
+    });
+    const bytes = exactBuffer(out);
+    reply({ t: 'result', id: m.id, bytes, media: [], ms: Date.now() - t0 }, [bytes]);
+  } catch (e) {
+    const code = e instanceof X2tError ? e.code : null;
+    reply({ t: 'result', id: m.id, error: String((e as Error)?.message ?? e).slice(0, 300), code });
+  }
+}
+
 scope.onmessage = (ev: MessageEvent) => {
   const m = ev.data as WorkerRequest | null;
   if (!m || typeof m !== 'object') return;
   if (m.t === 'start') start(m.base);
   else if (m.t === 'convert') convert(m);
+  else if (m.t === 'export') exportDocument(m);
 };

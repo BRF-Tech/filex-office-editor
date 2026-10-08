@@ -6,7 +6,7 @@
 // address whose one line imports the worker's file from the package) and
 // hands it documents, one at a time.
 
-import type { WorkerFile, WorkerReply, WorkerRequest } from './x2t-messages';
+import type { WorkerExport, WorkerFile, WorkerReply, WorkerRequest } from './x2t-messages';
 
 export interface Converted {
   bytes: ArrayBuffer;
@@ -70,20 +70,37 @@ export class X2tClient {
     this.worker.postMessage(m, transfer);
   }
 
-  /** Convert `bytes` (an office file, or an Editor.bin's text) from one format to another. Transfers the buffers. */
-  convert(from: string, to: string, bytes: ArrayBuffer | string, media: WorkerFile[] = []): Promise<Converted> {
+  /** Run `send` when the conversions before it are done; one at a time. */
+  private queue(send: (id: number) => { m: WorkerRequest; transfer: Transferable[] }): Promise<Converted> {
     const run = async (): Promise<Converted> => {
       await this.ready;
       const id = ++this.seq;
       return new Promise<Converted>((resolve, reject) => {
         this.pending.set(id, { resolve, reject });
-        const transfer: Transferable[] = media.map((f) => f.bytes);
-        if (typeof bytes !== 'string') transfer.push(bytes);
-        this.post({ t: 'convert', id, from, to, bytes, media }, transfer);
+        const { m, transfer } = send(id);
+        this.post(m, transfer);
       });
     };
     const next = this.chain.then(run, run);
     this.chain = next.catch(() => {});
     return next;
+  }
+
+  /** Convert `bytes` (an office file, or an Editor.bin's text) from one format to another. Transfers the buffers. */
+  convert(from: string, to: string, bytes: ArrayBuffer | string, media: WorkerFile[] = []): Promise<Converted> {
+    return this.queue((id) => {
+      const transfer: Transferable[] = media.map((f) => f.bytes);
+      if (typeof bytes !== 'string') transfer.push(bytes);
+      return { m: { t: 'convert', id, from, to, bytes, media }, transfer };
+    });
+  }
+
+  /** Write the editor's document in another format ("Download as", Print). Transfers the buffers. */
+  export(e: WorkerExport): Promise<Converted> {
+    return this.queue((id) => {
+      const transfer: Transferable[] = [...e.media.map((f) => f.bytes), ...(e.fonts ?? []).map((f) => f.bytes)];
+      if (e.pdf) transfer.push(e.pdf);
+      return { m: { t: 'export', id, ...e }, transfer };
+    });
   }
 }

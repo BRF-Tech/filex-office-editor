@@ -20,7 +20,8 @@ import vm from 'node:vm';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { x2tConvert, type X2tFormat, type X2tModule } from '../src/x2t';
+import { EXPORT_FORMATS, PDF, type DocumentKind } from '../src/formats';
+import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../src/x2t';
 import { TR, docx, docxParagraphs, docxRuns, parts, pptx, texts, xlsx } from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -165,6 +166,62 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     expect(t).toContain(TR.slideBody);
     const titleRun = [...slide.matchAll(/<a:r>[\s\S]*?<\/a:r>/g)].map((x) => x[0]).find((r) => r.includes(TR.slideTitle)) ?? '';
     expect(titleRun).toMatch(/<a:rPr[^>]*\bb="1"/);
+  });
+
+  // "Download as" (src/formats.ts): every format offered is written, as its
+  // own type, with the Turkish text whole.
+  const CONTENT_TYPE: Record<string, string> = {
+    docx: 'wordprocessingml.document.main',
+    docm: 'ms-word.document.macroEnabled.main',
+    dotx: 'wordprocessingml.template.main',
+    xlsx: 'spreadsheetml.sheet.main',
+    xlsm: 'ms-excel.sheet.macroEnabled.main',
+    xltx: 'spreadsheetml.template.main',
+    pptx: 'presentationml.presentation.main',
+    pptm: 'ms-powerpoint.presentation.macroEnabled.main',
+    potx: 'presentationml.template.main',
+    ppsx: 'presentationml.slideshow.main',
+  };
+  const kinds: [DocumentKind, () => Uint8Array, Exclude<X2tFormat, 'bin'>, string[]][] = [
+    ['word', docx, 'docx', [TR.title, TR.body, TR.bold, TR.italic, ...TR.cells]],
+    ['cell', xlsx, 'xlsx', [...TR.cells]],
+    ['slide', pptx, 'pptx', [TR.slideTitle, TR.slideBody]],
+  ];
+  /** The words of a written file: its XML without tags, or an RTF with its escapes read. */
+  function words(bytes: Uint8Array, ext: string): string {
+    if (ext === 'rtf') return Buffer.from(bytes).toString('latin1').replace(/\\u(-?\d+)\*?/g, (_, n) => String.fromCharCode((Number(n) + 65536) % 65536));
+    return [...parts(bytes).values()].join('\n').replace(/<[^>]+>/g, '');
+  }
+
+  for (const [kind, make, from, expected] of kinds) {
+    it(`${kind}: every Download as format but PDF, as its own type, with the Turkish text`, () => {
+      const bin = toBin(make(), from);
+      const done: string[] = [];
+      for (const f of EXPORT_FORMATS.filter((x) => x.kind === kind)) {
+        const t0 = performance.now();
+        const out = x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: f.id, ext: f.ext });
+        done.push(`${f.ext} ${out.length} B ${Math.round(performance.now() - t0)} ms`);
+        if (f.ext === 'rtf') expect(head(out, 5)).toBe('{\\rtf');
+        else if (CONTENT_TYPE[f.ext]) expect(parts(out).get('[Content_Types].xml'), f.ext).toContain(CONTENT_TYPE[f.ext]);
+        else expect(parts(out).get('mimetype'), f.ext).toBe(f.mime);
+        const w = words(out, f.ext);
+        for (const t of expected) expect(w, `${f.ext}: ${t}`).toContain(t);
+      }
+      measured.push(`${kind} Download as: ${done.join(', ')}`);
+    });
+  }
+
+  it('PDF needs the pages the editor drew: without them x2t writes nothing', () => {
+    const bin = toBin(docx(), 'docx');
+    expect(() => x2tExport(m, { bin: bin.bytes, formatTo: PDF, ext: 'pdf' })).toThrow(X2tError);
+  });
+
+  it('txt is still left out: this build cuts every letter outside ASCII to its low byte', () => {
+    // When this fails, x2t writes txt (and csv) right: add them to src/formats.ts.
+    const bin = toBin(docx(), 'docx');
+    const txt = Buffer.from(x2tExport(m, { bin: bin.bytes, formatTo: 0x0045, ext: 'txt' })).toString('utf8');
+    expect(txt).toContain('ifreli belge');
+    expect(txt).not.toContain(TR.title);
   });
 
   it('reports what it measured', () => {
