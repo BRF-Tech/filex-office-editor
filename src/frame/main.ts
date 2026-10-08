@@ -37,6 +37,7 @@ import { LocalSession } from '../session';
 import { pickSettings, readSettings } from '../settings';
 import { BridgeSocketPort, createSocketIo, installSocketIo } from '../shim';
 import { loadedFonts, retry, takeOverDownloads, trimDownloadFormats, type ExportJob } from './export';
+import { holdScripts } from './hold';
 import { keepImagesInPage } from './images';
 import { SaveRetry } from './save-retry';
 import { KeptStorage } from './storage';
@@ -67,12 +68,14 @@ const SETTINGS_WAIT_MS = 5000;
 const pendingExports = new Map<number, () => void>();
 let exportSeq = 0;
 
-/** Which editor this page is (its address: web-apps/apps/<editor>/main/index.html). */
+/** Which editor this page is (its address: web-apps/apps/<editor>/main/index.html, or .../mobile/ for the phone app). */
 function pageKind(): DocumentKind {
   const m = /\/apps\/(documenteditor|spreadsheeteditor|presentationeditor)\//.exec(location.pathname);
   return m?.[1] === 'spreadsheeteditor' ? 'cell' : m?.[1] === 'presentationeditor' ? 'slide' : 'word';
 }
 const kind = pageKind();
+/** ONLYOFFICE's phone app (web-apps/apps/<editor>/mobile/), which reads only, rather than the editor ("main"). */
+const phoneApp = /\/apps\/[a-z]+\/mobile\//.test(location.pathname);
 
 /** Where the editor page is (see the app page's phase()). */
 function phase(name: string): void {
@@ -104,7 +107,18 @@ const saveRetry = new SaveRetry();
 // The editor's settings: what it writes goes to the app page to keep
 // (settings.ts); what was kept comes in as the app page's first word, and
 // the editor's start waits for it (installSocketIo), a few seconds at most.
-const kept = new KeptStorage(win, (entries) => post({ t: 'settings-changed', values: pickSettings(entries) }));
+// What the editor writes before the kept settings are in is not reported
+// on its own: the app page keeps the whole set it is sent, and a set
+// without the kept ones would drop them. It goes out once they are in.
+let settingsIn = false;
+let reportWaiting = false;
+const kept = new KeptStorage(win, (entries) => {
+  if (!settingsIn) {
+    reportWaiting = true;
+    return;
+  }
+  post({ t: 'settings-changed', values: pickSettings(entries) });
+});
 kept.install();
 let settingsArrived: () => void = () => {};
 const settingsReady = new Promise<void>((resolve) => {
@@ -129,6 +143,8 @@ const socketPort = new BridgeSocketPort(() => ({
 }));
 
 installSocketIo(win as unknown as { io?: unknown; define?: unknown }, createSocketIo(socketPort.connector), settingsReady);
+// The phone app has no RequireJS to hold: its sdkjs scripts wait instead (hold.ts).
+if (phoneApp) holdScripts(document.body, settingsReady);
 serveTemplatesAsTxt(win);
 trimThemesPath(win);
 guardWorkers(win, document.baseURI);
@@ -302,7 +318,10 @@ function onExported(id: number): void {
   done?.();
 }
 
-retry(() => trimDownloadFormats(win, kind));
+// The editor's File menu lists every format a Document Server writes; the
+// phone app's Download page is its own (what x2t does not write here is
+// refused, and the app page says so).
+if (!phoneApp) retry(() => trimDownloadFormats(win, kind));
 retry(() =>
   takeOverDownloads(
     win,
@@ -344,7 +363,12 @@ function onPortMessage(ev: MessageEvent): void {
       return;
     case 'settings':
       kept.seed(readSettings(m.values));
+      settingsIn = true;
       settingsArrived();
+      if (reportWaiting) {
+        reportWaiting = false;
+        post({ t: 'settings-changed', values: pickSettings(kept.entries()) });
+      }
       return;
     case 'exported':
       onExported(m.id);

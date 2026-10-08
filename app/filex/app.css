@@ -26,20 +26,60 @@ html[data-theme="dark"] {
   min-height: 0;
 }
 #fx-editor-box iframe {
-  position: absolute;
+  /* api.js puts ONLYOFFICE's phone app in a position: fixed frame (its own
+     page is the whole screen there); here it stays in its box, above the
+     footer. */
+  position: absolute !important;
   inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
   display: block;
 }
-#fx-legal {
+#fx-foot {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid var(--fe-border, rgba(127, 127, 127, 0.25));
+}
+#fx-switch {
+  flex: 0 0 auto;
+  margin: 4px 0 4px 8px;
+  padding: 6px 14px;
+  min-height: 36px;
+  border: 1px solid var(--fe-accent, #2f6feb);
+  border-radius: 6px;
+  background: var(--fe-accent, #2f6feb);
+  color: var(--fe-accent-text, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#fx-switch[data-view="editor"] {
+  background: transparent;
+  color: var(--fe-accent, #2f6feb);
+}
+#fx-switch[hidden] {
+  display: none;
+}
+#fx-switch:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+#fx-switch:focus-visible {
+  outline: 2px solid var(--fe-accent, #2f6feb);
+  outline-offset: 2px;
+}
+#fx-legal {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
   padding: 3px 10px;
   font-size: 11px;
   line-height: 1.35;
   color: var(--fe-text-muted, #6e7781);
-  border-top: 1px solid var(--fe-border, rgba(127, 127, 127, 0.25));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

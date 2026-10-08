@@ -91,6 +91,9 @@ describe('one issue per version', () => {
     const body = issueBody({ pin, newest, release: null, runUrl: '' });
     expect(body).toContain(marker('9.5.0'));
     expect(body).toContain(pin.digest);
+    // The phone apps are checked too: how they load sdkjs, and that they still only read.
+    expect(body).toMatch(/isSupportEditFeature\(\)/);
+    expect(body).toContain('src/frame/hold.ts');
     expect(alreadyOpened([{ number: 1, state: 'open', title: 'x', body }], '9.5.0')?.number).toBe(1);
   });
 });

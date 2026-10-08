@@ -133,9 +133,9 @@ does not have yet. Their names below are proposals; filex decides them.
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
-| Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | `ui.print`: the app hands filex a PDF and filex prints it from its own page (a hidden frame of a `blob:` PDF, the browser's print dialog), on a gesture - the same kind of grant as `ui:download`. Until filex has it, the app hands the PDF over as a download and says so |
+| Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | **in filex 0.55:** `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`) and filex prints it from its own print page (`/_print/`: a frame of a `blob:` PDF, the browser's print dialog), on a gesture or after asking - the same kind of grant as `ui:download`. `filex-app.json` asks for it; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
 | No inline scripts | `script-src` is the package only | in the app: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (measured: 92.7 MiB zipped with x2t, 1,889 files, 300.5 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
+| A large package (measured: 97.7 MiB zipped with x2t and the phone apps, 2,633 files, 323.4 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -149,8 +149,8 @@ does not have yet. Their names below are proposals; filex decides them.
 | `src/formats.ts` | What Download as and Print can make here: the formats x2t writes, by the editor's file type, and what was measured to be left out |
 | `src/settings.ts` | Which of the editor's settings are kept between openings, and how they fit in filex's store |
 | `src/protocol.ts` | The messages and numbers both sides use |
-| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`), saving, the legal notice ([The app](#the-app)) |
-| `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
+| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)) |
+| `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
 | `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
 | `src/worker/x2t-worker.ts` | The converter's worker |
 | `app/` | The app page itself: `index.html` and `filex/app.css` |
@@ -195,9 +195,10 @@ in three containers, none of them with network access after the pull:
    Cambria).
 2. **The bundle** (`scripts/editor/bundle.mjs`, in a Node image pinned by
    its digest) keeps what the three editors need (`scripts/editor/rules.mjs`):
-   web-apps' document, spreadsheet and presentation editors, sdkjs, the
+   web-apps' document, spreadsheet and presentation editors - each with its
+   phone app (`mobile`, see [On a phone](#on-a-phone)) - sdkjs, the
    fonts, ONLYOFFICE's license files. It leaves out the help pages (533 MiB),
-   the PDF and Visio editors and engines, the mobile, embedded and forms
+   the PDF and Visio editors and engines, the embedded and forms
    apps, the macro editor, the server's script snapshots, the theme
    sources, the asm.js builds for browsers without WebAssembly, the large
    CJK fonts (a fallback CJK font stays) and pre-compressed copies;
@@ -232,13 +233,16 @@ the per-theme thumbnails out, below):
 | web-apps locales (46 languages, three editors) | 138 | 43.8 | 8.3 |
 | sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.3 | 3.4 |
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
-| **The editor bundle** | **1,880** | **263.3** | **83.0** |
-| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **1,889** | **300.5** | **92.7** |
+| The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
+| **The editor bundle** | **2,623** | **286.1** | **88.5** |
+| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **2,633** | **323.4** | **97.7** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
-`sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part is within the 2,000
-files and 100 MB aimed for.
+`sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part was within the 2,000
+files and 100 MB aimed for; with the phone apps it stays under 100 MB
+(92.8 MB) and goes over the file count (2,623), which the build
+only notes - filex's limits are what refuse.
 
 Two corrections came from the browser measurement (2026-10-08):
 
@@ -268,7 +272,11 @@ the lock file (`changed`, `added`) and in the bundle itself
 - **The storage stand-in** (`filex/storage.js`) is the first script of
   every page: in filex's sandboxed frame the browser refuses
   `localStorage`, where the editor keeps its settings; the page gets an
-  in-memory one instead.
+  in-memory one instead. It also takes `navigator.serviceWorker` away where
+  reading it throws (Chromium, in a sandboxed page): ONLYOFFICE's phone
+  apps read it while Framework7 starts, and the throw stopped them before
+  anything showed (measured 2026-10-08); the editors ask
+  `'serviceWorker' in navigator` first and now go on without one.
 - `web-apps/apps/api/documents/api.js` is `api.js.tpl`, as the Document
   Server's first start makes it, with the cache tag left as a placeholder so
   the editor's paths are not rewritten; ONLYOFFICE's `.license` files and
@@ -364,7 +372,9 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    (`src/app/config.ts`) follows filex: the person's language and region,
    filex's light or dark theme (ONLYOFFICE's `theme-white` /
    `theme-night`), a file that cannot be saved opens to read, a frame
-   narrower than 600 px starts the editor folded (below). Everything that
+   narrower than 600 px starts the editor folded and, on a touch screen,
+   opens ONLYOFFICE's phone app instead ([On a phone](#on-a-phone)).
+   Everything that
    would reach a Document Server is off: plugins, macros, chat, the spell
    checker, help, "suggest a feature". Download as and Print are on when
    filex can hand a file over (the app's `ui:download` grant).
@@ -382,9 +392,10 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    `src/formats.ts`, and PDF from the pages as the editor laid them out
    with the fonts it drew them with - and filex hands the file to the
    person (`ui.download`, named after the document) or prints the PDF
-   (`ui.print`, proposed for filex 0.55: a sandboxed frame may not open the
-   browser's print dialog). A filex without `ui.print` gets the PDF as a
-   download, and the person is told so.
+   (`ui.print`, filex 0.55, with the `ui:print` grant: a sandboxed frame may
+   not open the browser's print dialog, so filex prints it from its own
+   page). Without that grant, or on a filex without `ui.print`, the PDF goes
+   to the person as a download, and they are told so.
 7. **The editor's settings** (units, zoom, the ribbon folded or not, the
    "New" hints the person closed...) are kept in filex's store for this app
    (`state.set`, under one key, at most 8 KiB, `src/settings.ts`) a moment
@@ -414,18 +425,50 @@ measured in the browser before it was written:
 | Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture |
 | Download as and Print | the editor posts the document to the Document Server, which converts it and answers with an address | `src/frame/export.ts`: the editor's last step (`_downloadAsUsingServer`) goes to the app page instead, with the document, its pictures and - for PDF - the pages the editor drew and the font files it holds (read through `getFontStream`: a font the engine has taken in is only a pointer into its memory in `g_fonts_streams`, and a PDF made from those came out in a single face); the editor waits as it would for the server. The File menu's Download as lists only what x2t writes here |
 | The editor's settings between openings | the stand-in forgets them with the page, so the "New" hints showed at every opening | `src/frame/storage.ts` watches the stand-in and reports what the editor writes; the kept settings are the app page's first word, and the editor's start waits for them (a RequireJS loader plugin holds the `socketio` module the editor's code depends on, at most 5 s) |
+| The phone app's start waits for the kept settings | the phone apps have no RequireJS, so the hold above does not reach them; they load their scripts one after another and create the editor when sdkjs has loaded | `src/frame/hold.ts`: sdkjs's scripts appended to the phone app's page wait until the kept settings are in (at most the same 5 s), then go in, in order; the page's `appendChild` is put back |
 | One person counts one | the bridge's keeper is a participant (it keeps the editor sending its changes as it makes them: an editor that thinks it is alone does not), and the editor showed "2" | the keeper's name carries a group of its own (the editor's `group<NBSP>name` form) and the editor shows only people without a group (`permissions.userInfoGroups: [""]`) |
 
-**On a phone.** The bundle has no phone editors (ONLYOFFICE's `mobile`
-apps were left out: with the embedded and forms apps they are 929 files,
-27.0 MB unpacked, in the 9.4 image), so a frame narrower than 600 px gets
-the desktop editor folded: the ribbon shows its tabs only (a tap opens
-one), no rulers, the side panel closed, at the person's zoom - measured at
-390 px, a page fitted to the width is drawn at 32 % and the tab names
-disappear in the compact header, so neither is used. It is usable, with
-the page scrolling sideways; it is not made for a phone. ONLYOFFICE's
-phone editor is the real answer, after filex's PWA work (#190); see
-[Roadmap](#roadmap).
+### On a phone
+
+A phone - a frame narrower than 600 px on a touch screen (`isPhone`,
+`src/app/config.ts`) - opens the document in **ONLYOFFICE's phone app**,
+the `mobile` app each of the three editors has (Framework7, its own pages
+under `web-apps/apps/<editor>/mobile/`, on the same sdkjs and loading
+socket.io from the same address, so the same editor-page script answers
+it). It is made for a phone: touch-sized, with its own search, navigation,
+settings, Download and Print, which go through x2t to filex like the
+editor's (a format it lists that x2t does not write here is refused, and
+the person is told).
+
+**It reads; it does not edit.** The phone apps in ONLYOFFICE's Document
+Server image are the open-source build, whose editing controller is a stub
+(`isSupportEditFeature()` returns false in all three bundles of 9.4.0.129).
+In edit mode they show "Using the free Community version, you can open
+documents for viewing only. To access mobile web editors, a commercial
+license is required." and stay read-only: editing in the phone apps is a
+commercial ONLYOFFICE feature, not in the open-source code. So the app
+opens them in view mode, and for editing:
+
+- **"Edit"**, under the phone app (the app page's own button, next to the
+  legal line), replaces it with the editor - the desktop one, folded as on
+  any narrow screen: the ribbon shows its tabs only (a tap opens one), no
+  rulers, the side panel closed, at the person's zoom (measured at 390 px
+  before the phone apps came in: a page fitted to the width is drawn at
+  32 % and the tab names disappear in the compact header, so neither is
+  used). The document goes over as it is; nothing was changed in the phone
+  app.
+- **"Reading view"** goes back: changes are saved first (a new version, as
+  with Save), then the editor's document is converted through x2t again and
+  the phone app opens it.
+
+The switch is decided at the opening (a phone turned sideways keeps what it
+opened with), and it is the app's: the phone app's own "switch to desktop"
+choice is off (`customization.mobile.disableForceDesktop`). The phone app's
+theme follows filex's at the opening (it knows `theme-light` and
+`theme-dark` only); a change of filex's theme while it is open shows at the
+next opening. Its settings, all under `mobile-` in its storage, are kept
+with the editor's in the one value (`src/settings.ts`), and its start waits
+for them like the editor's (`src/frame/hold.ts`).
 
 ## Measured in the browsers
 
@@ -436,7 +479,8 @@ shape, the headers and the policy built from the grant
 `feat/189-p1-app-frame`), filex's bootstrap first in every page - with a
 host page that draws the sandboxed frame and answers the app's bridge the
 way filex's `AppFrame` does (`e2e/harness/`: `state.get/set` with filex
-0.54's limits, `ui.download`, and a stand-in for the proposed `ui.print`).
+0.54's limits, `ui.download`, and `ui.print` as filex 0.55 checks it - the
+`ui:print` grant, a PDF - recording the PDF instead of printing it).
 Then, headless, in Chromium, Firefox and WebKit: it opens a blank docx, xlsx
 and pptx (the ones filex's New menu makes) and the Turkish documents of the
 x2t smoke test, types `Merhaba dünya: ğüşıöç İĞÜŞÖÇ` into each, saves with
@@ -444,7 +488,8 @@ the editor's Ctrl+S and with filex's Save, and reads the written files back.
 For the Turkish documents it then opens File → Download as, checks what is
 offered, downloads the OpenDocument copy and the PDF, and prints. Once per
 browser, in one browser context, it closes the editor's "New" hint, reopens
-the document, and prints where filex has no print (`print=none`).
+the document, and prints where filex has no print (`print=none`) and,
+reopened, where the app has no `ui:print` grant.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -472,12 +517,43 @@ title bold, its body regular, its italic line italic (Liberation Serif in
 three faces), the workbook's total `39,5` as the Turkish locale writes it.
 Firefox splits a typed line into one run per letter outside ASCII in the
 saved docx (the text is whole; Playwright types those letters as text
-input). Every page logs one error that is the editor's own and harmless:
-its service worker cannot register in a sandboxed page; WebKit adds, for a
-presentation, that fullscreen is not allowed (filex's policy turns it off).
-At 390 px the editor is ONLYOFFICE's desktop one, folded (the ribbon's tabs
-only, no rulers, at 100 %; see [The app](#the-app), "On a phone"): usable,
-not made for a phone. The harness differs from filex 0.55 in one line, on
+input). Every page logged one error that is the editor's own and harmless:
+its service worker cannot register in a sandboxed page. Since the phone
+apps, the storage stand-in takes the service worker away where reading it
+throws (Chromium), so there the editor no longer tries and logs nothing;
+Firefox, where reading it does not throw, still logs the failed
+registration. WebKit adds, for a presentation, that fullscreen is not
+allowed (filex's policy turns it off).
+At 390 px on a computer (a mouse, no touch) the editor is ONLYOFFICE's
+desktop one, folded (the ribbon's tabs only, no rulers, at 100 %): usable,
+not made for a phone.
+
+**On a phone** (measured 2026-10-08 on Linux, in Playwright 1.59's image:
+Chromium 147, Firefox 148, WebKit 26.4; 390 x 844, a phone's user agent,
+touch; [On a phone](#on-a-phone)), 3 of 3, in a run that passed the 21
+above again as well (24 of 24):
+
+| | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| The Turkish docx opens in the phone app, to read, with "Edit" (from the host page's load) | 1.1 s | 1.7 s | 2.2 s |
+| The phone app's "commercial license" message | not shown | not shown | not shown |
+| Its Download (PDF) and Print reach filex; FB2, which x2t does not write here, is refused and the person told | yes | yes | yes |
+| "Edit": the folded editor with the document; typed text saved (Ctrl+S) and in the file | yes | yes | yes |
+| "Reading view": back in the phone app, nothing left unsaved | yes | yes | yes |
+| The xlsx and pptx open in their phone apps | yes | yes | yes |
+| Requests outside the package / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
+| Screenshots: the phone app light and dark, the editor, the way back, xlsx, pptx | 7/7 | 7/7 | 7/7 |
+
+Two things the browsers showed before it passed, both fixed in this
+project's own files: Chromium refuses even to read `navigator.serviceWorker`
+in a sandboxed page, and Framework7 reads it while it starts, so the phone
+app stopped before showing anything (the storage stand-in now takes the
+attribute away there); and filex's bootstrap makes
+`Node.prototype.appendChild` read-only, so the phone app's held start
+(`src/frame/hold.ts`) defines its `appendChild` on `<body>` instead of
+assigning it. The phone app draws the page fitted to the screen; the
+editor after "Edit" shows its "New" hints to a person who has not closed
+them yet, as on a computer. The harness differs from filex 0.55 in one line, on
 purpose: it sends no `frame-ancestors` (see
 [What filex provides](#what-filex-provides); `FX_FRAME_ANCESTORS=star`
 puts it back and Chromium refuses the editor page).
@@ -494,7 +570,9 @@ Once a week the [upstream watch](.github/workflows/upstream-watch.yml)
 compares that with the newest release on Docker Hub. When ONLYOFFICE has
 published a newer one, it opens an issue with what changed and what an
 update involves (the lock rules in `src/locks.ts` and the protocol in
-`src/bridge.ts` are compared with the new server and sdkjs). It opens one
+`src/bridge.ts` are compared with the new server and sdkjs, and the phone
+apps are checked: how they load sdkjs, and that they still only read). It
+opens one
 issue per version and never a second one, even after the first is closed;
 a version announced on GitHub whose image is not out yet waits for the
 image. The workflow uses only its own `GITHUB_TOKEN`, with permission to
@@ -529,10 +607,10 @@ is no earlier, partial release:
    stand-in for filex 0.55 ([The app](#the-app),
    [Measured in the browsers](#measured-in-the-browsers)), with Download as
    and Print through x2t, the editor's settings kept between openings and
-   one person counting one; still to come: the measurements in filex 0.55
-   itself, filex's `ui.print`, and a phone editor (ONLYOFFICE's mobile
-   apps, about 27 MB unpacked with the embedded and forms apps, which the
-   128 MiB limit has room for) once filex's PWA work (#190) is done.
+   one person counting one, and on a phone ONLYOFFICE's phone app to read
+   with "Edit" to the folded editor (**built and measured** in the three
+   browsers: [On a phone](#on-a-phone)); still to come: the measurements in
+   filex 0.55 itself, with filex's `ui.print` printing for real.
 4. Encrypted folders (filex's `files:e2e-plaintext`).
 5. Editing together (filex's `files:co-edit` and the relay).
 6. A release bundle pinned by its SHA-256, the legal notice in the editor,

@@ -12,7 +12,8 @@
 // This gives such a page an in-memory localStorage and sessionStorage that
 // behave like the real ones (getItem/setItem/removeItem/clear/key/length,
 // and the named properties) for as long as the page lives. Where the browser
-// does give storage, nothing is replaced.
+// does give storage, nothing is replaced. It also takes away
+// navigator.serviceWorker where reading it throws (below).
 (function () {
   'use strict';
 
@@ -83,4 +84,32 @@
       // the editor runs without settings, as it would anyway.
     }
   });
+
+  // No service workers either. In Chromium even reading
+  // navigator.serviceWorker throws in such a page ("SecurityError: Service
+  // worker is disabled because the context is sandboxed and lacks the
+  // 'allow-same-origin' flag"): ONLYOFFICE's phone apps read it while
+  // Framework7 starts, and the throw stopped them before anything showed
+  // (measured 2026-10-08); the editors ask `'serviceWorker' in navigator`
+  // first and then fail to register. Where the read throws, the attribute
+  // is taken away, so `in` says no and both go on without one.
+  var nav = window.navigator;
+  if (!nav) return;
+  try {
+    void nav.serviceWorker;
+  } catch (e) {
+    var proto = window.Navigator && window.Navigator.prototype;
+    try {
+      if (proto) delete proto.serviceWorker;
+    } catch (e2) {
+      // Not configurable here: the own property below hides it.
+    }
+    if ('serviceWorker' in nav) {
+      try {
+        Object.defineProperty(nav, 'serviceWorker', { value: undefined, configurable: true, enumerable: false, writable: false });
+      } catch (e3) {
+        // Left as the browser has it.
+      }
+    }
+  }
 })();

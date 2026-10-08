@@ -85,9 +85,13 @@ update.
   write them right: txt and csv (every letter outside ASCII is cut to its
   low byte), html, md, epub, fb2 and images.
 - **Print**: the document as a PDF, handed to filex to print (`ui.print`,
-  proposed for filex 0.55); a filex without it gets the PDF as a download,
-  and the person is told so - a sandboxed frame may not open the browser's
-  print dialog.
+  filex 0.55: `filex-app.json` asks for it with `"ui": {"print": true}`,
+  the permission `ui:print`, its reason in English and Turkish); without
+  that grant, or on a filex without `ui.print` (`unknown_method`,
+  `unavailable`), the PDF goes to the person as a download, and they are
+  told so - a sandboxed frame may not open the browser's print dialog.
+  The e2e harness answers `ui.print` as filex 0.55 checks it (the grant, a
+  PDF, `{printed, size}`).
 - **The editor's settings are kept between openings** in filex's store for
   the app (`state.set`, one value of at most 8 KiB): units, zoom, the
   ribbon folded or not, the "New" hints the person closed. filex keeps
@@ -95,6 +99,24 @@ update.
   most 5 seconds.
 - On a narrow screen (a frame under 600 px) the editor starts folded: the
   ribbon's tabs only, no rulers, the side panel closed.
+- **On a phone** (a frame under 600 px on a touch screen) the document
+  opens in **ONLYOFFICE's phone app**: the three editors' `mobile` apps of
+  the pinned 9.4 image are now in the bundle (743 files with their pages'
+  moved inline scripts, 22.9 MiB unpacked, 5.5 MiB zipped: `ui.zip` is
+  97.7 MiB, 2,633 files). It
+  is touch-sized, with its own search, navigation, settings, Download (PDF
+  and the other formats through x2t, as on a computer; a format x2t does
+  not write here is refused and the person told) and Print. ONLYOFFICE's
+  open-source phone apps open a document **to read only** - editing on a
+  phone is a commercial ONLYOFFICE feature, and their editing controller is
+  a stub in this build - so they open in view mode, and **"Edit"** under
+  them opens the editor, folded, with the document; **"Reading view"** goes
+  back with what was written, saving it first. The phone app's start waits
+  for the kept settings like the editor's, and its settings (all under
+  `mobile-`) are kept with the editor's in the one value. The build adds an
+  empty `plugins.json`, which the phone apps ask for. `npm run e2e`
+  measures it on a phone in the three browsers (`--no-phone` leaves it
+  out).
 - `npm run e2e` measures all of it in the three browsers: the people the
   editor counts, Download as from the File menu (the offered formats, an
   OpenDocument copy holding the typed text, a PDF with pages and fonts),
@@ -103,6 +125,16 @@ update.
 
 ### Fixed
 
+- Every page of the editor logged an error at opening, its service worker
+  failing to register in filex's sandbox; in Chromium even reading
+  `navigator.serviceWorker` throws there, which stopped the phone apps
+  (Framework7 reads it while it starts). The storage stand-in
+  (`filex/storage.js`, the first script of every page) now takes the
+  attribute away where reading it throws, and the editors go on without
+  one.
+- A setting the editor wrote before the kept ones had reached its page was
+  reported on its own, and the app page would have kept that smaller set
+  in place of the kept one; such a write now waits for the kept settings.
 - One person editing was shown as two: the bridge's own participant (which
   keeps the editor sending its changes as it makes them) is now in a group
   of its own that the editor is configured not to show

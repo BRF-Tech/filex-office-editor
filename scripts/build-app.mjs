@@ -171,6 +171,7 @@ const CHANGES_APP = (version) =>
     '',
     'Added by it:',
     "  themes.json: an empty list of custom themes, which the editor asks a Document Server for on every opening.",
+    '  plugins.json: an empty list of plugins, which the phone editors (web-apps/apps/*/mobile) ask a Document Server for.',
     '',
   ].join('\n');
 
@@ -198,6 +199,11 @@ export async function buildApp(o) {
   // opening (../../../../themes.json); there are none.
   if (lock.files['themes.json']) throw new Error('the editor files hold a themes.json; the build would replace it');
   put(`${EDITOR_PREFIX}themes.json`, Buffer.from(`${JSON.stringify({ themes: [] })}\n`, 'utf8'));
+  // The phone editors (web-apps/apps/*/mobile) load a Document Server's
+  // plugin list (../../../../plugins.json) whatever the configuration says;
+  // there are none (plugins are off).
+  if (lock.files['plugins.json']) throw new Error('the editor files hold a plugins.json; the build would replace it');
+  put(`${EDITOR_PREFIX}plugins.json`, Buffer.from(`${JSON.stringify({ pluginsData: [] })}\n`, 'utf8'));
 
   for (const [p, data] of await bundleScripts({ pin, version })) put(p, data);
   for (const [f, data] of readX2t(o.x2t, x2tPin)) put(`x2t/${f}`, data);

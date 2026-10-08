@@ -106,6 +106,21 @@ export function editorRegion(locale: string | undefined | null): string {
 export const THEME_LIGHT = 'theme-white';
 export const THEME_DARK = 'theme-night';
 
+/**
+ * The phone editors' light and dark themes: they know only theme-light,
+ * theme-dark, default-light and default-dark (their page's supportedThemes,
+ * 9.4), and fall back to the browser's colour scheme for anything else.
+ */
+export const PHONE_THEME_LIGHT = 'theme-light';
+export const PHONE_THEME_DARK = 'theme-dark';
+
+/**
+ * What the app shows: "editor" is ONLYOFFICE's editor (its "main" app, folded
+ * on a narrow frame); "reader" is ONLYOFFICE's phone app, which in its
+ * open-source build opens a document to read only (see phoneLayout).
+ */
+export type View = 'reader' | 'editor';
+
 export interface ConfigInput {
   kind: Kind;
   title: string;
@@ -121,6 +136,8 @@ export interface ConfigInput {
   canPrint?: boolean;
   /** The app's frame is a phone's width: the editor starts folded (see narrowLayout). */
   narrow?: boolean;
+  /** Open ONLYOFFICE's phone app, to read (see phoneLayout); `narrow` is then not used. */
+  phone?: boolean;
   /** The events the app page listens to. */
   events?: Record<string, (e: { data?: unknown }) => void>;
 }
@@ -129,13 +146,12 @@ export interface ConfigInput {
 export const NARROW_PX = 600;
 
 /**
- * The editor on a narrow screen. ONLYOFFICE's phone editors (each editor's
- * "mobile" app) are not in the bundle (scripts/editor/rules.mjs; telephones
- * come after filex's PWA work, #190), so a phone gets the desktop editor,
- * folded where its own options allow: the ribbon shows its tabs only (a tap
- * on one opens it), no rulers, the side panel closed. Every one of them
- * stays the person's to change, and the editor keeps their choice
- * (settings.ts) over this.
+ * The editor on a narrow screen: a narrow window on a computer, and a phone
+ * once the person taps "Edit" in ONLYOFFICE's phone app (which only reads,
+ * see phoneLayout). It is the desktop editor, folded where its own options
+ * allow: the ribbon shows its tabs only (a tap on one opens it), no rulers,
+ * the side panel closed. Every one of them stays the person's to change,
+ * and the editor keeps their choice (settings.ts) over this.
  *
  * Measured at 390 px (2026-10-08, Chromium): compactHeader puts the tabs
  * behind two arrows with no name showing, and a page fitted to the width
@@ -152,6 +168,39 @@ export function narrowLayout(): Record<string, unknown> {
 }
 
 /**
+ * Whether the app opens on a phone: a frame narrower than NARROW_PX on a
+ * touch screen. A narrow window on a computer (a mouse, no touch) keeps the
+ * folded editor; a wide tablet keeps the editor as on a computer.
+ */
+export function isPhone(o: { width: number; coarsePointer: boolean; touchPoints: number }): boolean {
+  return o.width > 0 && o.width < NARROW_PX && (o.coarsePointer || o.touchPoints > 0);
+}
+
+/**
+ * ONLYOFFICE's phone app (each editor's "mobile" app, type "mobile"):
+ * touch-sized, with its own search, navigation, settings, Download and
+ * Print (and, for a text document, its "mobile view", the text reflowed to
+ * the screen).
+ *
+ * ⚠ It opens to READ only. The build in ONLYOFFICE's Document Server image
+ * is the open-source one, whose editing controller is a stub: in edit mode
+ * it shows "Using the free Community version, you can open documents for
+ * viewing only. To access mobile web editors, a commercial license is
+ * required." and stays read-only (all three phone apps of 9.4.0.129, read
+ * 2026-10-08). So the app opens it in view mode, and the person edits on
+ * the phone with the editor, folded (narrowLayout): the app page's "Edit"
+ * switches over with the document, "Reading view" switches back (main.ts).
+ *
+ * `disableForceDesktop`: api.js would otherwise read a "desktop" choice the
+ * person made earlier from the page's storage - the switch is the app's.
+ */
+export function phoneLayout(): Record<string, unknown> {
+  return {
+    mobile: { forceView: true, disableForceDesktop: true },
+  };
+}
+
+/**
  * DocsAPI.DocEditor's configuration. The editor runs as against a Document
  * Server, in "fast" co-editing (changes go to the bridge as they are made),
  * with Save asking the bridge (forcesave). Everything that would reach a
@@ -164,9 +213,12 @@ export function narrowLayout(): Record<string, unknown> {
  * ask the logo to be kept; About names the version and its authors).
  */
 export function editorConfig(o: ConfigInput): Record<string, unknown> {
-  const edit = o.canEdit;
+  const phone = o.phone === true;
+  // The phone app only reads (phoneLayout): editing is the editor's.
+  const edit = o.canEdit && !phone;
+  const theme = phone ? (o.dark ? PHONE_THEME_DARK : PHONE_THEME_LIGHT) : o.dark ? THEME_DARK : THEME_LIGHT;
   return {
-    type: 'desktop',
+    type: phone ? 'mobile' : 'desktop',
     width: '100%',
     height: '100%',
     documentType: o.kind.documentType,
@@ -203,7 +255,7 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
       customization: {
         forcesave: true,
         autosave: true,
-        uiTheme: o.dark ? THEME_DARK : THEME_LIGHT,
+        uiTheme: theme,
         comments: true,
         help: false,
         feedback: false,
@@ -213,7 +265,7 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
         macros: false,
         mentionShare: false,
         features: { spellcheck: { mode: false, change: false } },
-        ...(o.narrow ? narrowLayout() : {}),
+        ...(phone ? phoneLayout() : o.narrow ? narrowLayout() : {}),
       },
     },
     events: o.events ?? {},

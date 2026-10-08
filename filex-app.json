@@ -63,6 +63,10 @@
       "en": "Only for Download as and Print in the editor's File menu: what you choose to keep goes to your computer; a PDF to print, too, where filex cannot print it for you.",
       "tr": "Yalnızca düzenleyicinin Dosya menüsündeki Farklı indir ve Yazdır için: saklamayı seçtiğiniz dosya bilgisayarınıza iner; filex sizin için yazdıramadığında yazdırılacak PDF de."
     },
+    "ui:print": {
+      "en": "For Print in the editor: the document goes to filex as a PDF, and filex opens your browser's print dialog for it.",
+      "tr": "Düzenleyicideki Yazdır için: belge filex'e PDF olarak gider, filex onun için tarayıcınızın yazdırma penceresini açar."
+    },
     "ui-viewer:.docx": {
       "en": "So a .docx document opens in the editor.",
       "tr": "Bir .docx belgesi düzenleyicide açılsın diye."
@@ -116,7 +120,8 @@
     "package_fetch": true,
     "frame_package": true,
     "connect_blob": true,
-    "download": true
+    "download": true,
+    "print": true
   },
   "encrypted_folders": {
     "open": true,

@@ -31,6 +31,15 @@ describe('the manifest and the locked editor files', () => {
     }
   });
 
+  it('asks filex to print (ui.print, filex 0.55) and to hand files over, and says why in both languages', () => {
+    expect(manifest.ui.print).toBe(true);
+    expect(manifest.ui.download).toBe(true);
+    for (const p of ['ui:print', 'ui:download']) {
+      expect(manifest.permission_reasons[p]?.en, p).toBeTruthy();
+      expect(manifest.permission_reasons[p]?.tr, p).toBeTruthy();
+    }
+  });
+
   it('the editor pages load socket.io from where the bridge goes', () => {
     expect(lock.files[SOCKET_IO]).toBeTruthy();
   });
@@ -43,15 +52,26 @@ describe('the manifest and the locked editor files', () => {
     expect(names).toContain('web-apps/apps/common/main/lib/template/ExtendedColorDialog.template.txt');
   });
 
-  it('holds no themes.json of its own (the build adds an empty one)', () => {
+  it('holds no themes.json or plugins.json of its own (the build adds empty ones)', () => {
     expect(lock.files['themes.json']).toBeUndefined();
+    expect(lock.files['plugins.json']).toBeUndefined();
+  });
+
+  it('carries the phone editors, their pages without inline code, loading socket.io from the same place', () => {
+    for (const editor of ['documenteditor', 'spreadsheeteditor', 'presentationeditor']) {
+      const page = `web-apps/apps/${editor}/mobile/index.html`;
+      expect(lock.files[page], page).toBeTruthy();
+      expect(lock.files[`web-apps/apps/${editor}/mobile/dist/js/app.js`], editor).toBeTruthy();
+      expect(lock.changed[page], page).toMatch(/inline scripts? moved/);
+    }
+    expect(Object.keys(lock.files).some((p) => /^web-apps\/apps\/[^/]+\/(embed|forms)\//.test(p))).toBe(false);
   });
 });
 
 describe.skipIf(!existsSync(path.join(UI, 'index.html')))('dist/ui (a bundle built on this machine)', () => {
   const read = (p: string) => readFileSync(path.join(UI, ...p.split('/')));
 
-  it('the editor files in it are the locked ones, but for the two the build replaces and the one it adds', () => {
+  it('the editor files in it are the locked ones, but for the two the build replaces and the two it adds', () => {
     const changed = new Set([SOCKET_IO, 'filex/CHANGES.txt']);
     const locked = { files: Object.fromEntries(Object.entries(lock.files as Record<string, string>).filter(([p]) => !changed.has(p))) };
     expect(() => readEditor(path.join(UI, 'editor'), locked as never)).toThrow(/^[^]*the editor files are not the locked ones[^]*$/);
@@ -62,7 +82,7 @@ describe.skipIf(!existsSync(path.join(UI, 'index.html')))('dist/ui (a bundle bui
       message = String((e as Error).message);
     }
     const lines = message.split('\n').slice(1).map((l) => l.trim()).sort();
-    expect(lines).toEqual(['+ filex/CHANGES.txt (not in the lock)', `+ ${SOCKET_IO} (not in the lock)`, '+ themes.json (not in the lock)'].sort());
+    expect(lines).toEqual(['+ filex/CHANGES.txt (not in the lock)', `+ ${SOCKET_IO} (not in the lock)`, '+ themes.json (not in the lock)', '+ plugins.json (not in the lock)'].sort());
   });
 
   it("serves the bridge at socket.io's address, and says so in the changes list", () => {
@@ -71,6 +91,8 @@ describe.skipIf(!existsSync(path.join(UI, 'index.html')))('dist/ui (a bundle bui
     expect(shim).not.toMatch(/Socket\.IO v4/);
     expect(read(`${EDITOR_PREFIX}filex/CHANGES.txt`).toString('utf8')).toMatch(/socket\.io\.min\.js: ONLYOFFICE's copy of the socket\.io client/);
     expect(JSON.parse(read(`${EDITOR_PREFIX}themes.json`).toString('utf8'))).toEqual({ themes: [] });
+    expect(JSON.parse(read(`${EDITOR_PREFIX}plugins.json`).toString('utf8'))).toEqual({ pluginsData: [] });
+    expect(read(`${EDITOR_PREFIX}filex/CHANGES.txt`).toString('utf8')).toMatch(/plugins\.json: an empty list of plugins/);
   });
 
   it('carries the pinned x2t, the app page without inline code, and the licence', () => {

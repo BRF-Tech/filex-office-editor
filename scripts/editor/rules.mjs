@@ -25,6 +25,23 @@ export const FONT_EXCLUDE = ['arphic-ukai', 'wqy-zenhei', 'takao-gothic', 'nanum
 export const EDITORS = ['documenteditor', 'spreadsheeteditor', 'presentationeditor'];
 
 /**
+ * The apps of each editor the bundle carries: "main", the editor a computer
+ * gets, and "mobile", ONLYOFFICE's phone app (Framework7, its own pages
+ * under web-apps/apps/<editor>/mobile/, the same sdkjs and the same
+ * socket.io address as "main"). The embedded viewer and the forms app are
+ * left out (the app never opens them).
+ *
+ * ⚠ The phone app in ONLYOFFICE's Document Server image is the open-source
+ * build: it opens documents to READ only. Its editing controller is a stub
+ * (`isSupportEditFeature()` returns false in all three bundles of 9.4.0.129,
+ * read 2026-10-08), and in edit mode it says so ("Using the free Community
+ * version, you can open documents for viewing only. To access mobile web
+ * editors, a commercial license is required."). The app opens it in view
+ * mode, and a phone edits with "main", folded (src/app/config.ts).
+ */
+export const APPS = ['main', 'mobile'];
+
+/**
  * The date of the changes this project makes to ONLYOFFICE's files (the
  * HTML pages, see html.mjs), for the notice ONLYOFFICE's terms ask for. It
  * is part of the build's input, not the clock, so two builds agree: change
@@ -40,7 +57,8 @@ export const CHANGES_DATED = '2026-10-08';
 const RULES = [
   { re: /\.(gz|br)$/, drop: 'pre-compressed copies (filex compresses what it serves)' },
   { re: /^web-apps\/apps\/(pdfeditor|visioeditor)\//, drop: 'the PDF and Visio editors' },
-  { re: /^web-apps\/apps\/[^/]+\/(mobile|embed|forms)\//, drop: 'the mobile, embedded-viewer and forms apps' },
+  // The phone apps ("mobile") stay: see APPS above.
+  { re: /^web-apps\/apps\/[^/]+\/(embed|forms)\//, drop: 'the embedded-viewer and forms apps' },
   { re: /\/resources\/help\//, drop: 'the help pages' },
   { re: /^web-apps\/apps\/api\/wopi\//, drop: "the WOPI host's server templates" },
   { re: /^web-apps\/vendor\/monaco\//, drop: 'the macro editor (macros are off)' },
