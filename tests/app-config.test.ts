@@ -272,6 +272,36 @@ describe('the editor page', () => {
     expect(added[added.length - 1]).toBe(`${B}sdkjs/slide/sdk-all-min.js`);
   });
 
+  it("holds them under filex's bootstrap too, whose Node.prototype.appendChild is read-only", async () => {
+    const added: string[] = [];
+    const proto = {};
+    Object.defineProperty(proto, 'appendChild', {
+      value: function <T>(n: T): T {
+        added.push((n as unknown as { src: string }).src);
+        return n;
+      },
+      writable: false,
+      configurable: false,
+    });
+    const body = Object.create(proto) as { appendChild<T>(n: T): T };
+    expect(() => {
+      'use strict';
+      (body as { appendChild: unknown }).appendChild = () => null;
+    }).toThrow();
+    let open: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    expect(holdScripts(body as never, ready)).toBe(true);
+    body.appendChild({ tagName: 'SCRIPT', src: 'x/sdkjs/common/AllFonts.js' });
+    expect(added).toEqual([]);
+    open();
+    await ready;
+    await Promise.resolve();
+    expect(added).toEqual(['x/sdkjs/common/AllFonts.js']);
+    expect(Object.prototype.hasOwnProperty.call(body, 'appendChild')).toBe(false);
+  });
+
   it('lets the held scripts go when the wait fails too, and holds nothing without a parent', async () => {
     const added: string[] = [];
     const body = { appendChild: <T>(n: T): T => (added.push((n as unknown as { src: string }).src), n) };

@@ -32,28 +32,43 @@ function isHeld(node: unknown, held: RegExp): boolean {
 /**
  * Until `ready` settles (resolved or rejected), scripts whose address
  * matches `held` that are appended to `parent` wait, in order; everything
- * else goes in at once. False: there is no parent to watch.
+ * else goes in at once. False: there is no parent to watch, or it cannot be
+ * watched (its appendChild cannot be defined).
  */
 export function holdScripts(parent: Parent | null | undefined, ready: Promise<unknown>, held: RegExp = HELD_SCRIPTS): boolean {
   if (!parent) return false;
   const target = parent;
-  const own = Object.prototype.hasOwnProperty.call(target, 'appendChild');
+  const before = Object.getOwnPropertyDescriptor(target, 'appendChild');
   const original = target.appendChild;
   const waiting: Node[] = [];
   let open = false;
-  const release = () => {
-    if (open) return;
-    open = true;
-    if (own) target.appendChild = original;
-    else Reflect.deleteProperty(target, 'appendChild');
-    for (const n of waiting.splice(0)) original.call(target, n);
-  };
-  target.appendChild = function <T extends Node>(node: T): T {
+  const wrapper = function <T extends Node>(node: T): T {
     if (!open && isHeld(node, held)) {
       waiting.push(node);
       return node;
     }
     return original.call(target, node) as T;
+  };
+  // ⚠ Defined, not assigned: filex's bootstrap makes Node.prototype.appendChild
+  // read-only (it wraps it to guard frames), and an inherited read-only
+  // property refuses `body.appendChild = ...` ("appendChild" is read-only,
+  // measured in Firefox 2026-10-08). The wrapper calls the page's own
+  // appendChild - filex's guarded one.
+  try {
+    Object.defineProperty(target, 'appendChild', { value: wrapper, configurable: true, writable: true, enumerable: false });
+  } catch {
+    return false;
+  }
+  const release = () => {
+    if (open) return;
+    open = true;
+    try {
+      if (before) Object.defineProperty(target, 'appendChild', before);
+      else Reflect.deleteProperty(target, 'appendChild');
+    } catch {
+      // The wrapper stays; it lets everything through now.
+    }
+    for (const n of waiting.splice(0)) original.call(target, n);
   };
   ready.then(release, release);
   return true;
