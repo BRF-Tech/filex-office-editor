@@ -7,7 +7,15 @@
 // answers the bridge's requests and keeps what the measurement reads in
 // window.__fx. The query string chooses the file and the person's setup:
 //
-//   ?doc=<name>&locale=tr&theme=dark&ro=1&tag=<run>
+//   ?doc=<name>&locale=tr&theme=dark&ro=1&tag=<run>&print=none&grants=-ui:download
+//
+// The app's store (state.get/set) is filex's as 0.54 keeps it - 8 KiB a
+// value, 16 KiB an app as JSON - and lasts across the pages of one browser
+// context (this page's own localStorage stands in for the person's
+// preferences). ui.download records the file with the server (/__file).
+// ui.print is a stand-in for a method filex does not have yet (see the
+// README, "Print"): it records the PDF the same way; print=none answers
+// unknown_method, as filex 0.55 does.
 'use strict';
 
 (function () {
@@ -18,6 +26,13 @@
   const mode = q.get('theme') === 'dark' ? 'dark' : 'light';
   const readOnly = q.get('ro') === '1';
   const tag = q.get('tag') || 'run';
+  const canPrint = q.get('print') !== 'none';
+  const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download'];
+  const without = (q.get('grants') || '').split(',').filter((g) => g.startsWith('-')).map((g) => g.slice(1));
+  const grants = GRANTS.filter((g) => !without.includes(g));
+  const STATE = 'fx-app-state:office-editor';
+  const STATE_VALUE_MAX = 8 << 10;
+  const STATE_APP_MAX = 16 << 10;
   const APP = '/_appui/office-editor/0123456789abcdef/index.html';
   const MIME = {
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -32,7 +47,7 @@
   if (mode === 'dark') document.documentElement.classList.add('dark');
   document.getElementById('name').textContent = name;
 
-  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], ready: false, hostSave: null });
+  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], stateSets: 0, ready: false, hostSave: null });
 
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
@@ -71,6 +86,44 @@
     reply(id, { saved: true, size: r.size });
   }
 
+  function readState() {
+    try {
+      return JSON.parse(localStorage.getItem(STATE) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function stateSet(id, params) {
+    const key = String((params && params.key) || '');
+    if (!key || key.length > 128) return fail(id, 'invalid', 'a state key is 1-128 characters');
+    const all = readState();
+    if (params.value === undefined) delete all[key];
+    else {
+      const json = JSON.stringify(params.value);
+      if (json.length > STATE_VALUE_MAX) return fail(id, 'too_large', `a state value is at most ${STATE_VALUE_MAX} bytes as JSON`);
+      all[key] = JSON.parse(json);
+    }
+    if (new TextEncoder().encode(JSON.stringify(all)).length > STATE_APP_MAX) return fail(id, 'too_large', `an app keeps at most ${STATE_APP_MAX} bytes`);
+    localStorage.setItem(STATE, JSON.stringify(all));
+    fx.stateSets++;
+    return reply(id, null);
+  }
+
+  /** ui.download and the ui.print stand-in: the file goes to the server, which keeps it for the measurement. */
+  async function handOver(id, params, how) {
+    let data = params && params.data;
+    if (typeof data === 'string') data = new TextEncoder().encode(data);
+    if (data && typeof data.getReader === 'function') data = await new Response(data).arrayBuffer();
+    if (!(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) return fail(id, 'invalid');
+    const fname = String((params && params.name) || '');
+    if (!fname || /[\\/]/.test(fname)) return fail(id, 'invalid', 'a name, not a path');
+    const res = await fetch(`/__file?how=${how}&name=${encodeURIComponent(fname)}&tag=${encodeURIComponent(tag)}`, { method: 'POST', body: data });
+    const r = await res.json();
+    fx.files.push({ how, name: fname, mime: params.mime || '', size: r.size });
+    return reply(id, how === 'print' ? { printed: true } : { saved: true, size: r.size });
+  }
+
   async function onRequest(ev) {
     const m = ev.data;
     if (!m || typeof m !== 'object') return;
@@ -94,7 +147,7 @@
             theme: { mode, tokens: TOKENS[mode] },
             user: { name: 'Ayşe Yılmaz' },
             files: [{ index: 0, name, ext, size: 0, mime: MIME[ext] || '', readOnly }],
-            grants: ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download'],
+            grants,
           });
         case 'file.read':
           return read(id);
@@ -111,10 +164,19 @@
           fx.titles.push(params && params.text);
           return reply(id, null);
         case 'ui.close':
-        case 'state.set':
           return reply(id, null);
-        case 'state.get':
-          return reply(id, undefined);
+        case 'state.set':
+          return stateSet(id, params);
+        case 'state.get': {
+          const v = readState()[String((params && params.key) || '')];
+          return reply(id, v === undefined ? null : v);
+        }
+        case 'ui.download':
+          if (!grants.includes('ui:download')) return fail(id, 'not_granted');
+          return handOver(id, params, 'download');
+        case 'ui.print':
+          if (!canPrint) return fail(id, 'unknown_method');
+          return handOver(id, params, 'print');
         case 'license.get':
           return reply(id, { status: 'free' });
         default:
@@ -144,6 +206,11 @@
       hostPending.set(n, resolve);
       port.postMessage({ hid: n, request: 'save' });
     });
+  };
+
+  /** filex closes the frame's surroundings: the app's last chance (settings, unsaved work). */
+  fx.closeRequest = function () {
+    port.postMessage({ event: 'close.request' });
   };
 
   /** filex's theme switch. */

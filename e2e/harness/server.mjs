@@ -134,6 +134,8 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
   const hostHtml = readFileSync(path.join(here, 'host.html'));
   const hostJs = readFileSync(path.join(here, 'host.js'));
   const saves = [];
+  /** What the app handed the person (ui.download) or gave filex to print (the ui.print stand-in). */
+  const files = [];
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const origin = `http://${req.headers.host}`;
@@ -144,7 +146,7 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
           // filex's own page names the interfaces by path, never 'self'.
-          'Content-Security-Policy': `default-src 'none'; script-src ${origin}/host.js; style-src 'unsafe-inline'; connect-src ${origin}/__doc/ ${origin}/__save; frame-src ${origin}/_appui/; img-src data:`,
+          'Content-Security-Policy': `default-src 'none'; script-src ${origin}/host.js; style-src 'unsafe-inline'; connect-src ${origin}/__doc/ ${origin}/__save ${origin}/__file; frame-src ${origin}/_appui/; img-src data:`,
         });
         res.end(hostHtml);
         return;
@@ -183,6 +185,27 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
           saves.push({ tag, name, n, size: body.length, file, at: Date.now() });
           log(`save ${tag} ${name} #${n}: ${body.length} bytes`);
           res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ saved: true, size: body.length }));
+        });
+        return;
+      }
+      if (p === '/__file' && req.method === 'POST') {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+          const body = Buffer.concat(chunks);
+          const how = url.searchParams.get('how') === 'print' ? 'print' : 'download';
+          const name = (url.searchParams.get('name') || 'file.bin').replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120);
+          const tag = (url.searchParams.get('tag') || 'run').replace(/[^A-Za-z0-9._-]/g, '_');
+          const n = files.filter((f) => f.tag === tag).length + 1;
+          let file = null;
+          if (out) {
+            mkdirSync(out, { recursive: true });
+            file = path.join(out, `${tag}-${how}-${n}-${name.replace(/[^A-Za-z0-9._-]/g, '_')}`);
+            writeFileSync(file, body);
+          }
+          files.push({ tag, how, name, n, size: body.length, file, at: Date.now() });
+          log(`${how} ${tag} ${name}: ${body.length} bytes`);
+          res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ size: body.length }));
         });
         return;
       }
@@ -236,7 +259,7 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
     }
   });
   return new Promise((resolve) => {
-    server.listen(port, '127.0.0.1', () => resolve({ server, saves, origin: `http://127.0.0.1:${server.address().port}` }));
+    server.listen(port, '127.0.0.1', () => resolve({ server, saves, files, origin: `http://127.0.0.1:${server.address().port}` }));
   });
 }
 

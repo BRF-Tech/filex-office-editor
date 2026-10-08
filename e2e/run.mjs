@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 BRF Tech. Part of filex-office-editor (see README.md and NOTICE).
 //
-// The browser measurement of the app (plan step A3): the built bundle
+// The browser measurement of the app (plan steps A3 and after): the built bundle
 // (dist/ui), served the way filex 0.55 serves an app's interface
 // (e2e/harness), opened in Chromium, Firefox and WebKit, headless:
 //
@@ -17,13 +17,22 @@
 //   - the storage stand-in (editor/filex/storage.js): whether the browser
 //     gave the sandboxed pages storage, and whether the editor's settings
 //     land in the stand-in;
+//   - one person counts one: the bridge's keeper is not in the editor's list
+//     of people, and no "2" shows in the header;
+//   - Download as (the Turkish documents): the File menu offers what x2t
+//     writes here (src/formats.ts), the OpenDocument copy and the PDF come
+//     to filex (ui.download) holding the typed text / pages and fonts, and
+//     Print hands filex a PDF to print (the ui.print stand-in);
+//   - the settings, once per engine: a "New" hint closed in one opening is
+//     kept (state.set) and does not show in the next one; and Print where
+//     filex has no print (print=none) hands the PDF over as a download;
 //   - screenshots at 1280 and 390 px, light and dark (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -40,6 +49,19 @@ const ROOT = path.join(here, '..');
 const DIST = path.join(ROOT, 'dist');
 const TYPED = 'Merhaba dünya: ğüşıöç İĞÜŞÖÇ';
 const OPEN_MS = 120_000;
+/** What the File menu's Download as offers for each kind (src/formats.ts; DOCM/XLSM/PPTM only for those files). */
+const DOWNLOAD_AS = {
+  docx: [0x0041, 0x0201, 0x0043, 0x004c, 0x0209, 0x004f, 0x0044],
+  xlsx: [0x0101, 0x0103, 0x0201, 0x0106, 0x010a, 0x0209],
+  pptx: [0x0081, 0x0084, 0x0201, 0x0083, 0x0087, 0x0209, 0x008a],
+};
+/** The OpenDocument kin of each, and its type: the copy the measurement downloads. */
+const ODF = {
+  docx: { id: 0x0043, ext: 'odt', mime: 'application/vnd.oasis.opendocument.text' },
+  xlsx: { id: 0x0103, ext: 'ods', mime: 'application/vnd.oasis.opendocument.spreadsheet' },
+  pptx: { id: 0x0083, ext: 'odp', mime: 'application/vnd.oasis.opendocument.presentation' },
+};
+const NAMESPACE = { docx: 'DE', xlsx: 'SSE', pptx: 'PE' };
 
 function args(argv) {
   const o = {
@@ -47,6 +69,7 @@ function args(argv) {
     docs: ['blank.docx', 'blank.xlsx', 'blank.pptx', 'tr.docx', 'tr.xlsx', 'tr.pptx'],
     shots: false,
     keep: false,
+    settings: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -55,6 +78,7 @@ function args(argv) {
     else if (a === '--docs') o.docs = argv[++i].split(',').filter(Boolean);
     else if (a === '--shots') o.shots = true;
     else if (a === '--keep') o.keep = true;
+    else if (a === '--no-settings') o.settings = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -75,6 +99,60 @@ async function until(what, fn, ms) {
     await sleep(250);
   }
   throw new Error(`timed out (${ms / 1000} s) waiting for ${what}${last instanceof Error ? `: ${last.message}` : ''}`);
+}
+
+/** A PDF's pages and embedded fonts, read from its objects (a check, not a parser). */
+function pdfFacts(bytes) {
+  const text = bytes.toString('latin1');
+  return {
+    pdf: text.startsWith('%PDF-'),
+    pages: (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length,
+    fonts: (text.match(/\/FontFile[23]?\b/g) ?? []).length,
+  };
+}
+
+/** The words of an OpenDocument file: its content.xml without tags. */
+function odfText(bytes) {
+  const e = readZip(bytes).find((x) => x.name === 'content.xml');
+  return e ? e.read().toString('utf8').replace(/<[^>]+>/g, '') : '';
+}
+
+function odfMime(bytes) {
+  const e = readZip(bytes).find((x) => x.name === 'mimetype');
+  return e ? e.read().toString('utf8') : '';
+}
+
+const editorLocator = (page) => page.frameLocator('iframe[title]').frameLocator('iframe[name="frameEditor"]');
+
+/** One person in the editor's list: the keeper is not counted, the header shows no "2". */
+async function people(page, ext) {
+  return editorFrame(page).evaluate((ns) => {
+    const users = window[ns].getCollection('Common.Collections.Users');
+    const box = document.querySelector('#tlb-box-users');
+    return { visible: users.getVisibleEditingCount(), all: users.length, badge: !!box && !!box.offsetParent };
+  }, NAMESPACE[ext]);
+}
+
+/** Wait for the next file the app hands filex (ui.download, or the ui.print stand-in). */
+async function nextFile(server, tag, before, what) {
+  return until(what, () => server.files.filter((f) => f.tag === tag)[before], 60_000);
+}
+
+/** File → Download as: the formats on offer, then one of them chosen. */
+async function downloadAs(page, format) {
+  const ed = editorLocator(page);
+  await ed.locator('[data-tab="file"]').click();
+  await ed.locator('#fm-btn-download').click();
+  await ed.locator('#panel-saveas .btn-doc-format').first().waitFor({ state: 'visible', timeout: 15_000 });
+  const offered = await ed.locator('#panel-saveas .btn-doc-format').evaluateAll((els) => els.filter((e) => e.offsetParent).map((e) => Number(e.getAttribute('format'))));
+  await ed.locator(`#panel-saveas .btn-doc-format[format="${format}"]`).click();
+  // The editor's own warning for some formats (an .ods may lose formulas): go on.
+  try {
+    await ed.locator('.asc-window .footer button[result="ok"]').first().click({ timeout: 2500 });
+  } catch {
+    /* no warning for this format */
+  }
+  return offered;
 }
 
 const appFrame = (page) => page.frames().find((f) => f.url().includes(APP_PATH) && /\/index\.html$/.test(new URL(f.url()).pathname) && !f.url().includes('/editor/'));
@@ -196,6 +274,8 @@ async function runOne(browser, server, engine, doc, o) {
       app: await appFrame(page).evaluate(() => window.__fxPhases || []),
       editor: await editorFrame(page).evaluate(() => window.__fxPhases || []),
     };
+    r.people = await people(page, ext);
+    if (r.people.visible !== 1 || r.people.badge) r.problems.push(`the editor counts ${r.people.visible} people (badge shown: ${r.people.badge}); one person should count one`);
     r.storage = { app: await storageReport(appFrame(page)), editor: await storageReport(editorFrame(page)) };
     r.storage.editorKeys = await editorFrame(page).evaluate(() => {
       try {
@@ -244,6 +324,39 @@ async function runOne(browser, server, engine, doc, o) {
     if (o.shots && ext === 'docx' && doc.startsWith('tr.')) {
       await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${tag}-1280-light-edited.png`) });
     }
+
+    if (doc.startsWith('tr.')) {
+      // Download as: the OpenDocument copy, then the PDF, from the File menu.
+      const odf = ODF[ext];
+      let n = server.files.filter((f) => f.tag === tag).length;
+      const offered = await downloadAs(page, odf.id);
+      r.downloadAs = offered;
+      if (JSON.stringify(offered) !== JSON.stringify(DOWNLOAD_AS[ext])) r.problems.push(`Download as offers ${offered.join(',')}, not ${DOWNLOAD_AS[ext].join(',')}`);
+      const got = await nextFile(server, tag, n++, `the ${odf.ext} download`);
+      const bytes = readFileSync(got.file);
+      step(`download ${odf.ext}`, { bytes: got.size });
+      if (got.how !== 'download' || !got.name.endsWith(`.${odf.ext}`)) r.problems.push(`the ${odf.ext} came as ${got.how} ${got.name}`);
+      if (odfMime(bytes) !== odf.mime) r.problems.push(`the ${odf.ext} is not one (${odfMime(bytes) || 'no mimetype'})`);
+      if (!odfText(bytes).includes(TYPED)) r.problems.push(`the ${odf.ext} does not hold the typed text`);
+
+      await downloadAs(page, 0x0201);
+      const pdfFile = await nextFile(server, tag, n++, 'the PDF download');
+      const facts = pdfFacts(readFileSync(pdfFile.file));
+      step('download pdf', { bytes: pdfFile.size, ...facts });
+      r.pdf = facts;
+      if (!facts.pdf || facts.pages < 1 || facts.fonts < 1) r.problems.push(`the PDF is not right: ${JSON.stringify(facts)}`);
+
+      // Print: the editor's own call, as its File menu and Ctrl+P make it.
+      await editorFrame(page).evaluate(() => {
+        const api = (window.Asc && window.Asc.editor) || window.editor;
+        api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
+      });
+      const printed = await nextFile(server, tag, n++, 'the PDF to print');
+      step('print', { bytes: printed.size });
+      if (printed.how !== 'print' || !pdfFacts(readFileSync(printed.file)).pdf) r.problems.push(`Print gave filex ${printed.how} ${printed.name}`);
+      const toasts = await page.evaluate(() => window.__fx.toasts);
+      if (toasts.some((t) => t && t.tone === 'error')) r.problems.push(`filex was told: ${JSON.stringify(toasts)}`);
+    }
     r.ok = r.problems.length === 0;
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));
@@ -255,7 +368,7 @@ async function runOne(browser, server, engine, doc, o) {
     }
   }
   const pkg = `${server.origin}${APP_PATH}`;
-  const host = [`${server.origin}/?`, `${server.origin}/host.js`, `${server.origin}/__doc/`, `${server.origin}/__save`];
+  const host = [`${server.origin}/?`, `${server.origin}/host.js`, `${server.origin}/__doc/`, `${server.origin}/__save`, `${server.origin}/__file`];
   r.requests = requests.length;
   r.outside = [...new Set(requests.filter((u) => !u.startsWith(pkg) && !u.startsWith('blob:') && !u.startsWith('data:') && !host.some((h) => u.startsWith(h))))];
   r.failures = [...new Set(failures)];
@@ -264,6 +377,71 @@ async function runOne(browser, server, engine, doc, o) {
   if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
   r.ok = r.problems.length === 0;
   await ctx.close();
+  return r;
+}
+
+/**
+ * Once per engine, in one browser context (one person): a "New" hint closed
+ * in one opening is kept and does not show in the next; Print where filex
+ * has no print hands the PDF over as a download.
+ */
+async function settingsRun(browser, server, engine) {
+  const r = { engine, doc: 'tr.docx (settings, print fallback)', ok: false, steps: [], problems: [], notes: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const tag = `${engine}-settings`;
+  const open = async (q) => {
+    const page = await ctx.newPage();
+    await page.goto(`${server.origin}/?doc=tr.docx&locale=tr&tag=${tag}${q}`);
+    await until('the editor', async () => (await appFrame(page)?.evaluate(() => document.documentElement.dataset.fxPhase)) === 'ready', OPEN_MS);
+    return page;
+  };
+  const hint = (page) => editorLocator(page).locator('.asc-synchronizetip .btn-div');
+  try {
+    const first = await open('&print=none');
+    step('opened');
+    await hint(first).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await hint(first).first().click();
+    const kept = await until('the closed hint to be kept', async () => {
+      const raw = await first.evaluate(() => localStorage.getItem('fx-app-state:office-editor'));
+      const values = raw ? JSON.parse(raw)['editor-settings'] : null;
+      return values && Object.keys(values).some((k) => /help-tip/.test(k)) ? values : false;
+    }, 20_000);
+    r.kept = Object.keys(kept);
+    step('hint kept', { keys: r.kept.length });
+
+    const before = server.files.filter((f) => f.tag === tag).length;
+    await editorFrame(first).evaluate(() => {
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
+    });
+    const got = await nextFile(server, tag, before, 'the PDF handed over in place of a print');
+    const toasts = await first.evaluate(() => window.__fx.toasts);
+    step('print fallback', { how: got.how, bytes: got.size });
+    if (got.how !== 'download' || !pdfFacts(readFileSync(got.file)).pdf) r.problems.push(`Print without filex's print gave ${got.how} ${got.name}`);
+    if (!toasts.some((t) => t && t.tone === 'info')) r.problems.push('Print without filex\'s print did not say what it did');
+    await first.close();
+
+    const second = await open('');
+    step('opened again');
+    await sleep(3000);
+    const shown = await hint(second).evaluateAll((els) => els.filter((e) => e.offsetParent).length);
+    const storage = await editorFrame(second).evaluate(() => {
+      const s = window.localStorage;
+      const o = {};
+      for (let i = 0; i < s.length; i++) o[s.key(i)] = s.getItem(s.key(i));
+      return o;
+    });
+    const missing = r.kept.filter((k) => storage[k] !== kept[k]);
+    if (missing.length) r.problems.push(`the next opening lacks the kept ${missing.join(', ')}`);
+    if (shown) r.problems.push(`the closed hint shows again (${shown})`);
+    await second.close();
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+  }
+  await ctx.close();
+  r.ok = r.problems.length === 0;
   return r;
 }
 
@@ -310,6 +488,11 @@ async function main() {
         report.results.push(r);
         const open = r.steps.find((s) => s.name === 'opened');
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${doc}${open ? ` opened in ${(open.ms / 1000).toFixed(1)} s` : ''}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.settings) {
+        const r = await settingsRun(browser, server, engine);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
       if (o.shots) report.shots = [...(report.shots ?? []), ...(await shots(browser, server, engine))];
       await browser.close();
