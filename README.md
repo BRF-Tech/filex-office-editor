@@ -543,7 +543,9 @@ Once a week the [upstream watch](.github/workflows/upstream-watch.yml)
 compares that with the newest release on Docker Hub. When ONLYOFFICE has
 published a newer one, it opens an issue with what changed and what an
 update involves (the lock rules in `src/locks.ts` and the protocol in
-`src/bridge.ts` are compared with the new server and sdkjs). It opens one
+`src/bridge.ts` are compared with the new server and sdkjs, and the phone
+apps are checked: how they load sdkjs, and that they still only read). It
+opens one
 issue per version and never a second one, even after the first is closed;
 a version announced on GitHub whose image is not out yet waits for the
 image. The workflow uses only its own `GITHUB_TOKEN`, with permission to
