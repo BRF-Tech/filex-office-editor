@@ -1,0 +1,176 @@
+{
+  "manifest_version": 1,
+  "name": "office-editor",
+  "version": "0.0.0",
+  "filex": ">=0.55.0",
+  "label": {
+    "en": "Office editor",
+    "tr": "Ofis düzenleyici"
+  },
+  "description": {
+    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server - also inside encrypted folders, where no server ever reads the document. Based on ONLYOFFICE Docs by Ascensio System SIA.",
+    "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin - şifreli klasörlerde de; orada belgeyi hiçbir sunucu okumaz. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır."
+  },
+  "homepage": "https://github.com/BRF-Tech/filex-onlyoffice",
+  "permissions": [
+    "files:read",
+    "files:write",
+    "files:e2e-plaintext",
+    "files:co-edit"
+  ],
+  "permission_reasons": {
+    "files:read": {
+      "en": "To open the document you open with it.",
+      "tr": "Onunla açtığınız belgeyi açmak için."
+    },
+    "files:write": {
+      "en": "To save the document back as a new version, or a new document where you choose.",
+      "tr": "Belgeyi yeni sürüm olarak geri kaydetmek ya da seçtiğiniz yere yeni belge olarak kaydetmek için."
+    },
+    "files:e2e-plaintext": {
+      "en": "To edit documents in encrypted folders: your browser decrypts the document and hands this app its contents in the clear, and encrypts what it saves. The app sees every document you open with it in an encrypted folder. The server still sees nothing.",
+      "tr": "Şifreli klasörlerdeki belgeleri düzenlemek için: tarayıcınız belgenin şifresini çözer, içeriğini bu uygulamaya şifresiz verir ve kaydedileni yeniden şifreler. Uygulama, şifreli bir klasörde onunla açtığınız her belgenin içeriğini görür. Sunucu yine hiçbir şey görmez."
+    },
+    "files:co-edit": {
+      "en": "So several people can edit one document together: their changes travel sealed through filex's relay, which orders them without reading them.",
+      "tr": "Birkaç kişi aynı belgeyi birlikte düzenleyebilsin diye: değişiklikler filex'in aktarıcısından mühürlü geçer; aktarıcı onları okumadan sıraya koyar."
+    },
+    "ui": {
+      "en": "The editor is this app: it runs in your browser, in the sandbox filex draws for it. Nothing of it runs on the server.",
+      "tr": "Düzenleyici bu uygulamanın kendisidir: filex'in onun için çizdiği yalıtım alanında, tarayıcınızda çalışır. Hiçbir parçası sunucuda çalışmaz."
+    },
+    "ui:package-fetch": {
+      "en": "The editor loads its own code, fonts and translations from its package while it runs.",
+      "tr": "Düzenleyici çalışırken kendi kodunu, fontlarını ve çevirilerini paketinden yükler."
+    },
+    "ui:frame-package": {
+      "en": "The editor opens its own page in a frame of its own, from the same package and in the same sandbox.",
+      "tr": "Düzenleyici kendi sayfasını, aynı paketten ve aynı yalıtım alanında, kendine ait bir çerçevede açar."
+    },
+    "ui:connect-blob": {
+      "en": "The editor reads the document your browser decrypted or converted from an in-memory address (blob:) that never leaves the page.",
+      "tr": "Düzenleyici, tarayıcınızın çözdüğü ya da dönüştürdüğü belgeyi sayfadan hiç çıkmayan bir bellek adresinden (blob:) okur."
+    },
+    "ui:eval": {
+      "en": "ONLYOFFICE's editor builds some of its code while it runs.",
+      "tr": "ONLYOFFICE düzenleyicisi kodunun bir kısmını çalışırken üretir."
+    },
+    "ui:wasm-eval": {
+      "en": "Documents are converted to the editor's format and back by ONLYOFFICE's converter (x2t), compiled to WebAssembly, in your browser.",
+      "tr": "Belgeler düzenleyicinin biçimine ve geri, tarayıcınızda WebAssembly'ye derlenmiş ONLYOFFICE dönüştürücüsüyle (x2t) çevrilir."
+    },
+    "ui:download": {
+      "en": "Only for Download as in the editor's File menu: what you choose to keep goes to your computer.",
+      "tr": "Yalnızca düzenleyicinin Dosya menüsündeki Farklı indir için: saklamayı seçtiğiniz dosya bilgisayarınıza iner."
+    },
+    "ui-viewer:.docx": {
+      "en": "So a .docx document opens in the editor.",
+      "tr": "Bir .docx belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xlsx": {
+      "en": "So a .xlsx spreadsheet opens in the editor.",
+      "tr": "Bir .xlsx tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.pptx": {
+      "en": "So a .pptx presentation opens in the editor.",
+      "tr": "Bir .pptx sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.odt": {
+      "en": "So an .odt document opens in the editor.",
+      "tr": "Bir .odt belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.ods": {
+      "en": "So an .ods spreadsheet opens in the editor.",
+      "tr": "Bir .ods tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.odp": {
+      "en": "So an .odp presentation opens in the editor.",
+      "tr": "Bir .odp sunusu düzenleyicide açılsın diye."
+    },
+    "ui-new:.docx": {
+      "en": "So you can start a new document from New document.",
+      "tr": "Yeni belge'den yeni bir metin belgesi başlatabilesiniz diye."
+    },
+    "ui-new:.xlsx": {
+      "en": "So you can start a new spreadsheet from New document.",
+      "tr": "Yeni belge'den yeni bir tablo başlatabilesiniz diye."
+    },
+    "ui-new:.pptx": {
+      "en": "So you can start a new presentation from New document.",
+      "tr": "Yeni belge'den yeni bir sunu başlatabilesiniz diye."
+    }
+  },
+  "languages": [
+    "en",
+    "tr"
+  ],
+  "ui": {
+    "bundle": {
+      "url": "https://github.com/BRF-Tech/filex-onlyoffice/releases/download/{tag}/ui.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "csp": [
+      "unsafe-eval",
+      "wasm-unsafe-eval"
+    ],
+    "package_fetch": true,
+    "frame_package": true,
+    "connect_blob": true,
+    "download": true
+  },
+  "encrypted_folders": {
+    "open": true,
+    "co_edit": true
+  },
+  "views": [
+    {
+      "id": "editor",
+      "placement": "viewer",
+      "ui": "index.html",
+      "label": {
+        "en": "Office editor",
+        "tr": "Ofis düzenleyici"
+      },
+      "applies": {
+        "kind": "file",
+        "ext": [
+          "docx",
+          "xlsx",
+          "pptx",
+          "odt",
+          "ods",
+          "odp"
+        ]
+      }
+    }
+  ],
+  "new_documents": [
+    {
+      "ext": "docx",
+      "label": {
+        "en": "Document (.docx)",
+        "tr": "Metin belgesi (.docx)"
+      },
+      "view": "editor",
+      "template": "filex/blank.docx"
+    },
+    {
+      "ext": "xlsx",
+      "label": {
+        "en": "Spreadsheet (.xlsx)",
+        "tr": "Tablo (.xlsx)"
+      },
+      "view": "editor",
+      "template": "filex/blank.xlsx"
+    },
+    {
+      "ext": "pptx",
+      "label": {
+        "en": "Presentation (.pptx)",
+        "tr": "Sunu (.pptx)"
+      },
+      "view": "editor",
+      "template": "filex/blank.pptx"
+    }
+  ]
+}

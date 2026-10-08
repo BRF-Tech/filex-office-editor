@@ -1,0 +1,32 @@
+# Changelog
+
+All notable changes to filex-onlyoffice are recorded here. The format
+follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
+follow [Semantic Versioning](https://semver.org/). The version in
+`filex-app.json` is the one a tag must match, and a version's section is its
+release's notes - what filex shows an administrator when it offers the
+update.
+
+## [Unreleased]
+
+### Added
+
+- The protocol prototype, moved here from filex (`packages/office-e2e` and
+  `web/tests/officeE2e`, filex commit 45e7bab7, task #189) with its history:
+  the bridge that answers the ONLYOFFICE editor as the Document Server
+  (`DocsCoServer.js`, Docs 9.4) does and turns what the other editors need
+  into entries of a session log; the Document Server's lock rules and the
+  spreadsheet's lock recalculation; a socket.io stand-in for the editor's
+  `socket.io.min.js`; a driver for x2t built to WebAssembly; their unit
+  tests (vitest, in Node).
+- A draft `filex-app.json` (`office-editor`, filex 0.55.0 or later): a
+  viewer for docx, xlsx, pptx, odt, ods and odp, New document rows for docx,
+  xlsx and pptx, and the platform permissions the app will ask filex for.
+- `NOTICE`: the licensing, what is based on ONLYOFFICE, the legal notice
+  the editor will show, the trademark line.
+
+### Changed
+
+- The license is **AGPL-3.0-or-later** (the prototype said AGPL-3.0-only).
+  `src/locks.ts` stays AGPL-3.0-only: it is a modified version of ONLYOFFICE
+  Docs, which is licensed under the AGPL version 3 only.
