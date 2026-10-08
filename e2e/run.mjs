@@ -498,7 +498,8 @@ async function viewReady(page, view) {
  * build's "commercial licence" message; its Download (PDF) and Print go
  * through x2t to filex, a format x2t does not write here is refused and the
  * person told; "Edit" opens the editor (folded) with the document, typed
- * text is saved; "Reading view" goes back to the phone app with it.
+ * text is saved; "Reading view" goes back to the phone app with it. Then
+ * the Turkish xlsx and pptx open in their phone apps the same way.
  */
 async function phoneRun(browser, server, engine, o) {
   const r = { engine, doc: 'tr.docx (phone)', ok: false, steps: [], problems: [], notes: [] };
@@ -597,6 +598,29 @@ async function phoneRun(browser, server, engine, o) {
     if (await page.evaluate(() => window.__fx.dirty)) r.problems.push('filex still says "unsaved changes" in the phone app');
     if (server.saves.filter((s) => s.tag === tag).length !== savesBefore) r.notes.push('going back to reading saved again (there were changes the Save had not covered)');
     await shot('reader-again');
+
+    // The other two phone apps open their documents too, to read, with "Edit".
+    for (const doc of ['tr.xlsx', 'tr.pptx']) {
+      const other = await ctx.newPage();
+      other.on('response', (s) => {
+        if (s.status() >= 400) failures.push(`${s.status()} ${s.url()}`);
+      });
+      other.on('request', (q) => requests.push(q.url()));
+      try {
+        await other.goto(`${server.origin}/?doc=${doc}&locale=tr&tag=${tag}-${doc.replace(/\W/g, '_')}`);
+        await viewReady(other, 'reader');
+        step(`opened ${doc} (phone app)`);
+        const f = phoneFrame(other);
+        if (!f) r.problems.push(`${doc}: not in the phone app`);
+        else if (/Community version|commercial license/i.test(await f.evaluate(() => document.body.innerText || ''))) r.problems.push(`${doc}: the phone app shows its open-source licence message`);
+        const shown = await appFrame(other).evaluate(() => !document.getElementById('fx-switch')?.hidden);
+        if (!shown) r.problems.push(`${doc}: no "Edit"`);
+        if (o.shots) await other.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-${doc}-phone-reader.png`) });
+      } catch (e) {
+        r.problems.push(`${doc}: ${String(e?.message ?? e).slice(0, 300)}`);
+      }
+      await other.close();
+    }
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));
     try {
