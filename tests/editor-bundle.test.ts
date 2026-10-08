@@ -302,6 +302,31 @@ describe('the storage stand-in (filex/storage.js)', () => {
     expect(w.localStorage).toBe(real);
     expect(w.sessionStorage).toBe(real);
   });
+
+  it('takes navigator.serviceWorker away where reading it throws (Chromium, sandboxed), and only there', () => {
+    const real = { getItem: () => 'real' };
+    class Navigator {}
+    Object.defineProperty(Navigator.prototype, 'serviceWorker', {
+      configurable: true,
+      get() {
+        throw new Error("SecurityError: Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.");
+      },
+    });
+    const w = { localStorage: real, sessionStorage: real, Navigator, navigator: new Navigator() };
+    run(w);
+    expect('serviceWorker' in w.navigator).toBe(false);
+    expect(() => (w.navigator as { serviceWorker?: unknown }).serviceWorker).not.toThrow();
+
+    const container = { register: () => Promise.resolve() };
+    class Open {}
+    Object.defineProperty(Open.prototype, 'serviceWorker', { configurable: true, get: () => container });
+    const w2 = { localStorage: real, sessionStorage: real, Navigator: Open, navigator: new Open() };
+    run(w2);
+    expect((w2.navigator as { serviceWorker?: unknown }).serviceWorker).toBe(container);
+
+    // No navigator at all: nothing to do, nothing thrown.
+    expect(() => run({ localStorage: real, sessionStorage: real })).not.toThrow();
+  });
 });
 
 describe('upstream/editor.lock.json (the committed build)', () => {
