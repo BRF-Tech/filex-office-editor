@@ -76,8 +76,40 @@ update.
   the package; the storage stand-in takes the place of the storage none of
   the three gives the sandboxed pages.
 
+- **Download as**, without a Document Server: the File menu offers what x2t
+  writes here (`src/formats.ts`) - docx, dotx, odt, ott, rtf (docm for a
+  docm); xlsx, xltx, ods, ots (xlsm); pptx, ppsx, potx, odp, otp (pptm); PDF
+  and PDF/A for all three - and filex hands the file to the person
+  (`ui.download`). A PDF is made from the pages as the editor laid them out,
+  with the fonts it drew them with. Left out because this x2t build cannot
+  write them right: txt and csv (every letter outside ASCII is cut to its
+  low byte), html, md, epub, fb2 and images.
+- **Print**: the document as a PDF, handed to filex to print (`ui.print`,
+  proposed for filex 0.55); a filex without it gets the PDF as a download,
+  and the person is told so - a sandboxed frame may not open the browser's
+  print dialog.
+- **The editor's settings are kept between openings** in filex's store for
+  the app (`state.set`, one value of at most 8 KiB): units, zoom, the
+  ribbon folded or not, the "New" hints the person closed. filex keeps
+  deciding the theme. The editor's start waits for the kept settings, at
+  most 5 seconds.
+- On a narrow screen (a frame under 600 px) the editor starts folded: the
+  ribbon's tabs only, no rulers, the side panel closed.
+- `npm run e2e` measures all of it in the three browsers: the people the
+  editor counts, Download as from the File menu (the offered formats, an
+  OpenDocument copy holding the typed text, a PDF with pages and fonts),
+  Print, a closed hint not showing at the next opening, and Print handed
+  over as a download where filex has no print.
+
 ### Fixed
 
+- One person editing was shown as two: the bridge's own participant (which
+  keeps the editor sending its changes as it makes them) is now in a group
+  of its own that the editor is configured not to show
+  (`permissions.userInfoGroups`). A no-break space in a person's name, which
+  the editor would read as a group, becomes a space.
+- "Suggest a feature" in the File menu, which opened ONLYOFFICE's site (the
+  sandbox cannot), is off.
 - The bridge told an editor that had not yet received every change it
   could save when it said it knew none (`isSaveLock` with
   `syncChangesIndex` 0): 0 is now checked like any other count. The

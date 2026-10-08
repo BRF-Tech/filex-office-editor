@@ -97,7 +97,14 @@ sponsored by Ascensio System SIA.
    messages between api.js and the editor's Gateway, the interface
    templates' names, the spell checker's worker, the presentation themes'
    folder, a Save the editor would drop, and pictures inserted from the
-   computer. ONLYOFFICE's files are not edited for any of these.
+   computer (BRF Tech, 2026-10-08); and, BRF Tech, 2026-10-08, later the
+   same day: the last step of Download as and Print (the editor's
+   _downloadAsUsingServer) goes to the app page, which converts with x2t,
+   instead of to a Document Server; Download as lists only the formats x2t
+   writes here; the editor's storage is watched so its settings are kept
+   between openings, and the editor's start waits for the kept ones; the
+   bridge's own participant is named in a group the editor is configured
+   not to show. ONLYOFFICE's files are not edited for any of these.
 
 4. The x2t WebAssembly build is ONLYOFFICE's converter (ONLYOFFICE core),
    pinned under "x2t" in upstream/onlyoffice.json. Today it is CryptPad's
