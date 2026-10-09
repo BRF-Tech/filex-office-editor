@@ -5,12 +5,15 @@
 // pins, driven by src/x2t.ts in Node, takes a Word document, a workbook and
 // a presentation with Turkish text to the editor's format (Editor.bin) and
 // back, and loses nothing on the way: every text, the bold and italic runs,
-// the table, the sheet's name, its numbers and its formula.
+// the table, the sheet's name, its numbers and its formula. Then Download
+// as: every format offered, and a txt and a csv in each encoding offered,
+// with every Turkish letter whole.
 //
-// It needs the build in dist/x2t (scripts/fetch-x2t.mjs, about 39 MB). Without
+// It needs the build in dist/x2t (bash scripts/x2t/build.sh, or
+// scripts/fetch-x2t.mjs from a build made elsewhere; about 40 MB). Without
 // it the suite is skipped - `npm test` stays offline - and `npm run
-// test:x2t` fetches it first and fails rather than skip. X2T_DIR points
-// elsewhere.
+// test:x2t` fails rather than skip. X2T_DIR points elsewhere (another build,
+// to compare).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -20,8 +23,9 @@ import vm from 'node:vm';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { EXPORT_FORMATS, PDF, type DocumentKind } from '../src/formats';
+import { CSV, EXPORT_FORMATS, PDF, TEXT_ENCODINGS, TXT, type DocumentKind } from '../src/formats';
 import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../src/x2t';
+import { writeZip } from '../scripts/lib/zip.mjs';
 import { TR, docx, docxParagraphs, docxRuns, parts, pptx, texts, xlsx } from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -30,7 +34,7 @@ const present = existsSync(path.join(DIR, 'x2t.js')) && existsSync(path.join(DIR
 const required = process.env.X2T_REQUIRED === '1' || process.env.npm_lifecycle_event === 'test:x2t';
 
 if (!present && required) {
-  throw new Error(`x2t is not in ${DIR}: run node scripts/fetch-x2t.mjs`);
+  throw new Error(`x2t is not in ${DIR}: run bash scripts/x2t/build.sh (or node scripts/fetch-x2t.mjs --dir DIR)`);
 }
 
 type EmModule = X2tModule & { onRuntimeInitialized?: () => void };
@@ -61,6 +65,78 @@ async function loadX2t(): Promise<EmModule> {
 }
 
 const head = (b: Uint8Array, n = 12) => Buffer.from(b.subarray(0, n)).toString('latin1');
+
+/**
+ * An odt with a formula the way LibreOffice writes one: an embedded object
+ * ("Object 1") holding MathML with its StarMath annotation, in a Turkish
+ * sentence.
+ */
+function odtWithFormula(): Uint8Array {
+  const X = '<?xml version="1.0" encoding="UTF-8"?>';
+  const content =
+    `${X}<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ` +
+    'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">' +
+    `<office:body><office:text><text:p>${TR.cells[3]}: <draw:frame draw:name="Object1" text:anchor-type="as-char" svg:width="2cm" svg:height="0.5cm">` +
+    '<draw:object xlink:href="./Object 1" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame></text:p></office:text></office:body></office:document-content>';
+  const math =
+    `${X}<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>a</mi><mo>+</mo><mi>b</mi></mrow>` +
+    '<annotation encoding="StarMath 5.0">a + b</annotation></semantics></math>';
+  const manifest =
+    `${X}<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">` +
+    '<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>' +
+    '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>' +
+    '<manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/>' +
+    '<manifest:file-entry manifest:full-path="Object 1/" manifest:media-type="application/vnd.oasis.opendocument.formula"/></manifest:manifest>';
+  return new Uint8Array(
+    writeZip([
+      { name: 'mimetype', data: Buffer.from('application/vnd.oasis.opendocument.text') },
+      { name: 'content.xml', data: Buffer.from(content) },
+      { name: 'Object 1/content.xml', data: Buffer.from(math) },
+      { name: 'META-INF/manifest.xml', data: Buffer.from(manifest) },
+    ]),
+  );
+}
+
+/**
+ * A txt or csv written in x2t's code page `codepage` (formats.ts
+ * TEXT_ENCODINGS): whether it starts with that encoding's byte order mark,
+ * and its text. Measured: UTF-8 and UTF-16 come with one, UTF-32 without.
+ */
+function decodeAs(bytes: Uint8Array, codepage: number): { bom: boolean; text: string } {
+  const b = Buffer.from(bytes);
+  const starts = (...x: number[]) => x.every((v, i) => b[i] === v);
+  const utf32 = (x: Buffer, le: boolean) => {
+    let t = '';
+    for (let i = 0; i + 3 < x.length; i += 4) t += String.fromCodePoint(le ? x.readUInt32LE(i) : x.readUInt32BE(i));
+    return t;
+  };
+  switch (codepage) {
+    case 46: {
+      const bom = starts(0xef, 0xbb, 0xbf);
+      return { bom, text: b.subarray(bom ? 3 : 0).toString('utf8') };
+    }
+    case 48: {
+      const bom = starts(0xff, 0xfe);
+      return { bom, text: b.subarray(bom ? 2 : 0).toString('utf16le') };
+    }
+    case 49: {
+      const bom = starts(0xfe, 0xff);
+      return { bom, text: Buffer.from(b.subarray(bom ? 2 : 0)).swap16().toString('utf16le') };
+    }
+    case 50: {
+      const bom = starts(0xff, 0xfe, 0, 0);
+      return { bom, text: utf32(b.subarray(bom ? 4 : 0), true) };
+    }
+    case 51: {
+      const bom = starts(0, 0, 0xfe, 0xff);
+      return { bom, text: utf32(b.subarray(bom ? 4 : 0), false) };
+    }
+    default:
+      throw new Error(`no decoder for code page ${codepage}`);
+  }
+}
+/** Which encodings x2t starts with a byte order mark (measured): UTF-8 and UTF-16. */
+const WITH_BOM = new Set([46, 48, 49]);
 const same = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
 
 /** The parts that differ between two office files (compared by content: x2t's zips carry the time). */
@@ -90,11 +166,12 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
   const fromBin = (bin: { bytes: Uint8Array; media: Record<string, Uint8Array> }, format: Exclude<X2tFormat, 'bin'>) =>
     x2tConvert(m, { bytes: bin.bytes, format: 'bin', media: bin.media }, format).bytes;
 
-  // Measured on CryptPad's v9.3.2+3 build: a docx or pptx gives the same
-  // Editor.bin every time; an xlsx does not - x2t writes a block of the
-  // workbook's Editor.bin from memory it never cleared, so a few bytes in it
-  // differ from one conversion to the next (the xlsx made from either is
-  // the same). `stableBin` says which kind the format is.
+  // Measured on CryptPad's v9.3.2+3 build and again on this project's: a
+  // docx or pptx gives the same Editor.bin every time; an xlsx does not -
+  // x2t writes a block of the workbook's Editor.bin from memory it never
+  // cleared, so a few bytes in it differ from one conversion to the next
+  // (the xlsx made from either is the same). `stableBin` says which kind the
+  // format is.
   function roundTrip(input: Uint8Array, format: Exclude<X2tFormat, 'bin'>, magic: string, stableBin: boolean) {
     const t0 = performance.now();
     const bin = toBin(input, format);
@@ -187,9 +264,10 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     ['cell', xlsx, 'xlsx', [...TR.cells]],
     ['slide', pptx, 'pptx', [TR.slideTitle, TR.slideBody]],
   ];
-  /** The words of a written file: its XML without tags, or an RTF with its escapes read. */
+  /** The words of a written file: its XML without tags, an RTF with its escapes read, a txt or csv as UTF-8. */
   function words(bytes: Uint8Array, ext: string): string {
     if (ext === 'rtf') return Buffer.from(bytes).toString('latin1').replace(/\\u(-?\d+)\*?/g, (_, n) => String.fromCharCode((Number(n) + 65536) % 65536));
+    if (ext === 'txt' || ext === 'csv') return decodeAs(bytes, 46).text;
     return [...parts(bytes).values()].join('\n').replace(/<[^>]+>/g, '');
   }
 
@@ -202,6 +280,7 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
         const out = x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: f.id, ext: f.ext });
         done.push(`${f.ext} ${out.length} B ${Math.round(performance.now() - t0)} ms`);
         if (f.ext === 'rtf') expect(head(out, 5)).toBe('{\\rtf');
+        else if (f.ext === 'txt' || f.ext === 'csv') expect(decodeAs(out, 46).bom, f.ext).toBe(true);
         else if (CONTENT_TYPE[f.ext]) expect(parts(out).get('[Content_Types].xml'), f.ext).toContain(CONTENT_TYPE[f.ext]);
         else expect(parts(out).get('mimetype'), f.ext).toBe(f.mime);
         const w = words(out, f.ext);
@@ -216,12 +295,59 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     expect(() => x2tExport(m, { bin: bin.bytes, formatTo: PDF, ext: 'pdf' })).toThrow(X2tError);
   });
 
-  it('txt is still left out: this build cuts every letter outside ASCII to its low byte', () => {
-    // When this fails, x2t writes txt (and csv) right: add them to src/formats.ts.
+  // ⚠ CryptPad's 9.3.2+3 cut every letter outside ASCII of a txt or csv to
+  // its low byte ("Şifreli" -> "^ifreli"): its UnicodeConverter handed
+  // wchar_t to ICU with u_strFromWCS, which fails in the WebAssembly build,
+  // and fell back to the low bytes (scripts/x2t/patches/03-unicode-utf32.patch).
+  // These two are red on that build and green on this project's.
+  it('txt: the Turkish text whole, in UTF-8', () => {
     const bin = toBin(docx(), 'docx');
-    const txt = Buffer.from(x2tExport(m, { bin: bin.bytes, formatTo: 0x0045, ext: 'txt' })).toString('utf8');
-    expect(txt).toContain('ifreli belge');
-    expect(txt).not.toContain(TR.title);
+    const done: string[] = [];
+    for (const codepage of TEXT_ENCODINGS.txt) {
+      const out = x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: TXT, ext: 'txt', text: { codepage } });
+      const { bom, text } = decodeAs(out, codepage);
+      expect(bom, `code page ${codepage}`).toBe(WITH_BOM.has(codepage));
+      for (const t of [TR.title, TR.body, `${TR.bold} / ${TR.italic}`, ...TR.cells]) expect(text, `code page ${codepage}: ${t}`).toContain(t);
+      done.push(`code page ${codepage} ${out.length} B`);
+    }
+    measured.push(`txt: ${done.join(', ')}`);
+  });
+
+  it("csv: the sheet's Turkish text whole, with the delimiter chosen", () => {
+    const bin = toBin(xlsx(), 'xlsx');
+    const csv = (text: { codepage: number; delimiter?: number; delimiterChar?: string }) =>
+      decodeAs(x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: CSV, ext: 'csv', text }), text.codepage);
+    const comma = csv({ codepage: 46 });
+    expect(comma.bom).toBe(true);
+    const rows = comma.text.split(/\r?\n/).filter((r) => r.length > 0);
+    expect(rows[0]).toBe(`${TR.cells[0]},${TR.cells[1]}`);
+    expect(rows.slice(1).join('\n')).toContain(TR.cells[2]);
+    expect(rows.slice(1).join('\n')).toContain(TR.cells[3]);
+    expect(csv({ codepage: 46, delimiter: 2 }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]};${TR.cells[1]}`);
+    expect(csv({ codepage: 46, delimiter: 1 }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]}\t${TR.cells[1]}`);
+    expect(csv({ codepage: 46, delimiterChar: '|' }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]}|${TR.cells[1]}`);
+    for (const codepage of TEXT_ENCODINGS.csv) {
+      const { bom, text } = csv({ codepage });
+      expect(bom, `code page ${codepage}`).toBe(WITH_BOM.has(codepage));
+      for (const t of TR.cells) expect(text, `code page ${codepage}: ${t}`).toContain(t);
+    }
+    measured.push(`csv: ${rows.length} rows, first ${JSON.stringify(rows[0])}`);
+  });
+
+  // ⚠ CryptPad's 9.3.2+3 does not link ONLYOFFICE's StarMath converter, and
+  // the ODF reader converts every LibreOffice formula with it: such an odt
+  // stopped the module ("Aborted(missing function:
+  // _ZN8StarMath18CStarMathConverterC1Ev)"). This build links it
+  // (scripts/x2t/patches/04-starmath.patch). Last before the report: on a
+  // build without it the module is gone after this.
+  it('odt: a LibreOffice formula comes in as OOXML math', () => {
+    const bin = toBin(odtWithFormula(), 'odt');
+    const doc = parts(fromBin(bin, 'docx')).get('word/document.xml') ?? '';
+    expect(doc).toContain(TR.cells[3]);
+    expect(doc).toMatch(/<m:oMath>/);
+    // (twice: x2t writes the object as a drawing and as its fallback)
+    expect(texts(doc, 'm:t').join('')).toContain('a+b');
+    measured.push(`odt with a formula: Editor.bin ${bin.bytes.length} B, back as OOXML math`);
   });
 
   it('reports what it measured', () => {

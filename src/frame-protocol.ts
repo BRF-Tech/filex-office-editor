@@ -18,6 +18,8 @@
 // for every sandboxed page, so it tells nothing), and then talk over a
 // MessagePort only they hold.
 
+import type { TextOptions } from './formats';
+
 /** The editor page's first word to the app page: "here I am, give me the port". */
 export const FRAME_HELLO = 'filex-office-editor:hello';
 /** The app page's answer, carrying the port. */
@@ -150,6 +152,8 @@ export interface ExportRequest {
   fonts?: MediaFile[];
   /** The editor's json parameters for the conversion (printPages, watermark...). */
   json?: string;
+  /** For txt and csv: the encoding and the delimiter the editor's dialog chose (formats.ts textOptions). */
+  text?: TextOptions;
 }
 
 export type FromFrame = SnapshotResult | SaveRequest | DirtyMessage | StateMessage | NoticeMessage | SettingsChanged | ExportRequest;

@@ -396,7 +396,7 @@ class OfficeApp {
     try {
       const f = exportFormat(m.format, this.kind.documentType);
       if (!f) throw new Error(`format ${m.format} is not written here`);
-      const out = await this.x2t.export({ bin: m.bin, media: m.media ?? [], formatTo: f.id, ext: f.ext, pdf: m.pdf, fonts: m.fonts, json: m.json });
+      const out = await this.x2t.export({ bin: m.bin, media: m.media ?? [], formatTo: f.id, ext: f.ext, pdf: m.pdf, fonts: m.fonts, json: m.json, text: m.text });
       const name = exportName(m.title || this.title, f);
       if (m.purpose === 'print') await this.print(name, out.bytes);
       else await this.fx.download(name, out.bytes, f.mime);

@@ -8,14 +8,13 @@
 // server; here it runs in the browser, so the document is never converted
 // anywhere else.
 //
-// The wasm build is pinned in upstream/onlyoffice.json ("x2t"): for now
-// CryptPad's v9.3.2+3 (release 0.1.0 carries it), fetched and checked by
-// scripts/fetch-x2t.mjs; in a later release, this project's own build from
-// ONLYOFFICE core at the same tag as the editor files (core v9.4.0.129 for
-// Docs 9.4). It is loaded into a
-// Worker; this file drives a loaded module. The calling convention (an
-// in-memory file system under /working, a params.xml, main1) is the one the
-// wasm build exports; CryptPad drives its build the same way.
+// The wasm build is pinned in upstream/onlyoffice.json ("x2t"): this
+// project's own build from ONLYOFFICE core at the same tag as the editor
+// files (core v9.4.0.129 for Docs 9.4), made by scripts/x2t/build.sh and
+// checked by its SHA-256 (release 0.1.0 carried CryptPad's v9.3.2+3). It is
+// loaded into a Worker; this file drives a loaded module. The calling
+// convention (an in-memory file system under /working, a params.xml, main1)
+// is the one the wasm build exports; CryptPad drives its build the same way.
 // tests/x2t-wasm.test.ts runs this driver against the real build (`npm run
 // test:x2t`): docx, xlsx and pptx with Turkish text, to Editor.bin and back.
 //
@@ -23,6 +22,8 @@
 // Editor.bin written without base64 ("DOCY;v10;0;...") and refuses the
 // base64 form ("Invalid typed array length"), which is why m_bIsNoBase64 is
 // true whenever the target is the editor's format.
+
+import type { TextOptions } from './formats';
 
 /** The part of the emscripten module x2t uses. */
 export interface X2tModule {
@@ -125,6 +126,8 @@ export interface X2tExport {
   fonts?: Record<string, Uint8Array>;
   /** The editor's json parameters (printPages, watermark...), as a Document Server passes them. */
   json?: string;
+  /** For txt and csv: the encoding and the delimiter the person chose (../formats.ts textOptions). */
+  text?: TextOptions;
 }
 
 const EXT = /^[a-z0-9]{2,5}$/;
@@ -133,12 +136,20 @@ function xmlText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** The conversion order for an export: x2tParams with the target's type, the fonts and the json parameters. */
-export function x2tExportParams(from: string, to: string, formatTo: number, o: { fonts: boolean; json?: string }): string {
+/**
+ * The conversion order for an export: x2tParams with the target's type, the
+ * fonts, the json parameters and, for txt and csv, the encoding and the
+ * delimiter (the names a Document Server gives them).
+ */
+export function x2tExportParams(from: string, to: string, formatTo: number, o: { fonts: boolean; json?: string; text?: TextOptions }): string {
+  const t = o.text;
   const extra =
     `<m_nFormatTo>${Math.trunc(formatTo)}</m_nFormatTo>` +
     (o.fonts ? `<m_sFontDir>${X2T_DIR}/fonts/</m_sFontDir>` : '') +
-    (o.json ? `<m_sJsonParams>${xmlText(o.json)}</m_sJsonParams>` : '');
+    (o.json ? `<m_sJsonParams>${xmlText(o.json)}</m_sJsonParams>` : '') +
+    (t ? `<m_nCsvTxtEncoding>${Math.trunc(t.codepage)}</m_nCsvTxtEncoding>` : '') +
+    (t?.delimiter !== undefined ? `<m_nCsvDelimiter>${Math.trunc(t.delimiter)}</m_nCsvDelimiter>` : '') +
+    (t?.delimiterChar !== undefined ? `<m_nCsvDelimiterChar>${xmlText(t.delimiterChar)}</m_nCsvDelimiterChar>` : '');
   return x2tParams(from, to, false).replace('</TaskQueueDataConvert>', `${extra}</TaskQueueDataConvert>`);
 }
 
@@ -168,7 +179,7 @@ export function x2tExport(m: X2tModule, e: X2tExport): Uint8Array {
       if (!MEDIA_NAME.test(name)) throw new X2tError(null, `x2t: bad font name ${JSON.stringify(name)}`);
       m.FS.writeFile(`${fontsDir}/${name}`, bytes);
     }
-    m.FS.writeFile(PARAMS, x2tExportParams(from, out, e.formatTo, { fonts: fonts.length > 0, json: e.json }));
+    m.FS.writeFile(PARAMS, x2tExportParams(from, out, e.formatTo, { fonts: fonts.length > 0, json: e.json, text: e.text }));
     const rc = m.ccall('main1', 'number', ['string'], [PARAMS]);
     if (typeof rc === 'number' && rc !== 0) throw new X2tError(rc, `x2t: conversion failed (${rc})`);
     try {

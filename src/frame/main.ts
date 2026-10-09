@@ -304,7 +304,7 @@ async function onExport(job: ExportJob, done: () => void): Promise<void> {
     const id = ++exportSeq;
     pendingExports.set(id, done);
     const pdf = job.pdf ? (job.pdf.buffer.slice(job.pdf.byteOffset, job.pdf.byteOffset + job.pdf.byteLength) as ArrayBuffer) : undefined;
-    const m: ExportRequest = { t: 'export', id, format: job.format.id, purpose: job.purpose, title: job.title, bin, media, pdf, fonts, json: job.json };
+    const m: ExportRequest = { t: 'export', id, format: job.format.id, purpose: job.purpose, title: job.title, bin, media, pdf, fonts, json: job.json, text: job.text };
     post(m, [...media.map((f) => f.bytes), ...(fonts ?? []).map((f) => f.bytes), ...(pdf ? [pdf] : [])]);
   } catch (e) {
     notice('export', (e as Error)?.message ?? e);

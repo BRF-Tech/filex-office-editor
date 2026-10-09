@@ -1,0 +1,27 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-10: x2t links ONLYOFFICE's
+StarMath converter (OdfFile/Reader/Converter/StarMath2OOXML, built by
+steps.sh), which CryptPad's build leaves out.
+
+Measured (2026-10-10): without it, an odt, ods or odp with a formula as
+LibreOffice writes one (MathML with its StarMath annotation) stops the
+module - "Aborted(missing function: _ZN8StarMath18CStarMathConverterC1Ev)"
+- in CryptPad's v9.3.2+3 as in this build before the change: the ODF reader
+converts the annotation to OOXML math with that converter
+(OdfFile/Reader/Format/math_elements.cpp). With it the formula comes into
+the document.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/X2tConverter/build/Qt/X2tConverter.pri b/X2tConverter/build/Qt/X2tConverter.pri
+index e3a11812e..63de3a243 100644
+--- a/X2tConverter/build/Qt/X2tConverter.pri
++++ b/X2tConverter/build/Qt/X2tConverter.pri
+@@ -161,7 +161,7 @@ LIBS += -L$$CORE_BUILDS_LIBRARIES_PATH -lCryptoPPLib
+ #All dynamic libs
+ 
+ # ADD_DEPENDENCY(graphics, kernel, UnicodeConverter, kernel_network, Fb2File, PdfFile, HtmlFile2, EpubFile, XpsFile, DjVuFile, doctrenderer, DocxRenderer, IWorkFile, HWPFile)
+-ADD_DEPENDENCY(graphics, kernel, UnicodeConverter, kernel_network, PdfFile, HtmlFile2, EpubFile, XpsFile, DjVuFile, doctrenderer, DocxRenderer, IWorkFile, HWPFile)
++ADD_DEPENDENCY(graphics, kernel, UnicodeConverter, kernel_network, PdfFile, HtmlFile2, EpubFile, XpsFile, DjVuFile, doctrenderer, DocxRenderer, IWorkFile, HWPFile, StarMathConverter)
+ 
+ #####################################################
+ # внешнее подключение сторонних библиотек

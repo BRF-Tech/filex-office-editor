@@ -1,6 +1,6 @@
 {
   "name": "filex-office-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "The office editor app for filex: ONLYOFFICE's editor in the browser, with the Document Server answered in the editor's frame, so documents in encrypted folders are edited without any server reading them.",
@@ -10,6 +10,7 @@
     "test:x2t": "node scripts/fetch-x2t.mjs && vitest run tests/x2t-wasm.test.ts",
     "typecheck": "tsc -p tsconfig.json",
     "x2t": "node scripts/fetch-x2t.mjs",
+    "x2t:build": "bash scripts/x2t/build.sh",
     "editor": "bash scripts/extract-editor.sh",
     "build": "node scripts/build-app.mjs",
     "e2e": "node e2e/run.mjs"
