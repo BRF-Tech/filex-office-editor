@@ -7,11 +7,20 @@ open in the editor in place of filex's preview, and saving writes a new
 version of the file. Nothing of the editor runs on the server: its files come
 from the app's package and the document is converted in the browser.
 
+**No Document Server is needed** - neither to edit office documents nor to
+edit them together. With filex 0.56 or later this app is all it takes:
+several people can edit one document at the same time, each in their own
+browser, through filex's relay ([Editing together](#editing-together)).
+filex keeps its Document Server support, and it is optional: an instance
+that has one can stay connected to it. What still needs a Document Server
+is what filex itself does with an office file **on the server** through one
+(a conversion run there, an office thumbnail made there); this app does
+neither - its Download as, PDF and Print run x2t in the browser.
+
 It goes further with filex 0.56: documents **inside encrypted folders**,
 decrypted in the browser, edited there and encrypted again before they are
 saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-folder),
-0.2.0, not released yet). **Editing together** through filex's relay comes
-with a later release, as filex gains what it needs ([Roadmap](#roadmap)).
+0.2.0, not released yet) - and edited together there too.
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -42,17 +51,25 @@ with a later release, as filex gains what it needs ([Roadmap](#roadmap)).
 > ([In an encrypted folder](#in-an-encrypted-folder)). Built and measured
 > in Chromium, Firefox and WebKit against a stand-in for filex 0.56; not
 > yet measured in a real filex 0.56; not released.
+>
+> **Unreleased (the next release, 0.3.0): editing together**, for filex
+> 0.56 or later - several people in one document in a folder that is not
+> encrypted, through filex's relay, with the Document Server's lock rules
+> ([Editing together](#editing-together)). Built, with its unit and browser
+> tests written but not run yet; not released.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.1.1: **0.55.0** or later. The next release (encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`): **0.56.0** or later (`"filex": ">=0.56.0"`) - filex 0.55 refuses a manifest with a block it does not know, and keeps 0.1.1 |
+| filex | 0.1.1: **0.55.0** or later. The next releases (encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`; editing together, `files:co-edit`): **0.56.0** or later (`"filex": ">=0.56.0"`) - filex 0.55 refuses a manifest with a block or a permission it does not know, and keeps 0.1.1 |
 | Release | **0.1.1** (tag `v0.1.1`): `ui.zip`, 98.3 MiB, SHA-256 `7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
 
-In filex 0.55.0 or later, as an administrator: **Admin → Plugins → Apps →
+Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
+or together. In filex 0.55.0 or later (0.56.0 or later for editing
+together), as an administrator: **Admin → Plugins → Apps →
 Install an app → GitHub repository**, `BRF-Tech/filex-office-editor`, tag
 `v0.1.1`. filex reads `filex-app.json` at that tag, downloads the release's
 `ui.zip` and refuses it unless its SHA-256 is the one the manifest names.
@@ -62,7 +79,9 @@ allowed - its own package, frames of its own package, `blob:` addresses it
 made, the script-policy exceptions ONLYOFFICE's editor and x2t need
 (`ui:eval`, `ui:wasm-eval`), handing the person a file (`ui:download`) and
 a PDF to print (`ui:print`), the six kinds it opens and the three rows it
-adds to New document. A store that lists the app installs the same release
+adds to New document - and, from the next release on, `files:co-edit`
+(several people editing a document together through filex's relay; filex
+seals what they share, the app holds no key). A store that lists the app installs the same release
 through the same review. On a server that downloads nothing, **Upload
 files** with the release's `filex-app.json` and `ui.zip` does the same.
 
@@ -74,7 +93,11 @@ spreadsheet and a presentation under Apps.
 
 - **filex without a Document Server.** filex edits office documents through
   an ONLYOFFICE Document Server it is connected to. An instance without one
-  installs this app and edits them in the browser instead.
+  installs this app and edits them in the browser instead - alone, or, with
+  filex 0.56, together with others
+  ([Editing together](#editing-together)). A Document Server stays
+  optional: filex goes on using one it is connected to for what it does on
+  the server.
 - **Encrypted folders** (a later release, [Roadmap](#roadmap)). A Document
   Server reads the document it edits, so filex never offers it in an
   encrypted folder: there a document opens read-only. With this app the
@@ -105,11 +128,12 @@ This app gives the editor all of that in the browser:
   `DocsCoServer.js`); whatever the other people need - a batch of changes, a
   lock request, a released lock - goes into the session's log. With one
   person (`src/session.ts`, what 0.1.0 runs) the log stays in the page.
-  Editing together (a later release), filex is to seal each entry and send
-  it through its relay, which puts the sealed entries in one order without
-  reading them, and every editor's bridge applies the same entries in the
-  same order with the Document Server's lock rules (`src/locks.ts`), so the
-  first request for a paragraph or a range wins everywhere.
+  Editing together (filex 0.56, `src/relay-session.ts` and
+  `src/app/together.ts`), filex seals each entry and sends it through its
+  relay, which puts the sealed entries in one order without reading them,
+  and every editor's bridge applies the same entries in the same order with
+  the Document Server's lock rules (`src/locks.ts`), so the first request
+  for a paragraph or a range wins everywhere.
 - **The conversion** runs in the browser: x2t, ONLYOFFICE's converter,
   compiled to WebAssembly, in a worker (`src/x2t.ts` drives it).
 
@@ -135,8 +159,10 @@ filex page (keys, network)        the app: two sandboxed pages (this repository)
 The app never holds a key and never touches the network: filex hands it the
 document and seals what it sends. filex never runs the editor's code. In
 0.1.0 the left column is the plain one - filex reads and saves a file that
-is not encrypted, and there is no relay; the sealed path is the design the
-later releases follow.
+is not encrypted, and there is no relay. Editing together (filex 0.56) adds
+the relay for a file that is not encrypted: filex seals the entries with a
+session key of its own there; in an encrypted folder (a later release) the
+key is the folder's.
 
 This is the model [CryptPad](https://github.com/cryptpad/cryptpad) uses for
 its office documents, measured against a Document Server 9.4 before it was
@@ -153,6 +179,69 @@ The design in full - keys, the order, the lease, saving, what the server
 sees - is filex's
 [E2E-OFFICE.md](https://github.com/BRF-Tech/filex/blob/main/docs/E2E-OFFICE.md).
 
+## Editing together
+
+With filex 0.56 or later and the `files:co-edit` grant, a document opened in
+the editor joins its **session** in filex: everyone who has it open in the
+editor edits the same document, sees the others in the editor's list of
+people, their cursors and their locks, and their changes as they make them -
+the editor's own "fast" co-editing, as with a Document Server, but with the
+"server" in each browser and filex's relay between them. Nobody sets
+anything up, and there is no Document Server.
+
+How it runs (`src/app/together.ts` on the app page, `src/relay-session.ts`
+on the editor page, `src/coedit.ts` for what both derive from the log):
+
+- **Joining.** The app page joins (`coedit.join`) before the editor is
+  configured: the editor's user id is the member's (`filex-person-<id>-`,
+  every member's differs, `coedit.ts editorIdOf`). The person who starts the
+  session puts exactly the bytes they opened as its **base**
+  (`coedit.blob.put('base')`); everybody after them opens the base
+  (`coedit.blob.get`), never the file - the file may already hold a save of
+  the session, and the log applies to the base.
+- **The log.** filex hands every member the same entries in the same order
+  (`coedit.entry`), each one checked by filex (its seal, its place, its
+  writer's counter). The app page hands them to the editor page in that
+  order, and the editor page's session hands them to the bridge - the
+  bridge cannot tell this session from the one-person one. A member's own
+  changes, lock requests and releases come back from the log with their
+  place, like everybody else's; the bridge starts (answers the editor's
+  auth, with every change so far) once it has read its own join.
+- **The lease.** Changes go into the log only from the one member that holds
+  filex's changes lease, and the lease goes only to a member that has seen
+  every change - the Document Server's save lock, kept by the relay.
+- **Images.** An image a person inserts goes to the session as a blob
+  (`m.<its name>`) before the change that shows it is appended; another
+  member's app page fetches it before handing that change over (a few tries
+  while the upload may still be under way), and the editor page registers it
+  under its `media/` name, where the editor looks for it.
+- **Saving** (the policy of filex task #189, the same for every member
+  because every member folds the same log): while there are unsaved changes,
+  a version every ten minutes, written by the **saver** - the writer who
+  joined first and is still in; **Save** (the editor's, Ctrl+S, filex's)
+  saves at once, by whoever pressed it; the **last writer to leave** saves
+  what is not saved yet. A save says how far into the log it reaches
+  (`file.save` with `through`), and filex writes that into the log, so
+  everybody's "unsaved" follows it. filex is told "unsaved changes" only by
+  the last writer: while somebody else who may write is in, closing leaves
+  nothing behind, and filex does not ask.
+- **When filex drops this member** (its page was unreachable a while,
+  `coedit.dropped` `gone`), the editor opens again in the session, a new
+  member with everybody's changes, and the person is told. **When an entry
+  does not check out** (`broken`), editing together stops for this person:
+  the session is left and the document opens again alone, as it was last
+  saved, and they are told.
+- **Alone, as before**, wherever filex offers no editing together: an older
+  filex (`unknown_method`), no `files:co-edit` grant, a file this person
+  cannot write, a vault - and on a phone's reading view (ONLYOFFICE's phone
+  app only reads; "Edit" joins the session, "Reading view" saves and leaves
+  it).
+
+The e2e harness has a stand-in for filex 0.56's relay
+(`e2e/harness/relay.mjs`), and `npm run e2e` opens one document in two
+browser contexts - two people - in each browser
+([Measured in the browsers](#measured-in-the-browsers)).
+
 ## What filex provides
 
 The half of the protocol filex owns is MIT and lives in filex: the relay
@@ -168,7 +257,7 @@ more, which later filex releases bring.
 | The editor page may be framed by the app page | a package page carries no `frame-ancestors` (⚠ measured in Chromium before 0.55: `*` never matches an opaque origin, and the editor page was refused) | 0.1.0 |
 | The editor loads the document from a `blob:` address | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` | 0.1.0 |
 | The plaintext of a document in an encrypted folder | not given in 0.55: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`). **filex 0.56:** the manifest's `encrypted_folders: {"open": true}` → the derived permission `files:e2e-plaintext` (a stern sentence in the review): the person's browser decrypts the document for the app (`FileInfo.plaintext`) and encrypts the save, written only over the file as it was opened | 0.2.0 ([In an encrypted folder](#in-an-encrypted-folder)) |
-| Editing together | the SDK's `coedit.*` methods are defined, and answer `unavailable`: the relay has no routes yet | a later release, with filex's `files:co-edit`: the relay's routes and WebSocket, its tables, the sealed blob store |
+| Editing together | filex 0.55: the SDK's `coedit.*` methods are defined, and answer `unavailable`. **filex 0.56:** they are answered through filex's relay (its routes and WebSocket, its tables, the sealed blob store), with the permission `files:co-edit` | the next release ([Editing together](#editing-together)); on filex 0.55 the app edits alone |
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
@@ -184,17 +273,19 @@ more, which later filex releases bring.
 | `src/locks.ts` | The Document Server's lock rules (text, spreadsheet, presentation) and the spreadsheet's lock recalculation after inserted or deleted rows and columns, kept as Docs 9.4 has them |
 | `src/shim.ts` | A `socket.io` stand-in: the editor's socket is plugged into the bridge |
 | `src/session.ts` | `LocalSession`: the session's log for one person, in the editor page, with the relay's rules (one order, changes only under the lease, the lease only for a member that has seen every change) |
+| `src/relay-session.ts` | `RelaySession`: the session when the document is edited together (filex 0.56), in the editor page - LocalSession's place in front of the bridge, the log filex's, through the app page; images go to the session before the change that shows them |
+| `src/coedit.ts` | Editing together: filex's entries and members in the bridge's words, the inserted images a change needs, and who saves (the saver, the last writer, the ten-minute version) |
 | `src/x2t.ts` | Drives x2t (WebAssembly) to turn a docx/xlsx/pptx (or odt/ods/odp) into the editor's format and back, and to write the editor's document in another format (Download as, PDF) |
 | `src/formats.ts` | What Download as and Print can make here: the formats x2t writes, by the editor's file type, the encodings it writes a txt or csv in, and what was measured to be left out |
 | `src/settings.ts` | Which of the editor's settings are kept between openings, and how they fit in filex's store |
 | `src/protocol.ts` | The messages and numbers both sides use |
-| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)) |
+| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)); editing together: `coedit-client.ts` (filex's `coedit.*`) and `together.ts` (the session, the base, the log to the editor page) |
 | `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
 | `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
 | `src/worker/x2t-worker.ts` | The converter's worker: loads x2t and converts one document at a time; when x2t stops it says so once, with why, and converts nothing more - the app page's client (`src/app/x2t-client.ts`) then starts a new one, and ends one that does not finish in time ([When x2t stops](#when-x2t-stops)) |
 | `app/` | The app page itself: `index.html` and `filex/app.css` |
 | `scripts/build-app.mjs` | Builds the app's bundle, `dist/ui/` and `dist/ui.zip`, from the editor files (checked against the lock), x2t (checked against the pin) and the app ([The app](#the-app)) |
-| `e2e/` | The browser measurement: a stand-in for filex 0.55 that serves the bundle the way filex serves an app (`e2e/harness/`), and the run in Chromium, Firefox and WebKit (`e2e/run.mjs`) ([Measured in the browsers](#measured-in-the-browsers)) |
+| `e2e/` | The browser measurement: a stand-in for filex 0.55 that serves the bundle the way filex serves an app (`e2e/harness/`, with `relay.mjs`, a stand-in for filex 0.56's co-editing relay), and the run in Chromium, Firefox and WebKit (`e2e/run.mjs`) ([Measured in the browsers](#measured-in-the-browsers)) |
 | `upstream/onlyoffice.json` | The one place the upstream versions are pinned: the ONLYOFFICE Docs release the editor files are taken from (version, build, image tag and digest, source tag, the date it was pinned) and, under `x2t`, the converter build (release, address, SHA-512, each file's SHA-256) |
 | `upstream/editor.lock.json` | What the editor bundle built from that release holds: every file with its SHA-256 and size, what was left out and why, what was changed and why, the zip's size and SHA-256 |
 | `scripts/extract-editor.sh` | Builds the editor bundle from the pinned image ([The editor bundle](#the-editor-bundle)); `scripts/editor/` holds its steps: `in-image.sh` (in the image), `rules.mjs` (what is kept, filex's limits), `html.mjs` (no inline code), `storage.js` (the storage stand-in), `bundle.mjs`, `fontnames.mjs`, `config.mjs` |
@@ -203,7 +294,7 @@ more, which later filex releases bring.
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
-| `filex-app.json` | The app's manifest: what filex 0.55 installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.55's fields and permissions |
+| `filex-app.json` | The app's manifest: what filex installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.56's fields and permissions |
 
 ```bash
 npm install
@@ -815,7 +906,14 @@ the document, and prints where filex has no print (`print=none`) and,
 reopened, where the app has no `ui:print` grant. Once per browser it also
 opens the two odts with a formula and reads, in the editor's own document,
 that each formula is in its line (`formulaRun`), and opens a document x2t
-stops on (`stopRun`, [When x2t stops](#when-x2t-stops)).
+stops on (`stopRun`, [When x2t stops](#when-x2t-stops)). And once per
+browser, two people - two browser contexts - open the same document through
+the relay stand-in (`?co=<room>`, filex 0.56's `coedit.*`): both editors
+join and count two people, what one types reaches the other's bridge, both
+bridges hold the same locks, the other one's save holds the typed text and
+is written into the log with how far it reaches, neither is asked about
+unsaved changes while the other may save, and when one leaves the other
+counts one again (written for the next release, not measured yet).
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -1053,7 +1151,8 @@ Next - the numbers are a plan, and each waits for what filex has to give it
   0.56 is, after its measurement in filex 0.56 itself.
 - **0.3.0, editing together**: several people in one document, in an
   encrypted folder or a plain one, through filex's relay and its
-  `files:co-edit` (planned for filex 0.57 or later).
+  `files:co-edit` (filex 0.56) - built on `main`, not released or measured
+  in the browsers yet ([Editing together](#editing-together)).
 - **In any release before those**: a corpus of real documents compared
   with what a Document Server makes of them; and, when filex serves an
   app's package compressed, a lighter download for the browser.
