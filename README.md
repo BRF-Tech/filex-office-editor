@@ -409,7 +409,9 @@ builds in two fresh checkouts, from the image to the zip, gave the same
 `ui.zip` - 102,979,682 bytes, 2,633 files, SHA-256
 `61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6` - and the
 same `editor.zip` as the lock file (`ce74fb00...e3be116`); about two minutes
-each. The release attaches that `ui.zip`; the repository does not carry it.
+each. The app's build alone, run again on the final tree, gave the same
+bytes in the pinned Node image (22.23.3) and in Playwright's image (Node
+24.14.1, the same zlib, 1.3.1-e00f703); deflate's bytes follow the zlib. The release attaches that `ui.zip`; the repository does not carry it.
 The bundle names its version in the legal line under the editor, so a
 release's source is the tag the line links to.
 
@@ -568,6 +570,14 @@ reads aside), 21 of 21:
 | Package files missing (404) | 0 | 0 | 0 |
 | Storage given to the sandboxed pages | none: the stand-in takes its place in both pages and holds the editor's settings; the app keeps them in filex's store | the same | the same |
 | Screenshots, 1280 and 390 px, light and dark | 4/4 | 4/4 | 4/4 |
+
+**The release, 0.1.0** (its `ui.zip`, run on 2026-10-09 on Linux in
+Playwright 1.59's image, Node 24.14.1): `npm run e2e -- --shots` 24 of 24 -
+the 21 above and the phone run below in each browser - with no request
+outside the package and no failed request; openings 1.1-1.4 s in Chromium,
+1.7-2.1 s in Firefox, 2.6-3.4 s in WebKit; 54 screenshots. In the same
+run: `npm test` 212 of 212, `npm run typecheck` clean, `npm run test:x2t`
+9 of 9.
 
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
