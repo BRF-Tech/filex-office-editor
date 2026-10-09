@@ -45,13 +45,15 @@ describe('the manifest and the locked editor files', () => {
     // (wasmplugin.ParseManifest, DisallowUnknownFields) and a permission it
     // does not know (ParsePermission). 0.56 knows encrypted folders
     // (`encrypted_folders`, the derived files:e2e-plaintext) and editing
-    // together (files:co-edit), so the manifest asks for filex 0.56.
-    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'ui', 'encrypted_folders', 'views', 'new_documents'];
+    // together (the `co_edit` block, the derived files:co-edit), so the
+    // manifest asks for filex 0.56 (0.55 would refuse either block).
+    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'co_edit', 'ui', 'encrypted_folders', 'views', 'new_documents'];
     expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
     expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
-    // files:e2e-plaintext is derived from encrypted_folders: filex refuses
-    // it written into `permissions`.
-    expect(manifest.permissions).toEqual(['files:read', 'files:write', 'files:co-edit']);
+    // files:e2e-plaintext and files:co-edit are derived from their blocks:
+    // filex refuses either written into `permissions`.
+    expect(manifest.permissions).toEqual(['files:read', 'files:write']);
+    expect(manifest.co_edit).toEqual({ open: true });
     expect(manifest.filex).toBe('>=0.56.0');
     for (const lang of ['en', 'tr']) expect(manifest.permission_reasons['files:co-edit']?.[lang], lang).toBeTruthy();
     const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;

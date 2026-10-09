@@ -81,9 +81,10 @@ browser.
   with `encrypted_folders`.
 - The description says encrypted folders again, and the `ui:connect-blob`
   reason the document the browser decrypted or converted.
-- The manifest asks for `files:co-edit` and for filex `>=0.56.0` (filex 0.55
-  refuses a manifest with a permission it does not know; servers on 0.55
-  keep 0.1.0). Where filex offers no editing together - an older filex, no
+- The manifest says `"co_edit": {"open": true}` (granted as
+  `files:co-edit`, which filex derives from the block - it is not listed in
+  `permissions`) and asks for filex `>=0.56.0` (filex 0.55 refuses a
+  manifest with a block it does not know; servers on 0.55 keep 0.1.0). Where filex offers no editing together - an older filex, no
   grant, a file the person cannot write, a vault, the phone's reading view -
   the editor runs alone, exactly as in 0.1.0.
 

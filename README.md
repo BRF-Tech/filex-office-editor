@@ -61,7 +61,7 @@ saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-f
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.1.1: **0.55.0** or later. The next releases (encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`; editing together, `files:co-edit`): **0.56.0** or later (`"filex": ">=0.56.0"`) - filex 0.55 refuses a manifest with a block or a permission it does not know, and keeps 0.1.1 |
+| filex | 0.1.1: **0.55.0** or later. The next releases (encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`; editing together, its `co_edit` block, granted as `files:co-edit`): **0.56.0** or later (`"filex": ">=0.56.0"`) - filex 0.55 refuses a manifest with a block it does not know, and keeps 0.1.1 |
 | Release | **0.1.1** (tag `v0.1.1`): `ui.zip`, 98.3 MiB, SHA-256 `7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 

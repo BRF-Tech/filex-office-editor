@@ -14,9 +14,11 @@
   "homepage": "https://github.com/BRF-Tech/filex-office-editor",
   "permissions": [
     "files:read",
-    "files:write",
-    "files:co-edit"
+    "files:write"
   ],
+  "co_edit": {
+    "open": true
+  },
   "permission_reasons": {
     "files:read": {
       "en": "To open the document you open with it.",
