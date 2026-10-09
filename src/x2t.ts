@@ -9,9 +9,10 @@
 // anywhere else.
 //
 // The wasm build is pinned in upstream/onlyoffice.json ("x2t"): for now
-// CryptPad's v9.3.2+3, fetched and checked by scripts/fetch-x2t.mjs; before
-// 0.1.0, this project's own build from ONLYOFFICE core at the same tag as
-// the editor files (core v9.4.0.129 for Docs 9.4). It is loaded into a
+// CryptPad's v9.3.2+3 (release 0.1.0 carries it), fetched and checked by
+// scripts/fetch-x2t.mjs; in a later release, this project's own build from
+// ONLYOFFICE core at the same tag as the editor files (core v9.4.0.129 for
+// Docs 9.4). It is loaded into a
 // Worker; this file drives a loaded module. The calling convention (an
 // in-memory file system under /working, a params.xml, main1) is the one the
 // wasm build exports; CryptPad drives its build the same way.
