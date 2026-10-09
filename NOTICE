@@ -122,8 +122,9 @@ sponsored by Ascensio System SIA.
    ONLYOFFICE core with CryptPad's changes for WebAssembly, whose core/ was
    pulled from Euro-Office's copy of ONLYOFFICE core at v9.3.2. This
    project does not change it; scripts/fetch-x2t.mjs checks it against the
-   pinned SHA-512 and SHA-256 sums. Before 0.1.0 this project's own build
-   from ONLYOFFICE core at the editor files' tag replaces it.
+   pinned SHA-512 and SHA-256 sums. Release 0.1.0 carries this build; a
+   later release replaces it with this project's own build from ONLYOFFICE
+   core at the editor files' tag.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:
@@ -155,7 +156,10 @@ a modified version:
   - leaves non-code content (icons, illustrations, documents) under
     CC BY-SA 4.0.
 The terms themselves are in ONLYOFFICE's LICENSE files (sdkjs, web-apps,
-server, core), which the release bundle will carry unchanged.
+server, core); the Document Server's LICENSE.txt, the AGPL version 3 with
+these additional terms, is in the app's bundle unchanged
+(editor/LICENSE.txt), with the license files of the third-party code the
+editor carries (editor/license/, editor/3rd-Party.txt).
 
 
 Other software in the app's bundle

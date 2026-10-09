@@ -40,6 +40,24 @@ describe('the manifest and the locked editor files', () => {
     }
   });
 
+  it('is what filex 0.55 installs: its fields, its permissions, the release it names', () => {
+    // filex refuses a manifest with a field it does not know
+    // (wasmplugin.ParseManifest, DisallowUnknownFields) and a permission it
+    // does not know (ParsePermission): 0.55 knows neither encrypted folders
+    // nor editing together, so 0.1.0 asks for neither.
+    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'ui', 'views', 'new_documents'];
+    expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
+    expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
+    expect(manifest.permissions).toEqual(['files:read', 'files:write']);
+    const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+    expect(manifest.version).toBe(version);
+    expect(manifest.ui.bundle.url).toBe(`https://github.com/BRF-Tech/filex-office-editor/releases/download/v${version}/ui.zip`);
+    expect(manifest.ui.bundle.sha256).toMatch(/^[0-9a-f]{64}$/);
+    for (const [p, why] of Object.entries(manifest.permission_reasons as Record<string, Record<string, string>>)) {
+      for (const lang of manifest.languages) expect(why[lang], `${p} ${lang}`).toBeTruthy();
+    }
+  });
+
   it('the editor pages load socket.io from where the bridge goes', () => {
     expect(lock.files[SOCKET_IO]).toBeTruthy();
   });

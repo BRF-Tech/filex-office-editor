@@ -9,73 +9,26 @@ update.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-09
+
+The first version: ONLYOFFICE's editor in filex, in the browser and without
+a Document Server - one person editing a document in a folder that is not
+encrypted, and saving it as a new version. A filex app for filex 0.55.0 or
+later, in English and Turkish.
+
 ### Added
 
-- The protocol prototype, moved here from filex (`packages/office-e2e` and
-  `web/tests/officeE2e`, filex commit 45e7bab7, task #189) with its history:
-  the bridge that answers the ONLYOFFICE editor as the Document Server
-  (`DocsCoServer.js`, Docs 9.4) does and turns what the other editors need
-  into entries of a session log; the Document Server's lock rules and the
-  spreadsheet's lock recalculation; a socket.io stand-in for the editor's
-  `socket.io.min.js`; a driver for x2t built to WebAssembly; their unit
-  tests (vitest, in Node).
-- A draft `filex-app.json` (`office-editor`, filex 0.55.0 or later): a
-  viewer for docx, xlsx, pptx, odt, ods and odp, New document rows for docx,
-  xlsx and pptx, and the platform permissions the app will ask filex for.
-- `NOTICE`: the licensing, what is based on ONLYOFFICE, the legal notice
-  the editor will show, the trademark line.
-- ONLYOFFICE's credit, in the README, NOTICE and the manifest's
-  description: the ONLYOFFICE code is Copyright © Ascensio System SIA under
-  the AGPL version 3; ONLYOFFICE® and ONLYOFFICE Docs™ are registered
-  trademarks or trademarks of Ascensio System SIA, and this project is not
-  affiliated with or endorsed by it.
-- `upstream/onlyoffice.json` pins the ONLYOFFICE Docs release the editor
-  files are taken from: 9.4.0 (build 9.4.0.129), the official Document
-  Server image `onlyoffice/documentserver:9.4.0.1` by its digest.
-- A weekly GitHub Actions workflow, the upstream watch
-  (`scripts/upstream-watch.mjs`), compares the pin with ONLYOFFICE's newest
-  release and opens one issue per newer version, never a second one for the
-  same version. It uses only the run's own `GITHUB_TOKEN` (issues: write).
-  The issue says how to rebuild: the new pin, `bash
-  scripts/extract-editor.sh --update`, the lock file's diff.
-- The editor bundle's build, `scripts/extract-editor.sh`: from the pinned
-  Document Server image (by digest, no network after the pull) it generates
-  the fonts from ONLYOFFICE's core-fonts, keeps the document, spreadsheet
-  and presentation editors, moves every HTML page's inline scripts into
-  files, loads an in-memory storage stand-in first, checks filex's limits
-  for an app's bundle and writes a reproducible zip. Measured for 9.4.0:
-  2,180 files, 271.6 MiB unpacked, 91.8 MiB zipped; two builds give the
-  same zip. `upstream/editor.lock.json` records every file's SHA-256; a
-  build that differs from it fails.
-- x2t: CryptPad's WebAssembly build `v9.3.2+3`, pinned under `x2t` in
-  `upstream/onlyoffice.json` by its SHA-512 and its files' SHA-256, fetched
-  and checked by `scripts/fetch-x2t.mjs`. `npm run test:x2t` takes a docx,
-  an xlsx and a pptx with Turkish text through it to Editor.bin and back
-  with `src/x2t.ts`; nothing is lost.
-- The app (plan step A3): `npm run build` (`scripts/build-app.mjs`) makes
-  `dist/ui.zip`, the bundle filex installs - the locked editor files, the
-  pinned x2t, the app page and the editor page's script in place of
-  socket.io (92.7 MiB zipped, 1,889 files). The app page reads the file
-  through filex's SDK, converts it with x2t in a worker, starts
-  ONLYOFFICE's editor in its own frame and hands it the document; one
-  person edits it, the session's log stays in the page
-  (`src/session.ts`), and the editor's Save, filex's Save and a save every
-  ten minutes while there are changes write a new version of the file in
-  its own format. filex is told about unsaved changes. The editor follows
-  filex's language and light or dark theme; a file that cannot be saved
-  opens to read; an empty file opens as a blank one. The legal notice
-  ONLYOFFICE's terms ask for is shown under the editor, in English and
-  Turkish.
-- New documents: the Document Server's blank docx, xlsx and pptx are in the
-  bundle (`editor/document-templates/new/default/new.*.bin`), and
-  `filex-app.json` names them.
-- `npm run e2e` (`e2e/run.mjs`): the bundle, served the way filex 0.55
-  serves an app (`e2e/harness/`), opened in Chromium, Firefox and WebKit;
-  blank and Turkish docx, xlsx and pptx are typed in and saved twice, and
-  the written files read back. All pass in all three; no request leaves
-  the package; the storage stand-in takes the place of the storage none of
-  the three gives the sandboxed pages.
-
+- **The editor in place of filex's preview** for `.docx`, `.xlsx`, `.pptx`,
+  `.odt`, `.ods` and `.odp`: the app page reads the file through filex's SDK,
+  converts it with x2t in a worker, starts ONLYOFFICE's editor in a frame of
+  its own package (`ui.frame_package`) and hands it the document as bytes.
+  The editor follows filex's language and region and its light or dark
+  theme; a file that cannot be saved opens to read; an empty file opens as
+  the blank document of its kind.
+- **Saving**: the editor's Save (its button, Ctrl+S), filex's Save, and a
+  save every ten minutes while there are changes write a new version of the
+  file in its own format. filex is told about unsaved changes and asks
+  before the person leaves them.
 - **Download as**, without a Document Server: the File menu offers what x2t
   writes here (`src/formats.ts`) - docx, dotx, odt, ott, rtf (docm for a
   docm); xlsx, xltx, ods, ots (xlsm); pptx, ppsx, potx, odp, otp (pptm); PDF
@@ -84,79 +37,75 @@ update.
   with the fonts it drew them with. Left out because this x2t build cannot
   write them right: txt and csv (every letter outside ASCII is cut to its
   low byte), html, md, epub, fb2 and images.
-- **Print**: the document as a PDF, handed to filex to print (`ui.print`,
-  filex 0.55: `filex-app.json` asks for it with `"ui": {"print": true}`,
-  the permission `ui:print`, its reason in English and Turkish); without
-  that grant, or on a filex without `ui.print` (`unknown_method`,
-  `unavailable`), the PDF goes to the person as a download, and they are
-  told so - a sandboxed frame may not open the browser's print dialog.
-  The e2e harness answers `ui.print` as filex 0.55 checks it (the grant, a
-  PDF, `{printed, size}`).
+- **Print**: the document goes to filex as a PDF (`ui.print`, the `ui:print`
+  grant) and filex asks the person before it opens the browser's print
+  dialog. Without that grant, or on a filex without `ui.print`, the PDF goes
+  to the person as a download, and they are told so - a sandboxed frame may
+  not open the print dialog itself.
+- **New document**: the Document Server's blank docx, xlsx and pptx are in
+  the bundle, and filex's New document dialog gets a document, a spreadsheet
+  and a presentation row.
 - **The editor's settings are kept between openings** in filex's store for
-  the app (`state.set`, one value of at most 8 KiB): units, zoom, the
-  ribbon folded or not, the "New" hints the person closed. filex keeps
-  deciding the theme. The editor's start waits for the kept settings, at
-  most 5 seconds.
-- On a narrow screen (a frame under 600 px) the editor starts folded: the
-  ribbon's tabs only, no rulers, the side panel closed.
-- **On a phone** (a frame under 600 px on a touch screen) the document
-  opens in **ONLYOFFICE's phone app**: the three editors' `mobile` apps of
-  the pinned 9.4 image are now in the bundle (743 files with their pages'
-  moved inline scripts, 22.9 MiB unpacked, 5.5 MiB zipped: `ui.zip` is
-  97.7 MiB, 2,633 files). It
-  is touch-sized, with its own search, navigation, settings, Download (PDF
-  and the other formats through x2t, as on a computer; a format x2t does
-  not write here is refused and the person told) and Print. ONLYOFFICE's
-  open-source phone apps open a document **to read only** - editing on a
-  phone is a commercial ONLYOFFICE feature, and their editing controller is
-  a stub in this build - so they open in view mode, and **"Edit"** under
-  them opens the editor, folded, with the document; **"Reading view"** goes
-  back with what was written, saving it first. The phone app's start waits
-  for the kept settings like the editor's, and its settings (all under
-  `mobile-`) are kept with the editor's in the one value. The build adds an
-  empty `plugins.json`, which the phone apps ask for. `npm run e2e`
-  measures it on a phone in the three browsers (`--no-phone` leaves it
-  out).
-- `npm run e2e` measures all of it in the three browsers: the people the
-  editor counts, Download as from the File menu (the offered formats, an
-  OpenDocument copy holding the typed text, a PDF with pages and fonts),
-  Print, a closed hint not showing at the next opening, and Print handed
-  over as a download where filex has no print.
-
-### Fixed
-
-- Every page of the editor logged an error at opening, its service worker
-  failing to register in filex's sandbox; in Chromium even reading
-  `navigator.serviceWorker` throws there, which stopped the phone apps
-  (Framework7 reads it while it starts). The storage stand-in
-  (`filex/storage.js`, the first script of every page) now takes the
-  attribute away where reading it throws, and the editors go on without
-  one.
-- A setting the editor wrote before the kept ones had reached its page was
-  reported on its own, and the app page would have kept that smaller set
-  in place of the kept one; such a write now waits for the kept settings.
-- One person editing was shown as two: the bridge's own participant (which
-  keeps the editor sending its changes as it makes them) is now in a group
-  of its own that the editor is configured not to show
-  (`permissions.userInfoGroups`). A no-break space in a person's name, which
-  the editor would read as a group, becomes a space.
-- "Suggest a feature" in the File menu, which opened ONLYOFFICE's site (the
-  sandbox cannot), is off.
-- The bridge told an editor that had not yet received every change it
-  could save when it said it knew none (`isSaveLock` with
-  `syncChangesIndex` 0): 0 is now checked like any other count. The
-  Document Server lets 0 through "for compatibility"; the pinned editor
-  always sends its count.
-- The editor's interface templates are kept (as `.template.txt`): they are
-  not built into the apps, and the editor stopped without them. The
-  per-theme thumbnails, which the editor never asks for, are left out.
-
-### Changed
-
-- The project is named **filex-office-editor** (it started as
-  filex-onlyoffice). "ONLYOFFICE" is Ascensio System SIA's trademark and
-  grants no rights, so it appears only to say what the app is based on,
-  never in the name of the repository or of the app.
-- The license is **AGPL-3.0-or-later** (the prototype said AGPL-3.0-only).
-  `src/locks.ts` stays AGPL-3.0-only: it is a modified version of ONLYOFFICE
-  Docs, which is licensed under the AGPL version 3 only.
+  the app (`state.set`, one value of at most 8 KiB): units, zoom, the ribbon
+  folded or not, the "New" hints the person closed. filex keeps deciding the
+  theme. The editor's start waits for the kept settings, at most 5 seconds.
+- **On a narrow screen** (a frame under 600 px) the editor starts folded:
+  the ribbon's tabs only, no rulers, the side panel closed.
+- **On a phone** (a frame under 600 px on a touch screen) the document opens
+  in ONLYOFFICE's phone app, to read: touch-sized, with its own search,
+  navigation, settings, Download (through x2t, as on a computer) and Print.
+  ONLYOFFICE's open-source phone apps do not edit, so **"Edit"** under them
+  opens the editor, folded, with the document, and **"Reading view"** goes
+  back with what was written, saving it first.
+- **One person counts one**: the bridge's own participant (which keeps the
+  editor sending its changes as it makes them) is in a group the editor is
+  configured not to show. "Suggest a feature", which would open ONLYOFFICE's
+  site, is off; plugins, macros, chat, the spell checker and help, which
+  would reach a Document Server, are off too.
+- **The legal notice** ONLYOFFICE's terms ask for, under the editor, in
+  English and Turkish: based on ONLYOFFICE Docs by Ascensio System SIA, this
+  version may have been modified, the Docs version and source tag, the AGPL
+  and this repository at the app's tag (`/tree/v0.1.0`), the trademark line.
+  The editor's own About is not touched.
+- **The bridge that stands in for the Document Server** (`src/bridge.ts`,
+  answering the editor as `DocsCoServer.js` of Docs 9.4 does), the Document
+  Server's lock rules and the spreadsheet's lock recalculation
+  (`src/locks.ts`), a socket.io stand-in for the editor's
+  `socket.io.min.js`, the session's log for one person (`src/session.ts`)
+  and a driver for x2t built to WebAssembly - moved here from filex (its
+  commit 45e7bab7) with their history and their unit tests.
+- **The editor bundle**, built by `scripts/extract-editor.sh` from
+  ONLYOFFICE's official Document Server image, pinned by digest in
+  `upstream/onlyoffice.json` (ONLYOFFICE Docs 9.4.0, build 9.4.0.129): the
+  fonts generated from ONLYOFFICE's core-fonts, the document, spreadsheet
+  and presentation editors with their phone apps, every page's inline
+  scripts moved into files, an in-memory storage stand-in loaded first in
+  every page. `upstream/editor.lock.json` records every file's SHA-256 and a
+  build that differs from it fails.
+- **x2t**: CryptPad's WebAssembly build `v9.3.2+3` (AGPL-3.0-or-later),
+  pinned in `upstream/onlyoffice.json` by its SHA-512 and its files'
+  SHA-256, fetched and checked by `scripts/fetch-x2t.mjs`.
+- **The release bundle**, `ui.zip`, built by `npm run build`: 2,633 files,
+  323.4 MiB unpacked, 98.2 MiB zipped (102,979,682 bytes), SHA-256
+  `61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6`, the
+  value in `filex-app.json`. It is reproducible: two complete builds, from
+  the image to the zip, gave the same bytes.
+- **The manifest** (`filex-app.json`, `office-editor`, `filex >=0.55.0`):
+  the permissions `files:read` and `files:write`, and the interface's
+  `ui.package_fetch`, `ui.frame_package`, `ui.connect_blob`, `ui.download`,
+  `ui.print`, `unsafe-eval` and `wasm-unsafe-eval`, each with its reason in
+  English and Turkish.
+- **A weekly upstream watch** (GitHub Actions, `scripts/upstream-watch.mjs`)
+  that compares the pin with ONLYOFFICE's newest release and opens one issue
+  per newer version, saying how to rebuild.
+- **Tests**: unit tests in Node (vitest) for all of the above, `npm run
+  test:x2t` (a docx, an xlsx and a pptx with Turkish text through the real
+  x2t and back), and `npm run e2e`, the bundle served the way filex 0.55
+  serves an app and measured in Chromium, Firefox and WebKit, on a computer
+  and on a phone.
+- **NOTICE**: the licensing, what is based on ONLYOFFICE and every change
+  made to its files, with the dates, the legal notice, the trademark line.
+  The project is licensed **AGPL-3.0-or-later**; `src/locks.ts`, a modified
+  version of ONLYOFFICE Docs, is AGPL-3.0-only. "ONLYOFFICE" is Ascensio
+  System SIA's trademark and appears only to say what the app is based on,
+  never as the name of the repository or of the app.
