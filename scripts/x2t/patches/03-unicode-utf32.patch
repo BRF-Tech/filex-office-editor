@@ -1,0 +1,88 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-10: UnicodeConverter
+hands wchar_t to ICU as UTF-32.
+
+Measured (2026-10-10, emscripten 4.0.11, its ICU 68.2): u_strFromWCS fails
+with U_ILLEGAL_ARGUMENT_ERROR on any letter outside ASCII in the "C" locale
+(ICU does not take emscripten's wchar_t for UTF-32 and goes through the C
+library's wcstombs), while u_strFromUTF32 converts the same text.
+CUnicodeConverter::fromUnicode then fell back to each character's low byte:
+a txt or csv written as UTF-8 came out with "Sehir" (capital S with cedilla,
+U+015E) as "^ehir". Where wchar_t holds more than 16 bits, the four calls go
+through u_strFromUTF32WithSub / u_strToUTF32WithSub instead (an invalid code
+point becomes U+FFFD); a 16-bit wchar_t (Windows) keeps u_strFromWCS.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/UnicodeConverter/UnicodeConverter.cpp b/UnicodeConverter/UnicodeConverter.cpp
+index 4bbd366a9..c3063fd17 100644
+--- a/UnicodeConverter/UnicodeConverter.cpp
++++ b/UnicodeConverter/UnicodeConverter.cpp
+@@ -57,6 +57,32 @@
+ #define FALSE 0
+ #endif
+ 
++// filex-office-editor (BRF Tech, 2026-10-10): wchar_t to ICU's UTF-16 and back.
++// Where wchar_t holds UTF-32 (Linux, WebAssembly) this uses ICU's UTF-32
++// functions. u_strFromWCS and u_strToWCS rely on ICU knowing that wchar_t is
++// UTF-32; built with emscripten it does not, goes through the C library's
++// multibyte functions in the current locale, and in the "C" locale every
++// letter outside ASCII fails (U_ILLEGAL_ARGUMENT_ERROR). fromUnicode then
++// fell back to keeping each character's low byte (U+015E, a capital S with
++// cedilla, became "^" in a txt or csv written as UTF-8).
++#include <cwchar>
++static void WcsToUChars(UChar* pDst, int32_t nDstCapacity, int32_t* pDstLength, const wchar_t* pSrc, int32_t nSrcLength, UErrorCode* pStatus)
++{
++#if WCHAR_MAX > 0xFFFF
++	u_strFromUTF32WithSub(pDst, nDstCapacity, pDstLength, (const UChar32*)pSrc, nSrcLength, 0xFFFD, NULL, pStatus);
++#else
++	u_strFromWCS(pDst, nDstCapacity, pDstLength, pSrc, nSrcLength, pStatus);
++#endif
++}
++static void UCharsToWcs(wchar_t* pDst, int32_t nDstCapacity, int32_t* pDstLength, const UChar* pSrc, int32_t nSrcLength, UErrorCode* pStatus)
++{
++#if WCHAR_MAX > 0xFFFF
++	u_strToUTF32WithSub((UChar32*)pDst, nDstCapacity, pDstLength, pSrc, nSrcLength, 0xFFFD, NULL, pStatus);
++#else
++	u_strToWCS(pDst, nDstCapacity, pDstLength, pSrc, nSrcLength, pStatus);
++#endif
++}
++
+ std::string g_overrideIcuDataPath = "";
+ 
+ namespace NSUnicodeConverter
+@@ -117,7 +143,7 @@ namespace NSUnicodeConverter
+ 				const UChar* pUCharStart = pUChar;
+ 				int32_t nUCharLength = 0;
+ 
+-				u_strFromWCS(pUChar, nUCharCapacity, &nUCharLength, sInput, (int32_t)nInputLen, &status);
++				WcsToUChars(pUChar, nUCharCapacity, &nUCharLength, sInput, (int32_t)nInputLen, &status);
+ 				if (U_SUCCESS(status))
+ 				{
+ 					UStringPrepProfile *profile = usprep_openByType(USPREP_RFC4013_SASLPREP, &status);
+@@ -183,7 +209,7 @@ namespace NSUnicodeConverter
+ 					const UChar* pUCharStart = pUChar;
+ 					int32_t nUCharLength = 0;
+ 
+-					u_strFromWCS(pUChar, nUCharCapacity, &nUCharLength, sInput, (int32_t)nInputLen, &status);
++					WcsToUChars(pUChar, nUCharCapacity, &nUCharLength, sInput, (int32_t)nInputLen, &status);
+ 					if (U_SUCCESS(status))
+ 					{
+ 						const UChar* pUCharLimit = pUCharStart + nUCharLength;
+@@ -242,7 +268,7 @@ namespace NSUnicodeConverter
+ 							sRes.resize(nTargetSize * 2);// UTF-16 uses 2 code-points per char
+ 							int32_t nResLen = 0;
+ 
+-							u_strToWCS(&sRes[0], (int32_t)sRes.size(), &nResLen, targetStart, (int32_t)nTargetSize, &status);
++							UCharsToWcs(&sRes[0], (int32_t)sRes.size(), &nResLen, targetStart, (int32_t)nTargetSize, &status);
+ 							if (U_SUCCESS(status))
+ 							{
+ 								sRes.resize((size_t)nResLen);
+@@ -297,7 +323,7 @@ namespace NSUnicodeConverter
+ 							sRes.resize(nTargetSize * 2);// UTF-16 uses 2 code-points per char
+ 							int32_t nResLen = 0;
+ 
+-							u_strToWCS(&sRes[0], (int32_t)sRes.size(), &nResLen, targetStart, (int32_t)nTargetSize, &status);
++							UCharsToWcs(&sRes[0], (int32_t)sRes.size(), &nResLen, targetStart, (int32_t)nTargetSize, &status);
+ 							if (U_SUCCESS(status))
+ 							{
+ 								sRes.resize((size_t)nResLen);
