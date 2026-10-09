@@ -40,15 +40,19 @@ describe('the manifest and the locked editor files', () => {
     }
   });
 
-  it('is what filex 0.55 installs: its fields, its permissions, the release it names', () => {
+  it('is what filex 0.56 installs: its fields, its permissions, the release it names', () => {
     // filex refuses a manifest with a field it does not know
     // (wasmplugin.ParseManifest, DisallowUnknownFields) and a permission it
-    // does not know (ParsePermission): 0.55 knows neither encrypted folders
-    // nor editing together, so 0.1.0 asks for neither.
-    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'ui', 'views', 'new_documents'];
+    // does not know (ParsePermission). 0.56 knows encrypted folders
+    // (`encrypted_folders`, the derived files:e2e-plaintext); editing
+    // together is not there yet, so 0.2.0 does not ask for it.
+    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'ui', 'encrypted_folders', 'views', 'new_documents'];
     expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
     expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
+    // files:e2e-plaintext is derived from encrypted_folders: filex refuses
+    // it written into `permissions`.
     expect(manifest.permissions).toEqual(['files:read', 'files:write']);
+    expect(manifest.filex).toBe('>=0.56.0');
     const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     expect(manifest.version).toBe(version);
     expect(manifest.ui.bundle.url).toBe(`https://github.com/BRF-Tech/filex-office-editor/releases/download/v${version}/ui.zip`);
@@ -56,6 +60,17 @@ describe('the manifest and the locked editor files', () => {
     for (const [p, why] of Object.entries(manifest.permission_reasons as Record<string, Record<string, string>>)) {
       for (const lang of manifest.languages) expect(why[lang], `${p} ${lang}`).toBeTruthy();
     }
+  });
+
+  it('asks to edit documents of encrypted folders (filex 0.56), and says what that means in both languages', () => {
+    expect(manifest.encrypted_folders).toEqual({ open: true });
+    const why = manifest.permission_reasons['files:e2e-plaintext'];
+    expect(why?.en).toContain('sees every document you open with it');
+    expect(why?.tr).toContain('her belgenin içeriğini görür');
+    // filex's own conditions for the block: an interface, a viewer, files:read.
+    expect(manifest.views.some((v: { placement: string; ui?: string }) => v.placement === 'viewer' && !!v.ui)).toBe(true);
+    expect(manifest.permissions).toContain('files:read');
+    expect(manifest.description.en).toContain('encrypted folders');
   });
 
   it('the editor pages load socket.io from where the bridge goes', () => {

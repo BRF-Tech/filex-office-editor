@@ -75,6 +75,31 @@ export function kindOf(ext: string | undefined | null): Kind | null {
   return Object.prototype.hasOwnProperty.call(KINDS, e) ? KINDS[e] : null;
 }
 
+/**
+ * What filex says of the file's encryption (FileInfo, filex 0.55 and 0.56):
+ * `encrypted` - "folder", "vault" or "file" for a file the server holds only
+ * as ciphertext; `plaintext` - filex 0.56 hands it to this app in the clear
+ * (the person's browser decrypts it for `file.read` and encrypts what
+ * `file.save` hands back; the manifest's `encrypted_folders`). Read off the
+ * object as it came: the SDK version the app builds with may not name them.
+ */
+export interface EncryptionInfo {
+  encrypted?: unknown;
+  plaintext?: unknown;
+}
+
+/**
+ * The file is encrypted and filex does not hand it over: an older filex, an
+ * administrator who turned it off, a vault or a single encrypted file - the
+ * app says so instead of asking for bytes filex refuses. A file filex hands
+ * over in the clear is edited like any other.
+ */
+export function encryptedNotHanded(info: object | null | undefined): boolean {
+  if (!info) return false;
+  const { encrypted, plaintext } = info as EncryptionInfo;
+  return (encrypted === 'folder' || encrypted === 'vault' || encrypted === 'file') && plaintext !== true;
+}
+
 /** The languages the app's own words come in. */
 export type UiLang = 'en' | 'tr';
 

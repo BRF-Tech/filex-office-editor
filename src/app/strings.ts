@@ -11,6 +11,8 @@ export interface Strings {
   opening: (name: string) => string;
   notInFilex: string;
   unsupported: (ext: string) => string;
+  /** The document is in an encrypted folder (or is encrypted) and filex does not hand it over here. */
+  encryptedNotHanded: string;
   openFailed: (reason: string) => string;
   saveFailed: (reason: string) => string;
   /** "Download as" or Print could not be written. */
@@ -58,6 +60,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     opening: (name) => `Opening ${name}…`,
     notInFilex: 'This page is the office editor app for filex; it opens inside filex.',
     unsupported: (ext) => `This app does not open .${ext} files.`,
+    encryptedNotHanded:
+      'This document is encrypted, and filex does not hand it to this app here. Editing in an encrypted folder needs filex 0.56 or later, a folder that is not a vault, and an administrator who allows it; until then filex opens it in its own viewer.',
     openFailed: (reason) => `The document could not be opened: ${reason}`,
     saveFailed: (reason) => `The document could not be saved: ${reason}`,
     exportFailed: (reason) => `The file could not be made: ${reason}`,
@@ -80,6 +84,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     opening: (name) => `${name} açılıyor…`,
     notInFilex: "Bu sayfa filex'in ofis düzenleyici uygulamasıdır; filex'in içinde açılır.",
     unsupported: (ext) => `Bu uygulama .${ext} dosyalarını açmaz.`,
+    encryptedNotHanded:
+      "Bu belge şifreli ve filex onu burada bu uygulamaya vermiyor. Şifreli bir klasörde düzenlemek için filex 0.56 ya da sonrası, kasa olmayan bir klasör ve buna izin veren bir yönetici gerekir; o zamana kadar filex onu kendi görüntüleyicisinde açar.",
     openFailed: (reason) => `Belge açılamadı: ${reason}`,
     saveFailed: (reason) => `Belge kaydedilemedi: ${reason}`,
     exportFailed: (reason) => `Dosya hazırlanamadı: ${reason}`,

@@ -25,6 +25,14 @@
 // One person, one document (plan step A3). Nothing leaves the browser but
 // the saves, the files the person asks for and the settings, and those go
 // to filex through the SDK.
+//
+// A document of an encrypted folder (filex 0.56, the manifest's
+// `encrypted_folders`): filex says `encrypted: "folder"` and `plaintext:
+// true`, decrypts it in the person's browser for `file.read` and encrypts
+// what `file.save` hands back - the app reads and saves it like any other,
+// and the server sees only ciphertext. An encrypted file filex does not
+// hand over (`plaintext` absent: an older filex, a vault, an administrator
+// who turned it off) is said, not asked for.
 
 import { connect, FilexError, type FilexApp } from '@brftech/filex-app-ui';
 
@@ -41,7 +49,7 @@ import {
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
-import { NARROW_PX, editorConfig, isPhone, kindOf, uiLang, type Kind, type View } from './config';
+import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, uiLang, type Kind, type View } from './config';
 import { STRINGS, type Strings } from './strings';
 import { X2tClient, X2tFailure, type Converted } from './x2t-client';
 
@@ -477,6 +485,11 @@ async function main(): Promise<void> {
   const kind = kindOf(info?.ext);
   if (!info || !kind) {
     setStatus(t.unsupported(info?.ext ?? '?'), true);
+    return;
+  }
+  if (encryptedNotHanded(info)) {
+    phase('failed');
+    setStatus(t.encryptedNotHanded, true);
     return;
   }
   setStatus(t.opening(info.name));

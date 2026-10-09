@@ -13,6 +13,7 @@ import {
   editorConfig,
   editorLang,
   editorRegion,
+  encryptedNotHanded,
   isPhone,
   kindOf,
   narrowLayout,
@@ -42,6 +43,33 @@ describe('the kind of document', () => {
     expect(kindOf('docx')!.blank).toBe('editor/document-templates/new/default/new.docx.bin');
     expect(kindOf('xlsx')!.blank).toBe('editor/document-templates/new/default/new.xlsx.bin');
     expect(kindOf('pptx')!.blank).toBe('editor/document-templates/new/default/new.pptx.bin');
+  });
+});
+
+// 0.2.0: a document of an encrypted folder is edited when filex 0.56 hands
+// it over in the clear (`plaintext`), and said - not asked for - when it
+// does not. Red before 0.2.0: encryptedNotHanded did not exist and the app
+// asked filex for the bytes of every file.
+describe('an encrypted document', () => {
+  it('is edited when filex hands it over in the clear', () => {
+    expect(encryptedNotHanded({ encrypted: 'folder', plaintext: true })).toBe(false);
+    expect(encryptedNotHanded({})).toBe(false);
+    expect(encryptedNotHanded(null)).toBe(false);
+  });
+
+  it('is said, not asked for, when filex does not (0.55, a vault, a .fxe, switched off)', () => {
+    for (const encrypted of ['folder', 'vault', 'file']) {
+      expect(encryptedNotHanded({ encrypted }), encrypted).toBe(true);
+      expect(encryptedNotHanded({ encrypted, plaintext: false }), encrypted).toBe(true);
+    }
+    expect(encryptedNotHanded({ encrypted: 'vault', plaintext: true }), 'plaintext: true is filex’s word that it hands the file over').toBe(false);
+  });
+
+  it('the words, in both languages', () => {
+    expect(STRINGS.en.encryptedNotHanded).toMatch(/encrypted/);
+    expect(STRINGS.en.encryptedNotHanded).toMatch(/filex 0\.56/);
+    expect(STRINGS.tr.encryptedNotHanded).toMatch(/şifreli/);
+    expect(STRINGS.tr.encryptedNotHanded).not.toBe(STRINGS.en.encryptedNotHanded);
   });
 });
 
