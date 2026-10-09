@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 BRF Tech. Part of filex-office-editor (see README.md and NOTICE).
 //
-// A stand-in for filex 0.55, for the browser measurements (e2e/run.mjs):
+// A stand-in for filex 0.55 (and filex 0.56's co-editing relay, relay.mjs),
+// for the browser measurements (e2e/run.mjs):
 // serves the built bundle (dist/ui) the way filex serves an app's interface
 // - the same address shape, the same headers, the same policy built from
 // the same grant, filex's bootstrap first in every page - and a host page
@@ -21,6 +22,8 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { createRelay } from './relay.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', '..');
@@ -136,6 +139,8 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
   const saves = [];
   /** What the app handed the person (ui.download) or gave filex to print (the ui.print stand-in). */
   const files = [];
+  /** Editing together: filex 0.56's relay, as far as the app sees it (relay.mjs). */
+  const relay = createRelay({ log });
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const origin = `http://${req.headers.host}`;
@@ -146,7 +151,7 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
           // filex's own page names the interfaces by path, never 'self'.
-          'Content-Security-Policy': `default-src 'none'; script-src ${origin}/host.js; style-src 'unsafe-inline'; connect-src ${origin}/__doc/ ${origin}/__save ${origin}/__file; frame-src ${origin}/_appui/; img-src data:`,
+          'Content-Security-Policy': `default-src 'none'; script-src ${origin}/host.js; style-src 'unsafe-inline'; connect-src ${origin}/__doc/ ${origin}/__save ${origin}/__file ${origin}/__co/; frame-src ${origin}/_appui/; img-src data:`,
         });
         res.end(hostHtml);
         return;
@@ -154,6 +159,12 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
       if (p === '/host.js') {
         res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(hostJs);
+        return;
+      }
+      if (p.startsWith('/__co/')) {
+        relay.handle(req, res, url).catch((e) => {
+          if (!res.headersSent) res.writeHead(500).end(String(e?.message ?? e));
+        });
         return;
       }
       if (p.startsWith('/__doc/')) {
@@ -183,8 +194,12 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
             writeFileSync(file, body);
           }
           // enc=1: the host page encrypted it (filex 0.56's encrypted folder).
-          saves.push({ tag, name, n, size: body.length, file, enc: url.searchParams.get('enc') === '1', at: Date.now() });
-          log(`save ${tag} ${name} #${n}: ${body.length} bytes`);
+          // Editing together: a save that carries `through` is written into the log (filex 0.56).
+          const room = url.searchParams.get('room');
+          const through = url.searchParams.get('through');
+          const together = room && through !== null ? relay.saved(room, url.searchParams.get('client') || '', Number(through)) : false;
+          saves.push({ tag, name, n, size: body.length, file, enc: url.searchParams.get('enc') === '1', at: Date.now(), through: through === null ? null : Number(through), together });
+          log(`save ${tag} ${name} #${n}: ${body.length} bytes${through === null ? '' : ` through ${through}`}`);
           res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ saved: true, size: body.length }));
         });
         return;
@@ -260,7 +275,7 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
     }
   });
   return new Promise((resolve) => {
-    server.listen(port, '127.0.0.1', () => resolve({ server, saves, files, origin: `http://127.0.0.1:${server.address().port}` }));
+    server.listen(port, '127.0.0.1', () => resolve({ server, saves, files, relay, origin: `http://127.0.0.1:${server.address().port}` }));
   });
 }
 

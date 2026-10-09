@@ -27,6 +27,14 @@
 // encrypts what the app hands over before it goes to the server - which
 // receives and keeps only that ciphertext. enc=055 is filex 0.55 with the
 // same file: `encrypted: "folder"`, read-only, and its read refused.
+//
+// Editing together (filex 0.56): with ?co=<room>&who=<id>&uname=<name> the
+// page grants files:co-edit and answers coedit.* the way filex 0.56's
+// AppFrame does - through the harness's relay (relay.mjs), which two browser
+// contexts share - and a save that carries `through` goes into the session's
+// log. filex seals the entries; nothing here does, because the app never
+// sees that. Without ?co the coedit.* methods are unknown_method, as in
+// filex 0.55 and older, and the app edits alone.
 'use strict';
 
 (function () {
@@ -41,6 +49,10 @@
   const enc = q.get('enc') || '';
   const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download', 'ui:print', 'files:e2e-plaintext'];
   const without = (q.get('grants') || '').split(',').filter((g) => g.startsWith('-')).map((g) => g.slice(1));
+  const room = q.get('co') || '';
+  const who = q.get('who') || 'a';
+  const personName = q.get('uname') || 'Ayşe Yılmaz';
+  if (room) GRANTS.push('files:co-edit');
   const grants = GRANTS.filter((g) => !without.includes(g));
   const STATE = 'fx-app-state:office-editor';
   const STATE_VALUE_MAX = 8 << 10;
@@ -59,7 +71,7 @@
   if (mode === 'dark') document.documentElement.classList.add('dark');
   document.getElementById('name').textContent = name;
 
-  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], stateSets: 0, ready: false, hostSave: null });
+  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], stateSets: 0, ready: false, hostSave: null, co: { client: '', entries: 0, cursors: 0 } });
 
   // ---- enc=folder: filex 0.56's encrypted folder, its key in this page only.
   const E2E_MAGIC = new TextEncoder().encode('filexe2e');
@@ -164,9 +176,12 @@
       fx.saves.push({ size: r.size, at: Date.now(), encrypted: true });
       return reply(id, { saved: true, size: plain.byteLength });
     }
-    const res = await fetch(`/__save?name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`, { method: 'POST', body: data });
+    let at = `/__save?name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`;
+    // In a session, the save says how far into the log it reaches (filex 0.56 records it).
+    if (room && co.client && typeof params.through === 'number') at += `&room=${encodeURIComponent(room)}&client=${encodeURIComponent(co.client)}&through=${params.through}`;
+    const res = await fetch(at, { method: 'POST', body: data });
     const r = await res.json();
-    fx.saves.push({ size: r.size, at: Date.now() });
+    fx.saves.push({ size: r.size, at: Date.now(), through: typeof params.through === 'number' ? params.through : null });
     reply(id, { saved: true, size: r.size });
   }
 
@@ -213,6 +228,103 @@
     return reply(id, how === 'print' ? { printed: true, size: r.size } : { saved: true, size: r.size });
   }
 
+  // ---- Editing together: filex 0.56's coedit.*, through the harness's relay.
+  const co = { client: '', events: null };
+  const coUrl = (what, extra) => `/__co/${what}?room=${encodeURIComponent(room)}&client=${encodeURIComponent(co.client)}${extra || ''}`;
+
+  /** A refusal as filex's AppFrame says it: the code, and the server's short word. */
+  async function coFail(id, res) {
+    let e = {};
+    try {
+      e = await res.json();
+    } catch {
+      /* no body */
+    }
+    return fail(id, e.error || 'failed', e.message || e.error || 'failed');
+  }
+
+  async function coPost(id, what, params, answer) {
+    const res = await fetch(coUrl(what), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params || {}) });
+    if (!res.ok) return coFail(id, res);
+    const r = await res.json();
+    return reply(id, answer ? answer(r) : null);
+  }
+
+  async function coedit(id, method, params) {
+    if (!room) return fail(id, 'unknown_method');
+    if (!grants.includes('files:co-edit')) return fail(id, 'not_granted');
+    switch (method) {
+      case 'coedit.join': {
+        // filex waits for the base the starter has not put yet (about 20 s).
+        const end = Date.now() + 20000;
+        for (;;) {
+          const res = await fetch(`/__co/join?room=${encodeURIComponent(room)}&who=${encodeURIComponent(who)}&name=${encodeURIComponent(personName)}${readOnly ? '&ro=1' : ''}`, { method: 'POST' });
+          if (res.status === 409 && Date.now() < end) {
+            await new Promise((r) => setTimeout(r, 500));
+            continue;
+          }
+          if (!res.ok) return coFail(id, res);
+          const hello = await res.json();
+          co.client = hello.me.client;
+          fx.co.client = co.client;
+          return reply(id, hello);
+        }
+      }
+      case 'coedit.subscribe': {
+        const from = Math.max(0, Number(params && params.from) || 0);
+        if (co.events) co.events.close();
+        const es = new EventSource(coUrl('events', `&from=${from}`));
+        co.events = es;
+        es.onmessage = (m) => {
+          let v;
+          try {
+            v = JSON.parse(m.data);
+          } catch {
+            return;
+          }
+          if (v.type === 'entry') {
+            fx.co.entries++;
+            port.postMessage({ event: 'coedit.entry', data: v.entry });
+          } else if (v.type === 'cursor') {
+            fx.co.cursors++;
+            port.postMessage({ event: 'coedit.cursor', data: { client: v.client, cursor: v.cursor } });
+          }
+        };
+        return reply(id, null);
+      }
+      case 'coedit.append':
+        return coPost(id, 'append', { kind: params && params.kind, body: params && params.body }, (r) => ({ seq: r.seq }));
+      case 'coedit.lease':
+        return coPost(id, 'lease', { op: params && params.op, changesSeen: params && params.changesSeen }, (r) => ({ granted: r.granted === true }));
+      case 'coedit.cursor':
+        return coPost(id, 'cursor', { cursor: params && params.cursor });
+      case 'coedit.blob.put': {
+        const data = params && params.data;
+        if (!(data instanceof ArrayBuffer)) return fail(id, 'invalid', 'a blob is bytes');
+        const res = await fetch(coUrl('blob', `&name=${encodeURIComponent(String(params.name || ''))}`), { method: 'PUT', body: data });
+        if (!res.ok) return coFail(id, res);
+        return reply(id, null);
+      }
+      case 'coedit.blob.get': {
+        const nm = String((params && params.name) || '');
+        const res = await fetch(coUrl('blob', `&name=${encodeURIComponent(nm)}`));
+        if (!res.ok) return coFail(id, res);
+        const bytes = await res.arrayBuffer();
+        return reply(id, { name: nm, bytes }, [bytes]);
+      }
+      case 'coedit.leave':
+        if (co.events) co.events.close();
+        co.events = null;
+        return coPost(id, 'leave', {});
+    }
+    return fail(id, 'unknown_method');
+  }
+
+  // Closing the page leaves the session (filex drops a member whose page is gone).
+  window.addEventListener('pagehide', () => {
+    if (room && co.client) fetch(coUrl('leave'), { method: 'POST', body: '{}', keepalive: true }).catch(() => {});
+  });
+
   async function onRequest(ev) {
     const m = ev.data;
     if (!m || typeof m !== 'object') return;
@@ -234,7 +346,7 @@
             locale,
             dir: 'ltr',
             theme: { mode, tokens: TOKENS[mode] },
-            user: { name: 'Ayşe Yılmaz' },
+            user: { name: personName },
             files: [
               {
                 index: 0,
@@ -280,6 +392,15 @@
           return handOver(id, params, 'print');
         case 'license.get':
           return reply(id, { status: 'free' });
+        case 'coedit.join':
+        case 'coedit.subscribe':
+        case 'coedit.append':
+        case 'coedit.lease':
+        case 'coedit.cursor':
+        case 'coedit.blob.put':
+        case 'coedit.blob.get':
+        case 'coedit.leave':
+          return coedit(id, method, params);
         default:
           return fail(id, 'unknown_method');
       }

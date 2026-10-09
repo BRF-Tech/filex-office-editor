@@ -49,13 +49,21 @@
 //     it holds decrypts with the folder key to a document holding the typed
 //     text; on filex 0.55 the app says the document is encrypted instead of
 //     asking for it;
+//   - two people on one document, once per engine (filex 0.56's coedit.*,
+//     through the harness's relay stand-in): both editors join the same
+//     session and count two people, what one types reaches the other's
+//     bridge (the same changes), both bridges hold the same locks, a save by
+//     the one who did not type holds the other's text and is written into
+//     the log with how far it reaches (`through`), neither is told
+//     "unsaved changes" while the other may save, and when one leaves the
+//     other counts one again (togetherRun);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted] [--no-together]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -104,6 +112,7 @@ function args(argv) {
     formula: true,
     stop: true,
     encrypted: true,
+    together: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -117,6 +126,7 @@ function args(argv) {
     else if (a === '--no-formula') o.formula = false;
     else if (a === '--no-stop') o.stop = false;
     else if (a === '--no-encrypted') o.encrypted = false;
+    else if (a === '--no-together') o.together = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -918,6 +928,129 @@ async function encryptedRun(browser, server, engine, o) {
   return r;
 }
 
+/**
+ * Once per engine, two people - two browser contexts - on the same document,
+ * through the harness's stand-in for filex 0.56's relay (harness/relay.mjs):
+ *
+ *   - both editors join the one session (the first starts it and puts the
+ *     base, the second opens the base) and each counts two people;
+ *   - what Ayşe types reaches Mehmet's bridge: both hold the same changes;
+ *   - both bridges hold the same locks (every bridge applies the same lock
+ *     requests in the same order);
+ *   - Mehmet saves (filex's Save): the file holds Ayşe's text, and the save
+ *     is written into the log with how far it reaches (`through`), past the
+ *     last change;
+ *   - neither is told "unsaved changes" while the other may save;
+ *   - Mehmet leaves: the log says so, and Ayşe's editor counts one again.
+ */
+async function togetherRun(browser, server, engine) {
+  const doc = 'tr.docx';
+  const room = `room-${engine}`;
+  const r = { engine, doc: `${doc} (two people)`, ok: false, steps: [], problems: [], notes: [] };
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const failures = [];
+  const consoleErrors = [];
+  const people2 = [];
+  const open = async (who, uname) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+    const page = await ctx.newPage();
+    page.on('response', (q) => {
+      if (q.status() >= 400 && !q.url().includes('/__co/join')) failures.push(`${who}: ${q.status()} ${q.url()}`);
+    });
+    page.on('console', (m) => {
+      if (m.type() === 'error') consoleErrors.push(`${who}: ${m.text().slice(0, 300)}`);
+    });
+    page.on('pageerror', (e) => consoleErrors.push(`${who}: pageerror: ${String(e.message ?? e).slice(0, 300)}`));
+    await page.goto(`${server.origin}/?doc=${doc}&locale=tr&tag=${engine}-co-${who}&co=${room}&who=${who}&uname=${encodeURIComponent(uname)}`);
+    await until(`${uname}'s editor to open the document`, async () => {
+      const a = appFrame(page);
+      if (!a) return false;
+      const ph = await a.evaluate(() => document.documentElement.dataset.fxPhase || '');
+      if (ph === 'failed') throw new Error(await a.evaluate(() => document.getElementById('fx-status-text')?.textContent || 'failed'));
+      return ph === 'ready';
+    }, OPEN_MS);
+    const x = { who, uname, ctx, page };
+    people2.push(x);
+    return x;
+  };
+  const bridge = (x, what) => editorFrame(x.page).evaluate((w) => {
+    const b = window.__fxBridge;
+    return b ? b[w]() : null;
+  }, what);
+  try {
+    const a = await open('a', 'Ayşe Yılmaz');
+    step('Ayşe opened');
+    const b = await open('b', 'Mehmet Demir');
+    step('Mehmet opened');
+    for (const x of [a, b]) {
+      if ((await bridge(x, 'together')) !== true) r.problems.push(`${x.uname}'s editor is not editing together`);
+    }
+    const first = server.relay.snapshot(room);
+    r.relayAtStart = first;
+    if (!first || !first.blobs.includes('base')) r.problems.push('the session has no base');
+    if (!first || first.members.length !== 2) r.problems.push(`the session has ${first?.members.length ?? 0} members, not 2`);
+    const ids = await Promise.all([a, b].map((x) => bridge(x, 'people')));
+    if (new Set(ids[0]).size !== ids[0].length) r.problems.push(`two people share an editor user id: ${JSON.stringify(ids[0])}`);
+    await until('each editor to count two people', async () => (await people(a.page, 'docx')).visible === 2 && (await people(b.page, 'docx')).visible === 2, 30_000);
+    step('two people');
+
+    // Ayşe types: her changes reach Mehmet's bridge.
+    await typeInto(a.page, 'docx');
+    step('Ayşe typed');
+    const counts = await until('both bridges to hold the same changes', async () => {
+      const ca = await bridge(a, 'changes');
+      const cb = await bridge(b, 'changes');
+      return ca > 0 && ca === cb ? { a: ca, b: cb } : false;
+    }, 30_000);
+    step('the same changes', counts);
+    await sleep(1500);
+    const la = JSON.stringify(await bridge(a, 'locks'));
+    const lb = JSON.stringify(await bridge(b, 'locks'));
+    r.locks = { a: la.length, b: lb.length };
+    if (la !== lb) r.problems.push('the two bridges hold different locks');
+    step('the same locks');
+
+    // Mehmet saves: the file holds Ayşe's text, and the log says how far the save reaches.
+    const tagB = `${engine}-co-b`;
+    const before = server.saves.filter((x) => x.tag === tagB).length;
+    const answer = await b.page.evaluate(() => window.__fx.hostSave());
+    if (answer?.error) r.problems.push(`Mehmet's Save: ${JSON.stringify(answer.error)}`);
+    const saved = await until("Mehmet's save to write the file", () => server.saves.filter((x) => x.tag === tagB)[before], 60_000);
+    step('saved (Mehmet)', { bytes: saved.size, through: saved.through });
+    if (!documentText(readFileSync(saved.file), 'docx').includes(TYPED)) r.problems.push("Mehmet's save does not hold what Ayşe typed");
+    if (saved.through === null || !saved.together) r.problems.push(`the save was not written into the log (through ${saved.through})`);
+    const afterSave = server.relay.snapshot(room);
+    const savedEntry = afterSave.log.filter((e) => e.kind === 'saved').pop();
+    if (!savedEntry || savedEntry.through < afterSave.changesHead) r.problems.push(`the log's save reaches ${savedEntry?.through ?? 'nothing'}, the last change is ${afterSave.changesHead}`);
+    await until('neither to be told "unsaved changes"', async () => !(await a.page.evaluate(() => window.__fx.dirty)) && !(await b.page.evaluate(() => window.__fx.dirty)), 20_000);
+    step('nothing unsaved');
+
+    // Mehmet leaves: the log says so, Ayşe counts one again.
+    await b.page.close({ runBeforeUnload: true });
+    await until('the log to say Mehmet left', () => server.relay.snapshot(room).log.some((e) => e.kind === 'leave'), 20_000);
+    await until("Ayşe's editor to count one person again", async () => (await people(a.page, 'docx')).visible === 1, 30_000);
+    step('Mehmet left');
+    r.relayAtEnd = server.relay.snapshot(room).log.map((e) => `${e.seq}:${e.kind}:${e.client}`);
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+    for (const x of people2) {
+      try {
+        mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+        if (!x.page.isClosed()) await x.page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-together-${x.who}-FAILED.png`) });
+      } catch {
+        /* the page is gone */
+      }
+    }
+  }
+  for (const x of people2) await x.ctx.close().catch(() => {});
+  r.failures = [...new Set(failures)];
+  r.consoleErrors = [...new Set(consoleErrors)];
+  if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
+  r.ok = r.problems.length === 0;
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -1000,6 +1133,11 @@ async function main() {
       }
       if (o.encrypted) {
         const r = await encryptedRun(browser, server, engine, o);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.together) {
+        const r = await togetherRun(browser, server, engine);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
