@@ -10,17 +10,54 @@
   "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
   "pinned": "2026-10-08",
   "x2t": {
-    "about": "The converter, x2t, built to WebAssembly - for now CryptPad's build, pinned by its release's SHA-512 and its two files' SHA-256; scripts/fetch-x2t.mjs fetches and checks it. Release 0.1.0 carries it; a later release builds its own from ONLYOFFICE core at source_tag, and this entry names that build instead.",
-    "from": "CryptPad's onlyoffice-x2t-wasm (AGPL-3.0-or-later): ONLYOFFICE core with CryptPad's changes, built with emscripten. Its core/ was pulled from Euro-Office's copy of ONLYOFFICE core at v9.3.2.",
-    "repository": "https://github.com/cryptpad/onlyoffice-x2t-wasm",
-    "release": "v9.3.2+3",
-    "commit": "7debf5e6d6d4f19874d764cd34446f7e63c6bc32",
-    "url": "https://github.com/cryptpad/onlyoffice-x2t-wasm/releases/download/v9.3.2%2B3/x2t.zip",
-    "sha512": "ed0579097a0269877d6622b28b1e2718e1f9f4e8ac99301f5f13f5f052b3db24db789deab8c654044db588be103c139be74f83a0ca066dee1789522241c1af6e",
-    "files": {
-      "x2t.js": "e2f79cf6b71d10a7b5db695dcb4043afb1c5e0412520201bf71d6f12f97648d7",
-      "x2t.wasm": "d5e67dec96ad28f0057818cc6f4faf599f1bc982e150efb44e1605dd23a655c2"
+    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs takes a build made elsewhere and checks it the same way. Change it only together with a build that gives the new sums.",
+    "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/; built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
+    "release": "v9.4.0.129+1",
+    "build": {
+      "recipe": {
+        "about": "Where scripts/x2t comes from: CryptPad's Dockerfile and embuild.sh at the release commit, and its changes to ONLYOFFICE core (its core/ at the changes commit, against core v9.3.0.140, the commit that core/ was pulled from), ported to source_tag in scripts/x2t/patches/01-cryptpad-wasm.patch.",
+        "repository": "https://github.com/cryptpad/onlyoffice-x2t-wasm",
+        "release": "v9.3.2+3",
+        "commit": "7debf5e6d6d4f19874d764cd34446f7e63c6bc32",
+        "changes": "v9.3.0+0",
+        "changes_commit": "96886ff143e05471144c4426fb304b4d794370d2"
+      },
+      "toolchain": {
+        "image": "docker.io/emscripten/emsdk:4.0.11",
+        "digest": "sha256:f8a157011b8fa61bdaab875bb1f0f08695229dffe086448d14b53538cae16bd3",
+        "emsdk": "4.0.11",
+        "apt_snapshot": "20261001T000000Z"
+      },
+      "sources": {
+        "core": {
+          "repository": "https://github.com/ONLYOFFICE/core.git",
+          "tag": "v9.4.0.129",
+          "commit": "a016fc2868b9f99f59dd30aa2088e68bbe5104af"
+        },
+        "build_tools": {
+          "repository": "https://github.com/ONLYOFFICE/build_tools.git",
+          "tag": "v9.4.0.129",
+          "commit": "cf4cac0846d03e2e00a6fec5d1ecd4e9463086d5"
+        },
+        "hyphen": {
+          "repository": "https://github.com/hunspell/hyphen.git",
+          "commit": "dcd90f0056cfbcbd2d389b7a13db45ddf5b0b98e"
+        },
+        "openssl": {
+          "repository": "https://github.com/openssl/openssl.git",
+          "tag": "OpenSSL_1_1_1f",
+          "commit": "36eadf1f84daa965041cce410b4ff32cbda4ef08"
+        },
+        "boost": {
+          "url": "https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2",
+          "sha256": "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454"
+        }
+      }
     },
-    "pinned": "2026-10-08"
+    "files": {
+      "x2t.js": "9f2f65ac557470b2895beaa0f9678ee1a998545d49c8b93d67306ff3e7d7fe4b",
+      "x2t.wasm": "8f643075cfad6d2ba7512ddfe918e56b8977f3c106b8dd0cbe74944947248d48"
+    },
+    "pinned": "2026-10-10"
   }
 }
