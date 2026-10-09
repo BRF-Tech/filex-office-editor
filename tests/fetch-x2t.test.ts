@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { X2T_FILES, checkX2tFiles, extractX2t, readX2tPin, validateX2tPin } from '../scripts/fetch-x2t.mjs';
+import { X2T_FILES, checkX2tFiles, extractX2t, packX2t, readX2tPin, validateX2tPin } from '../scripts/fetch-x2t.mjs';
 import { writeZip } from '../scripts/lib/zip.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,6 +34,13 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     expect(x2t.build.toolchain.image).toBe(`docker.io/emscripten/emsdk:${x2t.build.toolchain.emsdk}`);
   });
 
+  it("names the zip this version's release attaches, with its SHA-512", () => {
+    const x2t = readX2tPin();
+    const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+    expect(x2t.url).toBe(`https://github.com/BRF-Tech/filex-office-editor/releases/download/v${version}/x2t.zip`);
+    expect(x2t.sha512).toMatch(/^[0-9a-f]{128}$/);
+  });
+
   it('names the toolchain the Dockerfile builds from, by the same digest and snapshot', () => {
     const t = readX2tPin().build.toolchain;
     const dockerfile = readFileSync(path.join(ROOT, 'scripts', 'x2t', 'Dockerfile'), 'utf8');
@@ -49,12 +56,14 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, core: { ...sources.core, commit: 'v9.4.0.129' } } } })).toThrow(/core\.commit/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, toolchain: { ...good.build.toolchain, digest: 'latest' } } })).toThrow(/digest/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, boost: { ...sources.boost, sha256: '' } } } })).toThrow(/boost\.sha256/);
-    expect(() => validateX2tPin({ ...good, url: 'https://github.com/a/b/releases/download/v1/x2t.zip' })).toThrow(/sha512/);
+    expect(() => validateX2tPin({ ...good, sha512: undefined })).toThrow(/sha512/);
+    expect(() => validateX2tPin({ ...good, url: 'https://example.com/x2t.zip' })).toThrow(/url/);
+    expect(validateX2tPin({ ...good, url: undefined, sha512: undefined }).files).toEqual(good.files);
     expect(() => validateX2tPin({ ...good, build: undefined })).toThrow(/build/);
   });
 
   it('checks the two files, and a zip of them (with its SHA-512 when one is pinned)', () => {
-    const good = readX2tPin();
+    const good = { ...readX2tPin(), url: undefined, sha512: undefined };
     const files = { 'x2t.js': sha256('js'), 'x2t.wasm': sha256('wasm') };
     const pinned = { ...good, files };
     expect(() => checkX2tFiles({ 'x2t.js': Buffer.from('js'), 'x2t.wasm': Buffer.from('other') }, pinned)).toThrow(/x2t\.wasm: SHA-256/);
@@ -68,6 +77,10 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     const sha512 = createHash('sha512').update(zip).digest('hex');
     expect(() => extractX2t(zip, { ...pinned, sha512: 'a'.repeat(128) })).toThrow(/SHA-512/);
     expect(extractX2t(zip, { ...pinned, sha512 })['x2t.js'].toString()).toBe('js');
+    // --pack writes the same zip from the same files, and refuses others.
+    const packed = packX2t({ 'x2t.js': Buffer.from('js'), 'x2t.wasm': Buffer.from('wasm') }, pinned);
+    expect(Buffer.from(packed).equals(Buffer.from(zip))).toBe(true);
+    expect(() => packX2t({ 'x2t.js': Buffer.from('js'), 'x2t.wasm': Buffer.from('other') }, pinned)).toThrow(/x2t\.wasm: SHA-256/);
   });
 });
 

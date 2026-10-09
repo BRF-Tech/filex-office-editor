@@ -10,7 +10,7 @@
   "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
   "pinned": "2026-10-08",
   "x2t": {
-    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs takes a build made elsewhere and checks it the same way. Change it only together with a build that gives the new sums.",
+    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: the zip release 0.1.1 attaches, made by fetch-x2t.mjs --pack in the pinned Node image) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
     "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/; built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
     "release": "v9.4.0.129+1",
     "build": {
@@ -58,6 +58,8 @@
       "x2t.js": "9f2f65ac557470b2895beaa0f9678ee1a998545d49c8b93d67306ff3e7d7fe4b",
       "x2t.wasm": "8f643075cfad6d2ba7512ddfe918e56b8977f3c106b8dd0cbe74944947248d48"
     },
+    "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.1.1/x2t.zip",
+    "sha512": "4a5ba87a9ba72e91885823a2019ed507f86244f1b658dba63f5e43771980c105c7305ac729b3cbce32c04cb5f22320b209376bc70eb6f1cb622ae86bc9f77335",
     "pinned": "2026-10-10"
   }
 }
