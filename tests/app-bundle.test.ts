@@ -44,15 +44,16 @@ describe('the manifest and the locked editor files', () => {
     // filex refuses a manifest with a field it does not know
     // (wasmplugin.ParseManifest, DisallowUnknownFields) and a permission it
     // does not know (ParsePermission). 0.56 knows encrypted folders
-    // (`encrypted_folders`, the derived files:e2e-plaintext); editing
-    // together is not there yet, so 0.2.0 does not ask for it.
+    // (`encrypted_folders`, the derived files:e2e-plaintext) and editing
+    // together (files:co-edit), so the manifest asks for filex 0.56.
     const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'ui', 'encrypted_folders', 'views', 'new_documents'];
     expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
     expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
     // files:e2e-plaintext is derived from encrypted_folders: filex refuses
     // it written into `permissions`.
-    expect(manifest.permissions).toEqual(['files:read', 'files:write']);
+    expect(manifest.permissions).toEqual(['files:read', 'files:write', 'files:co-edit']);
     expect(manifest.filex).toBe('>=0.56.0');
+    for (const lang of ['en', 'tr']) expect(manifest.permission_reasons['files:co-edit']?.[lang], lang).toBeTruthy();
     const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     expect(manifest.version).toBe(version);
     expect(manifest.ui.bundle.url).toBe(`https://github.com/BRF-Tech/filex-office-editor/releases/download/v${version}/ui.zip`);
