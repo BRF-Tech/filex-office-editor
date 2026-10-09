@@ -64,7 +64,7 @@ import {
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
-import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type Kind, type View } from './config';
+import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type EncryptionInfo, type Kind, type View } from './config';
 import { coeditApi } from './coedit-client';
 import { STRINGS, type Strings } from './strings';
 import { Together, joinSession } from './together';
@@ -575,7 +575,9 @@ async function main(): Promise<void> {
   // `canEdit: false`, refuses whatever they would write, and the editor shows
   // the others' changes as they land (bridge.ts liveViewerSupport). With
   // nobody editing it there is nothing to watch, and it opens alone, as it is.
-  const canTogether = grants.includes('files:co-edit');
+  // A vault is one person's at a time: its document is never edited
+  // together (filex refuses the join there too).
+  const canTogether = grants.includes('files:co-edit') && (info as EncryptionInfo).encrypted !== 'vault';
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
