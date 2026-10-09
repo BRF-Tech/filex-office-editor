@@ -3,10 +3,14 @@
 The office editor app for [filex](https://github.com/BRF-Tech/filex), based
 on ONLYOFFICE Docs: ONLYOFFICE's editor in the browser, **without a Document
 Server**. Word, Excel and PowerPoint documents (and their OpenDocument kin)
-open in the editor in place of filex's preview, alone or with other people -
-and also **inside encrypted folders**, where the document is decrypted in
-the browser, edited there and encrypted again before it is saved, so no
-server ever reads it.
+open in the editor in place of filex's preview, and saving writes a new
+version of the file. Nothing of the editor runs on the server: its files come
+from the app's package and the document is converted in the browser.
+
+The design goes further - documents **inside encrypted folders**, decrypted
+in the browser, edited there and encrypted again before they are saved, and
+**editing together** through filex's relay - and those come with later
+releases, as filex gains what they need ([Roadmap](#roadmap)).
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -21,33 +25,55 @@ server ever reads it.
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: prototype, not installable.** This repository holds the part of
-> the design that runs next to the editor - the bridge that stands in for the
-> Document Server, the Document Server's lock rules, a socket.io stand-in and
-> the x2t driver - with their unit tests, and the builds of the two large
-> pieces: the [editor bundle](#the-editor-bundle), taken from ONLYOFFICE's
-> official image, and the pinned [x2t WebAssembly build](#x2t-the-converter).
-> The app's page and the release bundle come with the next steps, and the
-> app needs platform features filex gains in 0.55
-> ([What filex provides](#what-filex-provides)). `filex-app.json` is a draft.
-> The first release, 0.1.0, brings all of it at once ([Roadmap](#roadmap)).
+> **Status: 0.1.0, the first release.** One person edits a document in a
+> folder that is not encrypted and saves it as a new version; Download as
+> and Print go through filex; the editor's settings are kept; New document
+> gets three rows; on a phone the document opens in ONLYOFFICE's phone view
+> to read, with "Edit". Measured in a real filex 0.55.0
+> ([Measured in filex 0.55](#measured-in-filex-055)). filex 0.55 opens no
+> app on an encrypted file, so in an encrypted folder filex keeps its own
+> read-only preview.
 
 | | |
 |---|---|
-| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built from ONLYOFFICE core (for now CryptPad's build, pinned under `x2t` in the same file) - see [NOTICE](NOTICE) |
-| filex | **0.55.0** or later (draft: `"filex": ">=0.55.0"`) |
+| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built from ONLYOFFICE core (in 0.1.0 CryptPad's build, pinned under `x2t` in the same file) - see [NOTICE](NOTICE) |
+| filex | **0.55.0** or later (`"filex": ">=0.55.0"`) |
+| Release | **0.1.0** (tag `v0.1.0`): `ui.zip`, 98.2 MiB, SHA-256 `61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6` ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
+
+## Installing
+
+In filex 0.55.0 or later, as an administrator: **Admin → Plugins → Apps →
+Install an app → GitHub repository**, `BRF-Tech/filex-office-editor`, tag
+`v0.1.0`. filex reads `filex-app.json` at that tag, downloads the release's
+`ui.zip` and refuses it unless its SHA-256 is the one the manifest names.
+The review lists what the app asks for: `files:read` and `files:write` (the
+file it was opened with, and its new versions), and what its interface is
+allowed - its own package, frames of its own package, `blob:` addresses it
+made, the script-policy exceptions ONLYOFFICE's editor and x2t need
+(`ui:eval`, `ui:wasm-eval`), handing the person a file (`ui:download`) and
+a PDF to print (`ui:print`), the six kinds it opens and the three rows it
+adds to New document. A store that lists the app installs the same release
+through the same review. On a server that downloads nothing, **Upload
+files** with the release's `filex-app.json` and `ui.zip` does the same.
+
+Once installed, a `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods` or `.odp`
+opens in the editor, and **New → New document** offers a document, a
+spreadsheet and a presentation under Apps.
 
 ## What it is for
 
 - **filex without a Document Server.** filex edits office documents through
   an ONLYOFFICE Document Server it is connected to. An instance without one
   installs this app and edits them in the browser instead.
-- **Encrypted folders.** A Document Server reads the document it edits, so
-  filex never offers it in an encrypted folder: there a document opens
-  read-only today. With this app the document stays a docx, xlsx or pptx
-  encrypted in the folder; only the browsers of the people editing it ever
-  hold it in the clear.
+- **Encrypted folders** (a later release, [Roadmap](#roadmap)). A Document
+  Server reads the document it edits, so filex never offers it in an
+  encrypted folder: there a document opens read-only. With this app the
+  document is to stay a docx, xlsx or pptx encrypted in the folder, and only
+  the browsers of the people editing it hold it in the clear. That needs a
+  filex that hands an app the plaintext of a file in an encrypted folder
+  (`files:e2e-plaintext`); filex 0.55 refuses every app at the door of an
+  encrypted file.
 
 ## How it works
 
@@ -69,12 +95,12 @@ This app gives the editor all of that in the browser:
   answers every message the way the Document Server does (Docs 9.4,
   `DocsCoServer.js`); whatever the other people need - a batch of changes, a
   lock request, a released lock - goes into the session's log. With one
-  person (`src/session.ts`) the log stays in the page; editing together,
-  filex seals each entry and sends it through its relay, which puts the
-  sealed entries in one order without reading them, and every editor's
-  bridge applies the same entries in the same order with the Document
-  Server's lock rules (`src/locks.ts`), so the first request for a paragraph
-  or a range wins everywhere.
+  person (`src/session.ts`, what 0.1.0 runs) the log stays in the page.
+  Editing together (a later release), filex is to seal each entry and send
+  it through its relay, which puts the sealed entries in one order without
+  reading them, and every editor's bridge applies the same entries in the
+  same order with the Document Server's lock rules (`src/locks.ts`), so the
+  first request for a paragraph or a range wins everywhere.
 - **The conversion** runs in the browser: x2t, ONLYOFFICE's converter,
   compiled to WebAssembly, in a worker (`src/x2t.ts` drives it).
 
@@ -98,7 +124,10 @@ filex page (keys, network)        the app: two sandboxed pages (this repository)
 ```
 
 The app never holds a key and never touches the network: filex hands it the
-document and seals what it sends. filex never runs the editor's code.
+document and seals what it sends. filex never runs the editor's code. In
+0.1.0 the left column is the plain one - filex reads and saves a file that
+is not encrypted, and there is no relay; the sealed path is the design the
+later releases follow.
 
 This is the model [CryptPad](https://github.com/cryptpad/cryptpad) uses for
 its office documents, measured against a Document Server 9.4 before it was
@@ -120,22 +149,23 @@ sees - is filex's
 The half of the protocol filex owns is MIT and lives in filex: the relay
 (`backend/internal/e2eoffice`), the session keys and the log reader
 (`packages/core/src/lib/e2eoffice.ts`), who saves when
-(`e2eofficeSave.ts`). Running this app also needs platform features filex
-does not have yet. Their names below are proposals; filex decides them.
+(`e2eofficeSave.ts`). Running the app needs platform features filex 0.55
+added for it (0.1.0 uses them); encrypted folders and editing together need
+more, which later filex releases bring.
 
-| The app needs | filex today | Proposed (filex 0.55) |
+| The app needs | filex 0.55 | Used by |
 |---|---|---|
-| ONLYOFFICE's `DocsAPI.DocEditor` opens the editor page in a frame of its own | `frame-src 'none'` | `ui.frame_package` → permission `ui:frame-package`: frames from the app's own package only, in the same sandbox |
-| The editor page may be framed by the app page | package pages carry `frame-ancestors *` | ⚠ **measured, Chromium:** `*` never matches an opaque origin, so the editor page is refused ("Framing ... violates frame-ancestors *"); a package page needs no `frame-ancestors` at all (filex's own page decides what it frames) |
-| The editor loads the document from a `blob:` address | `connect-src 'none'` or the package | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` |
-| The plaintext of a document in an encrypted folder | apps are never given one | `files:e2e-plaintext`: the explorer decrypts and hands the bytes over, encrypts the save (a conditional write); a separate permission with a stern warning in the review |
-| Editing together | - | `files:co-edit`: the relay's routes and WebSocket, its tables, the sealed blob store, and a bridge method for the app to append and read the log |
+| ONLYOFFICE's `DocsAPI.DocEditor` opens the editor page in a frame of its own | `ui.frame_package` → permission `ui:frame-package`: frames from the app's own package only, in the same sandbox | 0.1.0 |
+| The editor page may be framed by the app page | a package page carries no `frame-ancestors` (⚠ measured in Chromium before 0.55: `*` never matches an opaque origin, and the editor page was refused) | 0.1.0 |
+| The editor loads the document from a `blob:` address | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` | 0.1.0 |
+| The plaintext of a document in an encrypted folder | not given: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`) | a later release, with filex's `files:e2e-plaintext`: the explorer decrypts and hands the bytes over, encrypts the save (a conditional write); a separate permission with a stern warning in the review |
+| Editing together | the SDK's `coedit.*` methods are defined, and answer `unavailable`: the relay has no routes yet | a later release, with filex's `files:co-edit`: the relay's routes and WebSocket, its tables, the sealed blob store |
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
-| Print | nothing: a sandboxed frame without `allow-modals` may not open the browser's print dialog (measured: in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox, while in the host page both print; headless WebKit prints from neither, so it is unmeasured there) | **in filex 0.55:** `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`) and filex prints it from its own print page (`/_print/`: a frame of a `blob:` PDF, the browser's print dialog), on a gesture or after asking - the same kind of grant as `ui:download`. `filex-app.json` asks for it; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
-| No inline scripts | `script-src` is the package only | in the app: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (measured: 97.7 MiB zipped with x2t and the phone apps, 2,633 files, 323.4 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | serving the package's files compressed (`Content-Encoding`), cached by version |
+| Print (a sandboxed frame without `allow-modals` may not open the browser's print dialog: measured, in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox) | `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`), filex asks the person every time, and its own print page (`/_print/`, a frame of a `blob:` PDF) opens the print dialog on their Allow | 0.1.0; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
+| No inline scripts | `script-src` is the package only | 0.1.0: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
+| A large package (0.1.0: 98.2 MiB zipped with x2t and the phone apps, 2,633 files, 323.4 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | a later filex: serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -163,7 +193,7 @@ does not have yet. Their names below are proposals; filex decides them.
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
-| `filex-app.json` | The app's manifest - a **draft** until the platform features above exist |
+| `filex-app.json` | The app's manifest: what filex 0.55 installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.55's fields and permissions |
 
 ```bash
 npm install
@@ -235,7 +265,7 @@ the per-theme thumbnails out, below):
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
 | The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
 | **The editor bundle** | **2,623** | **286.1** | **88.5** |
-| **The app's bundle** (`ui.zip`: with x2t, 37.1 MiB unpacked, and the app) | **2,633** | **323.4** | **97.7** |
+| **The app's bundle** (`ui.zip` of 0.1.0: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image) | **2,633** | **323.4** | **98.2** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
@@ -299,7 +329,8 @@ in the bundle says so.
 
 The converter is pinned under `x2t` in `upstream/onlyoffice.json`. Until
 this project builds its own from ONLYOFFICE core at the editor's tag (a
-requirement for 0.1.0), it is **CryptPad's build**:
+later release, [Roadmap](#roadmap)), it is - in 0.1.0 too - **CryptPad's
+build**:
 [onlyoffice-x2t-wasm](https://github.com/cryptpad/onlyoffice-x2t-wasm)
 `v9.3.2+3` (AGPL-3.0-or-later), pinned like CryptPad pins it, by the
 release's SHA-512, and by each file's SHA-256. `node scripts/fetch-x2t.mjs`
@@ -355,6 +386,32 @@ installs, `dist/ui.zip` (and the tree, `dist/ui/`): the editor files from
 with esbuild (pinned in `package-lock.json`); the app page; `LICENSE` and
 `NOTICE`. It checks filex's limits, that the app page has no inline code
 and that every file `filex-app.json` names is in it.
+
+### Building a release
+
+A release's `ui.zip` is built from its tag with docker alone, every step
+pinned - the Document Server image and the Node image by digest, the npm
+packages by `package-lock.json`, x2t by its hashes - so anyone can make the
+same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
+
+```bash
+git clone --branch v0.1.0 https://github.com/BRF-Tech/filex-office-editor
+cd filex-office-editor
+bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
+docker run --rm -v "$PWD:/src" -w /src \
+  docker.io/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 \
+  sh -c 'npm ci && node scripts/fetch-x2t.mjs && node scripts/build-app.mjs'
+sha256sum dist/ui.zip                 # the value in filex-app.json
+```
+
+Measured for 0.1.0 (2026-10-09, an x86-64 Linux machine): two complete
+builds in two fresh checkouts, from the image to the zip, gave the same
+`ui.zip` - 102,979,682 bytes, 2,633 files, SHA-256
+`61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6` - and the
+same `editor.zip` as the lock file (`ce74fb00...e3be116`); about two minutes
+each. The release attaches that `ui.zip`; the repository does not carry it.
+The bundle names its version in the legal line under the editor, so a
+release's source is the tag the line links to.
 
 Under filex both pages of the app are sandboxed, each an opaque origin of
 its own (`sandbox allow-scripts`): neither can reach into the other, a
@@ -475,8 +532,8 @@ for them like the editor's (`src/frame/hold.ts`).
 `npm run e2e` (`node e2e/run.mjs`, `--shots` for screenshots) serves the
 built bundle the way filex 0.55 serves an app's interface - the address
 shape, the headers and the policy built from the grant
-(`backend/internal/wasmplugin/uipolicy.go` on filex's branch
-`feat/189-p1-app-frame`), filex's bootstrap first in every page - with a
+(`backend/internal/wasmplugin/uipolicy.go`, as filex 0.55 has it), filex's
+bootstrap first in every page - with a
 host page that draws the sandboxed frame and answers the app's bridge the
 way filex's `AppFrame` does (`e2e/harness/`: `state.get/set` with filex
 0.54's limits, `ui.download`, and `ui.print` as filex 0.55 checks it - the
@@ -553,10 +610,43 @@ attribute away there); and filex's bootstrap makes
 (`src/frame/hold.ts`) defines its `appendChild` on `<body>` instead of
 assigning it. The phone app draws the page fitted to the screen; the
 editor after "Edit" shows its "New" hints to a person who has not closed
-them yet, as on a computer. The harness differs from filex 0.55 in one line, on
-purpose: it sends no `frame-ancestors` (see
+them yet, as on a computer. Like filex 0.55, the harness sends no
+`frame-ancestors` on a package page (see
 [What filex provides](#what-filex-provides); `FX_FRAME_ANCESTORS=star`
-puts it back and Chromium refuses the editor page).
+puts back the `frame-ancestors *` filex sent before, and Chromium refuses the
+editor page).
+
+## Measured in filex 0.55
+
+The release, measured in the real thing (2026-10-09): filex 0.55.0's own
+image (`ghcr.io/brf-tech/filex:v0.55.0`) in a throwaway container on an
+x86-64 Linux machine, a local storage, the app installed with the
+administrator's API exactly as the wizard does it (`POST
+/api/admin/app-plugins` with the release's `filex-app.json` and `ui.zip`, a
+dry run first, then the install granting what the review listed), and
+English documents - a report with a table, a budget with formulas, a
+roadmap slide - opened from the explorer by a double-click in Playwright
+1.59 (Chromium 147, Firefox 148, WebKit 26.4; headless, 1440 x 900, English
+interface).
+
+| | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| The install: dry run, review, install | 200, 19 rows (`files:read`, `files:write` and the 17 the `ui` block, the viewers and the New rows derive), `compat` ok for 0.55.0; installed `running`, its `ui.zip` SHA-256 checked against the manifest's | - | - |
+| docx, xlsx, pptx open in the editor in place of the preview (from the explorer's load, a 0.7 s pause before the double-click included) | 2.1-2.4 s | 3.4-3.9 s | 4.6-5.0 s |
+| Typed text, Ctrl+S in the editor: filex's save answers 200, the file on disk holds the text and what it held, the bytes it replaced are a version (`.versions/<node>/<n>`) | 3/3 | 3/3 | 3/3 |
+| The legal line under the editor names the source at `/tree/v0.1.0` | yes | yes | yes |
+| Download as (File menu, ODT): the file comes to the person | filex opens Chromium's save dialog (`showSaveFilePicker`), which a headless run cannot answer: not measured | `Quarterly report.odt` | `Quarterly report.odt` |
+| Print (the editor's Print): filex asks ("Office editor (office-editor) wants to print “Quarterly report.pdf”."), Allow, the question goes | yes | yes | yes |
+| The "New" hints closed in one opening do not show in the next (the settings kept in filex's store) | yes | yes | yes |
+| New document: the dialog's Apps group offers Document (.docx), Spreadsheet (.xlsx), Presentation (.pptx); the new docx opens in the editor, typed text saves (200) | yes | not measured | not measured |
+| A phone (390 x 844, touch, Chromium's Pixel 7): the phone app opens the docx to read, with "Edit"; "Edit" opens the folded editor, a save answers 200; "Reading view" goes back with the saved text | yes | not measured | not measured |
+| Requests outside filex / failed requests | 0 / 0 | 0 / 0 | 0 / 1: filex's print page's `blob:` PDF frame ("Frame load interrupted", headless WebKit hands the PDF over as a download) |
+
+The manifest drafted before 0.1.0 is what filex 0.55 refuses, measured the
+same way: `400 manifest_invalid`, `json: unknown field "encrypted_folders"`;
+without that block, `unknown permission "files:e2e-plaintext"`. 0.1.0 asks
+for neither. On a phone, filex's viewer keeps its previous and next buttons
+beside the app, so the app's frame is about 306 px wide at 390 px.
 
 ## Keeping up with ONLYOFFICE
 
@@ -590,34 +680,39 @@ put the new release in `upstream/onlyoffice.json`, run
 
 ## Roadmap
 
-The first release, **0.1.0**, brings all of the following at once - there
-is no earlier, partial release:
+**0.1.0** (2026-10-09, filex 0.55.0 or later) is what works today:
 
-1. The editor bundle: ONLYOFFICE web-apps + sdkjs from the official Document
-   Server image (`upstream/onlyoffice.json`), without help pages,
-   dictionaries and the PDF and diagram editors; inline scripts moved to
-   files - **built** ([The editor bundle](#the-editor-bundle)).
-2. x2t built to WebAssembly from ONLYOFFICE core at the same version, run
-   in a Worker - CryptPad's build is **pinned, passes the round trips and
-   runs in the app's worker** ([x2t, the converter](#x2t-the-converter));
-   this project's own build replaces it before 0.1.0.
-3. The app's page: the editor frame, the port to filex, a single person
-   editing (also in an unencrypted folder), saving as a new version -
-   **built and measured in Chromium, Firefox and WebKit** against a
-   stand-in for filex 0.55 ([The app](#the-app),
-   [Measured in the browsers](#measured-in-the-browsers)), with Download as
-   and Print through x2t, the editor's settings kept between openings and
-   one person counting one, and on a phone ONLYOFFICE's phone app to read
-   with "Edit" to the folded editor (**built and measured** in the three
-   browsers: [On a phone](#on-a-phone)); still to come: the measurements in
-   filex 0.55 itself, with filex's `ui.print` printing for real.
-4. Encrypted folders (filex's `files:e2e-plaintext`).
-5. Editing together (filex's `files:co-edit` and the relay).
-6. A release bundle pinned by its SHA-256, the legal notice in the editor,
-   the store listing.
+1. The editor bundle from ONLYOFFICE's official Document Server image
+   (`upstream/onlyoffice.json`), the three editors and their phone apps,
+   inline scripts moved to files ([The editor bundle](#the-editor-bundle)).
+2. x2t in a worker: CryptPad's WebAssembly build, pinned
+   ([x2t, the converter](#x2t-the-converter)).
+3. The app: one person editing a document in a folder that is not
+   encrypted, saving it as a new version; Download as and Print through
+   filex; the editor's settings kept between openings; New document rows;
+   on a phone, ONLYOFFICE's phone app to read with "Edit" to the folded
+   editor; the legal notice ([The app](#the-app)).
+4. A release bundle anyone can rebuild to the same SHA-256
+   ([Building a release](#building-a-release)), measured in the three
+   browsers against a stand-in for filex
+   ([Measured in the browsers](#measured-in-the-browsers)) and in filex
+   0.55 itself ([Measured in filex 0.55](#measured-in-filex-055)).
 
-The platform features it needs ([What filex provides](#what-filex-provides))
-come with filex 0.55.
+Next - the numbers are a plan, and each waits for what filex has to give it
+([What filex provides](#what-filex-provides)):
+
+- **0.2.0, encrypted folders**: one person editing a document in an
+  encrypted folder, with filex's `files:e2e-plaintext` (the explorer
+  decrypts the document for the app and encrypts what it saves; planned for
+  filex 0.56).
+- **0.3.0, editing together**: several people in one document, in an
+  encrypted folder or a plain one, through filex's relay and its
+  `files:co-edit` (planned for filex 0.57 or later).
+- **In any release before those**: this project's own x2t, built from
+  ONLYOFFICE core at the editor's tag in place of CryptPad's build (it also
+  decides whether txt and csv can be offered); a corpus of real documents
+  compared with what a Document Server makes of them; and, when filex serves
+  an app's package compressed, a lighter download for the browser.
 
 ## License
 
