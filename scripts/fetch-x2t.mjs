@@ -21,13 +21,19 @@
 //   node scripts/fetch-x2t.mjs --dir DIR        x2t.js and x2t.wasm from DIR (still checked)
 //   node scripts/fetch-x2t.mjs --from x2t.zip   a zip already here (still checked)
 //   node scripts/fetch-x2t.mjs --out DIR        somewhere other than dist/x2t
+//   node scripts/fetch-x2t.mjs --pack x2t.zip   then the zip a release attaches (its
+//                                               SHA-512 is what the pin's "sha512" names)
+//
+// The zip is written the way the app's bundle is (scripts/lib/zip.mjs: sorted,
+// one date, deflate level 9), so in the pinned Node image (README.md,
+// "Building a release") it comes out byte for byte the same.
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readZip } from './lib/zip.mjs';
+import { readZip, writeZip } from './lib/zip.mjs';
 import { PIN_FILE } from './upstream-watch.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -106,6 +112,12 @@ export function extractX2t(zip, x2t) {
   return checkX2tFiles(out, x2t);
 }
 
+/** The zip of the build a release attaches: the two files, checked first. */
+export function packX2t(files, x2t) {
+  checkX2tFiles(files, x2t);
+  return writeZip(X2T_FILES.map((name) => ({ name, data: files[name] })));
+}
+
 /** Whether dir already holds the pinned build. */
 export function x2tInPlace(dir, x2t) {
   try {
@@ -130,16 +142,25 @@ async function main() {
   const argv = process.argv.slice(2);
   let from = null;
   let fromDir = null;
+  let pack = null;
   let dir = X2T_DEFAULT_DIR;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--from') from = argv[++i];
     else if (argv[i] === '--dir') fromDir = path.resolve(argv[++i]);
     else if (argv[i] === '--out') dir = path.resolve(argv[++i]);
-    else throw new Error(`usage: node scripts/fetch-x2t.mjs [--dir DIR | --from x2t.zip] [--out DIR]`);
+    else if (argv[i] === '--pack') pack = path.resolve(argv[++i]);
+    else throw new Error(`usage: node scripts/fetch-x2t.mjs [--dir DIR | --from x2t.zip] [--out DIR] [--pack x2t.zip]`);
   }
   const x2t = readX2tPin();
+  const packIt = () => {
+    if (!pack) return;
+    const zip = packX2t(Object.fromEntries(X2T_FILES.map((f) => [f, readFileSync(path.join(dir, f))])), x2t);
+    writeFileSync(pack, zip);
+    console.log(`x2t ${x2t.release}: ${path.relative(process.cwd(), pack) || pack}, ${zip.length} bytes, SHA-512 ${createHash('sha512').update(zip).digest('hex')}`);
+  };
   if (!from && !fromDir && x2tInPlace(dir, x2t)) {
     console.log(`x2t ${x2t.release}: already in ${path.relative(process.cwd(), dir) || '.'}`);
+    packIt();
     return;
   }
   let files;
@@ -161,6 +182,7 @@ async function main() {
   writeFileSync(path.join(dir, '.version'), `${x2t.release}\n`);
   const sizes = X2T_FILES.map((f) => `${f} ${files[f].length} bytes`).join(', ');
   console.log(`x2t ${x2t.release}: both files' SHA-256 match the pin; ${sizes} -> ${path.relative(process.cwd(), dir) || '.'}`);
+  packIt();
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
