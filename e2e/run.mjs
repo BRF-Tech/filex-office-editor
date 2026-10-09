@@ -952,7 +952,7 @@ async function togetherRun(browser, server, engine) {
   const failures = [];
   const consoleErrors = [];
   const people2 = [];
-  const open = async (who, uname) => {
+  const open = async (who, uname, extra = '', coRoom = room) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
     const page = await ctx.newPage();
     page.on('response', (q) => {
@@ -962,7 +962,7 @@ async function togetherRun(browser, server, engine) {
       if (m.type() === 'error') consoleErrors.push(`${who}: ${m.text().slice(0, 300)}`);
     });
     page.on('pageerror', (e) => consoleErrors.push(`${who}: pageerror: ${String(e.message ?? e).slice(0, 300)}`));
-    await page.goto(`${server.origin}/?doc=${doc}&locale=tr&tag=${engine}-co-${who}&co=${room}&who=${who}&uname=${encodeURIComponent(uname)}`);
+    await page.goto(`${server.origin}/?doc=${doc}&locale=tr&tag=${engine}-co-${who}&co=${coRoom}&who=${who}&uname=${encodeURIComponent(uname)}${extra}`);
     await until(`${uname}'s editor to open the document`, async () => {
       const a = appFrame(page);
       if (!a) return false;
@@ -995,15 +995,27 @@ async function togetherRun(browser, server, engine) {
     await until('each editor to count two people', async () => (await people(a.page, 'docx')).visible === 2 && (await people(b.page, 'docx')).visible === 2, 30_000);
     step('two people');
 
-    // Ayşe types: her changes reach Mehmet's bridge.
+    // Zeynep may only read the file: she joins as a watcher (filex 0.56).
+    const w = await open('w', 'Zeynep Kaya', '&ro=1');
+    step('Zeynep opened (watching)');
+    if ((await bridge(w, 'together')) !== true) r.problems.push("Zeynep's editor is not following the session");
+
+    // Ayşe types: her changes reach Mehmet's bridge, and the watcher's.
     await typeInto(a.page, 'docx');
     step('Ayşe typed');
-    const counts = await until('both bridges to hold the same changes', async () => {
+    const counts = await until('the three bridges to hold the same changes', async () => {
       const ca = await bridge(a, 'changes');
       const cb = await bridge(b, 'changes');
-      return ca > 0 && ca === cb ? { a: ca, b: cb } : false;
+      const cw = await bridge(w, 'changes');
+      return ca > 0 && ca === cb && ca === cw ? { a: ca, b: cb, w: cw } : false;
     }, 30_000);
     step('the same changes', counts);
+    const watcher = server.relay.snapshot(room).members.find((m) => m.name === 'Zeynep Kaya');
+    if (!watcher || watcher.canEdit) r.problems.push('the watcher is not a member that may not write');
+    else if (server.relay.snapshot(room).log.some((e) => e.client === watcher.client && e.kind !== 'join')) r.problems.push('the watcher wrote into the log');
+    await w.page.close({ runBeforeUnload: true });
+    await until('the log to say Zeynep left', () => server.relay.snapshot(room).log.some((e) => e.kind === 'leave' && e.client === watcher?.client), 20_000);
+    step('Zeynep left');
     await sleep(1500);
     const la = JSON.stringify(await bridge(a, 'locks'));
     const lb = JSON.stringify(await bridge(b, 'locks'));
@@ -1028,10 +1040,16 @@ async function togetherRun(browser, server, engine) {
 
     // Mehmet leaves: the log says so, Ayşe counts one again.
     await b.page.close({ runBeforeUnload: true });
-    await until('the log to say Mehmet left', () => server.relay.snapshot(room).log.some((e) => e.kind === 'leave'), 20_000);
+    await until('the log to say Mehmet left', () => server.relay.snapshot(room).log.filter((e) => e.kind === 'leave').length >= 2, 20_000);
     await until("Ayşe's editor to count one person again", async () => (await people(a.page, 'docx')).visible === 1, 30_000);
     step('Mehmet left');
     r.relayAtEnd = server.relay.snapshot(room).log.map((e) => `${e.seq}:${e.kind}:${e.client}`);
+
+    // A person who may only read a document nobody is editing: nothing to
+    // follow, it opens as it is (filex 0.56: a watcher starts no session).
+    const alone = await open('v', 'Can Aydın', '&ro=1', `${room}-nobody`);
+    if ((await bridge(alone, 'together')) !== false) r.problems.push('a watcher started a session nobody edits');
+    step('a reader alone');
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));
     for (const x of people2) {

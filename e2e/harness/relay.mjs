@@ -106,6 +106,12 @@ export function createRelay({ log = () => {} } = {}) {
       const name = url.searchParams.get('name') || who;
       const canEdit = url.searchParams.get('ro') !== '1';
       let created = false;
+      if (!s && !canEdit) {
+        // filex 0.56: a person who may only read the file never starts a
+        // session (its starter chooses the base every member builds on).
+        json(res, 409, { error: 'unavailable', message: 'nothing_to_watch' });
+        return true;
+      }
       if (!s) {
         s = { log: [], blobs: new Map(), members: new Map(), nextClient: 0, nextIndex: 0, lease: { holder: '', until: 0 }, changesHead: 0, savedThrough: 0, subs: new Set(), id: `s-${room}` };
         rooms.set(room, s);

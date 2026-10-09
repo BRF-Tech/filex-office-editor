@@ -260,8 +260,12 @@
         for (;;) {
           const res = await fetch(`/__co/join?room=${encodeURIComponent(room)}&who=${encodeURIComponent(who)}&name=${encodeURIComponent(personName)}${readOnly ? '&ro=1' : ''}`, { method: 'POST' });
           if (res.status === 409 && Date.now() < end) {
-            await new Promise((r) => setTimeout(r, 500));
-            continue;
+            // Only a session whose base is not there yet is asked again.
+            const why = await res.clone().json().catch(() => ({}));
+            if (why.message === 'not_ready') {
+              await new Promise((r) => setTimeout(r, 500));
+              continue;
+            }
           }
           if (!res.ok) return coFail(id, res);
           const hello = await res.json();
