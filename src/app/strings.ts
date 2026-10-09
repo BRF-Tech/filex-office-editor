@@ -36,6 +36,16 @@ export interface Strings {
   readHint: string;
   /** The switch between the two could not be made. */
   switchFailed: (reason: string) => string;
+  /** Editing together (filex 0.56) could not be joined though filex offers it: the person edits alone. */
+  aloneNow: (reason: string) => string;
+  /** filex dropped this member (its page was unreachable a while): the editor was opened again in the session. */
+  rejoined: string;
+  /** An entry of the session did not check out: editing together stopped, the document opened again alone. */
+  togetherBroken: string;
+  /** The session's log is full: save, and the next opening starts a new session. */
+  logFull: string;
+  /** A change did not reach the others (filex refused it). */
+  changeRefused: (code: string) => string;
   /** The notice ONLYOFFICE's terms ask for: whose work it is, that it is modified, where the source is. */
   legal: (o: LegalFacts) => string;
   legalLabel: string;
@@ -85,6 +95,12 @@ export const STRINGS: Record<UiLang, Strings> = {
     read: 'Reading view',
     readHint: 'Back to the phone view (saves your changes first)',
     switchFailed: (reason) => `The view could not be changed: ${reason}`,
+    aloneNow: (reason) => `Editing together with others is not possible right now (${reason}); you are editing this document alone.`,
+    rejoined: "The connection to the people editing this document with you was lost; the document was opened again, with everybody's changes.",
+    togetherBroken:
+      'Editing together stopped: a change from the others could not be checked. The document was opened again as it was last saved; your changes that were already shared stay with the others.',
+    logFull: 'This document has gathered as many shared changes as it can hold: save it, then open it again to go on editing together.',
+    changeRefused: (code) => `A change did not reach the others (${code}).`,
     legal: (o) =>
       `Based on ONLYOFFICE Docs by Ascensio System SIA; this version may have been modified (Docs ${o.version}, build ${o.build}, ONLYOFFICE source tag ${o.tag}). ` +
       `Free software under the GNU AGPL version 3; source code: ${sourceOf(o.app)}. ` +
@@ -117,6 +133,12 @@ export const STRINGS: Record<UiLang, Strings> = {
     read: 'Okuma görünümü',
     readHint: 'Telefon görünümüne dön (önce değişikliklerinizi kaydeder)',
     switchFailed: (reason) => `Görünüm değiştirilemedi: ${reason}`,
+    aloneNow: (reason) => `Şu anda başkalarıyla birlikte düzenlenemiyor (${reason}); bu belgeyi tek başınıza düzenliyorsunuz.`,
+    rejoined: 'Bu belgeyi sizinle birlikte düzenleyenlerle bağlantı koptu; belge herkesin değişiklikleriyle yeniden açıldı.',
+    togetherBroken:
+      'Birlikte düzenleme durdu: diğerlerinden gelen bir değişiklik doğrulanamadı. Belge son kaydedildiği hâliyle yeniden açıldı; daha önce paylaşılan değişiklikleriniz diğerlerinde duruyor.',
+    logFull: 'Bu belge tutabileceği kadar ortak değişiklik biriktirdi: kaydedin, sonra birlikte düzenlemeye devam etmek için yeniden açın.',
+    changeRefused: (code) => `Bir değişiklik diğerlerine ulaşmadı (${code}).`,
     legal: (o) =>
       `Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır; bu sürüm değiştirilmiş olabilir (Docs ${o.version}, yapı ${o.build}, ONLYOFFICE kaynak etiketi ${o.tag}). ` +
       `GNU AGPL sürüm 3 ile lisanslı özgür yazılımdır; kaynak kodu: ${sourceOf(o.app)}. ` +

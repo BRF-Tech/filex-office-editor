@@ -7,8 +7,10 @@
 // pages load socket.io from (with RequireJS, as the module "socketio") - so
 // the editor's own files stay as ONLYOFFICE ships them and its socket is the
 // shim (shim.ts): a Document Server answered here, in this page, by the
-// bridge (bridge.ts) over the session (session.ts). Nothing of the document
-// leaves the page through it.
+// bridge (bridge.ts) over the session - session.ts for one person,
+// relay-session.ts when the document is edited together (filex 0.56), whose
+// log the app page brings from filex. Nothing of the document leaves the
+// page through the socket.
 //
 // It also holds this page's half of the link to the app page
 // (frame-protocol.ts): the document comes in as bytes and becomes blob:
@@ -33,6 +35,7 @@ import {
 } from '../frame-protocol';
 import type { EditorMessage } from '../protocol';
 import { adaptOpaqueOrigin } from '../origin';
+import { RelaySession } from '../relay-session';
 import { LocalSession } from '../session';
 import { pickSettings, readSettings } from '../settings';
 import { BridgeSocketPort, createSocketIo, installSocketIo } from '../shim';
@@ -58,7 +61,7 @@ let doc: OpenMessage | null = null;
 let connected = false;
 const waiting: EditorMessage[] = [];
 let bridge: OfficeBridge | null = null;
-let session: LocalSession | null = null;
+let session: LocalSession | RelaySession | null = null;
 let lastDirty = false;
 /** documentOpen's map: filled when the document arrives, read when the bridge answers the editor's auth. */
 const documentUrls: Record<string, string> = {};
@@ -130,7 +133,10 @@ const socketPort = new BridgeSocketPort(() => ({
   connect: () => {
     phase('socket');
     saveRetry.attach(editorApi());
-    keepImagesInPage(win.AscCommon as Parameters<typeof keepImagesInPage>[0]);
+    keepImagesInPage(win.AscCommon as Parameters<typeof keepImagesInPage>[0], (name, file) => {
+      // Editing together: the others need the image (relay-session.ts).
+      if (session instanceof RelaySession) session.imageInserted(name, file.arrayBuffer());
+    });
     connected = true;
     if (bridge) bridge.connect();
     else begin();
@@ -162,8 +168,12 @@ adaptOpaqueOrigin(
 function begin(): void {
   if (bridge || !doc || !connected) return;
   const open = doc;
-  const me: BridgeMember = { client: 'local', user: EDITOR_USER_ID, name: personName(open.name), indexUser: 1, canEdit: open.canEdit };
-  const s = new LocalSession({ me, notice });
+  // Together, the member filex made of this editor (its log is the app
+  // page's to bring, relay-session.ts); alone, the one member of a local log.
+  const me: BridgeMember = open.together
+    ? { ...open.together.me, name: personName(open.together.me.name), canEdit: open.canEdit && open.together.me.canEdit }
+    : { client: 'local', user: open.userId || EDITOR_USER_ID, name: personName(open.name), indexUser: 1, canEdit: open.canEdit };
+  const s = session ?? new LocalSession({ me, notice });
   const b = new OfficeBridge({
     me,
     editorType: open.editorType,
@@ -195,6 +205,7 @@ function begin(): void {
       }
     },
     onLease: (granted) => b.onLease(granted),
+    onCursor: (client, body) => b.onCursor(client, body),
     start: () => b.start(),
   });
   phase('bridge');
@@ -209,6 +220,9 @@ function onOpen(m: OpenMessage): void {
   if (doc) return;
   phase('document');
   doc = m;
+  // Together: the session is there before the bridge, so the log's first
+  // entries, which may come before the editor has connected, wait in it.
+  if (m.together) session = new RelaySession({ me: m.together.me, out: post, notice });
   documentUrls['Editor.bin'] = URL.createObjectURL(new Blob([m.bin], { type: 'application/octet-stream' }));
   for (const f of m.media) {
     if (!MEDIA_NAME.test(f.name)) continue;
@@ -336,6 +350,24 @@ function onSaved(ok: boolean, through: number): void {
   bridge?.saved(ok);
 }
 
+/**
+ * An image another member inserted, before the change that shows it: kept
+ * as a blob: address of this page under its media/ name, where the editor
+ * looks for it - the documentOpen map until the editor has opened, its
+ * registry after.
+ */
+function registerMedia(name: string, bytes: ArrayBuffer): void {
+  if (!MEDIA_NAME.test(name) || documentUrls[`media/${name}`]) return;
+  const url = URL.createObjectURL(new Blob([bytes], { type: mediaType(name) }));
+  documentUrls[`media/${name}`] = url;
+  const common = win.AscCommon as { g_oDocumentUrls?: { addUrls?: (urls: Record<string, string>) => void } } | undefined;
+  try {
+    common?.g_oDocumentUrls?.addUrls?.({ [`media/${name}`]: url });
+  } catch (e) {
+    notice('image', e);
+  }
+}
+
 function onTheme(dark: boolean): void {
   const common = win.Common as { UI?: { Themes?: { setTheme?: (id: string) => void } } } | undefined;
   try {
@@ -373,6 +405,24 @@ function onPortMessage(ev: MessageEvent): void {
     case 'exported':
       onExported(m.id);
       return;
+    case 'co-entry':
+      if (session instanceof RelaySession) session.entry(m.entry);
+      return;
+    case 'co-lease-answer':
+      if (session instanceof RelaySession) session.leaseAnswer(m.id, m.granted === true);
+      return;
+    case 'co-cursor-in':
+      if (session instanceof RelaySession) session.cursorFrom(String(m.client), m.cursor);
+      return;
+    case 'co-media':
+      if (m.bytes instanceof ArrayBuffer) registerMedia(String(m.name), m.bytes);
+      return;
+    case 'co-media-stored':
+      if (session instanceof RelaySession) session.mediaStored(String(m.name), m.ok === true);
+      return;
+    case 'co-refused':
+      if (session instanceof RelaySession) session.refused(String(m.kind), String(m.code));
+      return;
   }
 }
 
@@ -386,6 +436,16 @@ function onWindowMessage(ev: MessageEvent): void {
   port.onmessage = onPortMessage;
   for (const m of early.splice(0)) port.postMessage(m);
 }
+
+// For the measurements (e2e/run.mjs): what this page's bridge holds - every
+// member's bridge must hold the same locks and the same people.
+(win as Record<string, unknown>).__fxBridge = {
+  locks: () => bridge?.lockSnapshot() ?? null,
+  people: () => bridge?.participants().map((p) => p.idOriginal) ?? [],
+  head: () => session?.head ?? 0,
+  changes: () => bridge?.changeCount ?? 0,
+  together: () => session instanceof RelaySession,
+};
 
 if (window.parent !== window) {
   window.addEventListener('message', onWindowMessage);

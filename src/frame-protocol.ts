@@ -17,6 +17,15 @@
 // on window.postMessage, each checking `event.source` (the origin is "null"
 // for every sandboxed page, so it tells nothing), and then talk over a
 // MessagePort only they hold.
+//
+// Editing together (filex 0.56): the app page holds the session (filex's
+// `coedit.*`), the editor page holds the bridge. The bridge's appends, lease
+// requests and cursor go to the app page (co-append, co-lease, co-cursor),
+// and the session's entries come back in the log's order (co-entry), each
+// image another member inserted ahead of the change that shows it
+// (co-media).
+
+import type { BridgeAppend, BridgeEntry, BridgeMember } from './bridge';
 
 import type { TextOptions } from './formats';
 
@@ -48,6 +57,63 @@ export interface OpenMessage {
   canEdit: boolean;
   /** The document's key (the editor's docId). */
   key: string;
+  /**
+   * Editing together (filex 0.56): this editor's member of the session. The
+   * document is the session's base, and its log arrives as co-entry
+   * messages; absent, the editor runs alone (session.ts).
+   */
+  together?: TogetherInfo;
+  /**
+   * The user id the editor was configured with (app/config.ts userId); the
+   * bridge must use the same. Absent: EDITOR_USER_ID.
+   */
+  userId?: string;
+}
+
+/** Who this editor is in a session it edits together. */
+export interface TogetherInfo {
+  me: BridgeMember;
+}
+
+/** The next entry of the session's log, opened and checked by filex. */
+export interface CoEntryMessage {
+  t: 'co-entry';
+  entry: BridgeEntry;
+}
+
+/** filex's answer to a lease the editor page asked for (co-lease). */
+export interface CoLeaseAnswer {
+  t: 'co-lease-answer';
+  id: number;
+  granted: boolean;
+}
+
+/** Another member's cursor. */
+export interface CoCursorIn {
+  t: 'co-cursor-in';
+  client: string;
+  cursor: unknown;
+}
+
+/** An image another member inserted, before the change that shows it: the editor page registers it under media/<name>. */
+export interface CoMediaMessage {
+  t: 'co-media';
+  name: string;
+  bytes: ArrayBuffer;
+}
+
+/** An image this editor inserted is kept with the session (or could not be). */
+export interface CoMediaStored {
+  t: 'co-media-stored';
+  name: string;
+  ok: boolean;
+}
+
+/** filex refused what the editor page asked to append ("no_lease", "log_full"...). */
+export interface CoRefused {
+  t: 'co-refused';
+  kind: string;
+  code: string;
 }
 
 /** The app page asks for the document as the editor holds it now. */
@@ -87,7 +153,19 @@ export interface ExportedMessage {
   ok: boolean;
 }
 
-export type ToFrame = OpenMessage | SnapshotRequest | SavedMessage | ThemeMessage | SettingsMessage | ExportedMessage;
+export type ToFrame =
+  | OpenMessage
+  | SnapshotRequest
+  | SavedMessage
+  | ThemeMessage
+  | SettingsMessage
+  | ExportedMessage
+  | CoEntryMessage
+  | CoLeaseAnswer
+  | CoCursorIn
+  | CoMediaMessage
+  | CoMediaStored
+  | CoRefused;
 
 /** The document as the editor holds it: what x2t turns back into an office file. */
 export interface SnapshotResult {
@@ -156,7 +234,45 @@ export interface ExportRequest {
   text?: TextOptions;
 }
 
-export type FromFrame = SnapshotResult | SaveRequest | DirtyMessage | StateMessage | NoticeMessage | SettingsChanged | ExportRequest;
+/** Editing together: put this in the session's log (the bridge's append). */
+export interface CoAppendRequest {
+  t: 'co-append';
+  append: BridgeAppend;
+}
+
+/** Editing together: the changes lease (the bridge's lease); an acquire is answered with co-lease-answer. */
+export interface CoLeaseRequest {
+  t: 'co-lease';
+  id: number;
+  op: 'acquire' | 'release';
+  seen: number;
+}
+
+/** Editing together: this editor's cursor, for the others. */
+export interface CoCursorOut {
+  t: 'co-cursor';
+  cursor: unknown;
+}
+
+/** Editing together: an image the person inserted, to keep with the session (answered with co-media-stored). */
+export interface CoMediaPut {
+  t: 'co-media-put';
+  name: string;
+  bytes: ArrayBuffer;
+}
+
+export type FromFrame =
+  | SnapshotResult
+  | SaveRequest
+  | DirtyMessage
+  | StateMessage
+  | NoticeMessage
+  | SettingsChanged
+  | ExportRequest
+  | CoAppendRequest
+  | CoLeaseRequest
+  | CoCursorOut
+  | CoMediaPut;
 
 export function isFrameHello(v: unknown): boolean {
   return !!v && typeof v === 'object' && (v as { type?: unknown }).type === FRAME_HELLO && (v as { v?: unknown }).v === FRAME_VERSION;
