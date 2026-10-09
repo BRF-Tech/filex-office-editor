@@ -727,6 +727,15 @@ txt (382 B) and the csv (106 B) come to filex in UTF-8 with every Turkish
 letter and the typed text; the OpenDocument copy, the PDF and Print as
 before; no request outside the package.
 
+**The release, 0.1.1** (its `ui.zip`, run on 2026-10-10; Windows,
+headless, Playwright 1.59): `npm run e2e -- --shots` 24 of 24 - the 21
+and the phone run in each browser - with no request outside the package
+and no failed request; the txt (382 B) and the csv (106 B) in each engine;
+openings 1.6-2.3 s in Chromium, 3.3-4.7 s in Firefox, 3.4-4.1 s in WebKit;
+54 screenshots. In the same run: `npm test` 221 of 221 (the one test of a
+built `dist/editor` skipped there), `npm run typecheck` clean, `npm run
+test:x2t` 11 of 11.
+
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
 three faces), the workbook's total `39,5` as the Turkish locale writes it.
@@ -805,6 +814,23 @@ same way: `400 manifest_invalid`, `json: unknown field "encrypted_folders"`;
 without that block, `unknown permission "files:e2e-plaintext"`. 0.1.0 asks
 for neither. On a phone, filex's viewer keeps its previous and next buttons
 beside the app, so the app's frame is about 306 px wide at 390 px.
+
+**0.1.1 in filex 0.55** (2026-10-10, the same filex image, a throwaway
+container on the loopback with its data and its files in memory;
+Playwright 1.59 on Windows, headless, 1440 x 900): 0.1.0 installed from its
+release, then 0.1.1 over it with filex's upgrade (`POST
+/api/admin/app-plugins/{id}/upgrade`, a dry run first: the same 19 rows,
+`compat` ok for 0.55.0; installed `running`, its `ui.zip` SHA-256 checked
+against the manifest's; the viewer says "Office editor was updated to
+0.1.1."):
+
+| | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| An odt with a LibreOffice formula, with 0.1.0 | never opens (nothing for 2 minutes) | "The document could not be opened: Aborted(missing function: _ZN8StarMath18CStarMathConverterC1Ev)" | the same |
+| The same odt, with 0.1.1 | opens in 2.8 s, the formula on the page | 6.2 s | 5.3 s |
+| The Turkish document as txt, through the editor's dialog (it offers UTF-8 alone) | filex opens Chromium's save dialog (`showSaveFilePicker`), which a headless run cannot answer: not measured | 339 B, UTF-8, every Turkish letter | the same |
+| The Turkish workbook as csv (the dialog offers UTF-8, UTF-16 and UTF-32) | not measured, as above | 59 B, UTF-8, `Şehir,Sıcaklık` | the same |
+| Requests outside filex / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
 
 ## Keeping up with ONLYOFFICE
 
