@@ -182,7 +182,8 @@ export function startServer({ port = 8089, ui = path.join(ROOT, 'dist', 'ui'), d
             file = path.join(out, `${tag}-${n}-${name}`);
             writeFileSync(file, body);
           }
-          saves.push({ tag, name, n, size: body.length, file, at: Date.now() });
+          // enc=1: the host page encrypted it (filex 0.56's encrypted folder).
+          saves.push({ tag, name, n, size: body.length, file, enc: url.searchParams.get('enc') === '1', at: Date.now() });
           log(`save ${tag} ${name} #${n}: ${body.length} bytes`);
           res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ saved: true, size: body.length }));
         });
