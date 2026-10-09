@@ -68,8 +68,24 @@ browser.
   again in the session with everybody's changes, and the person is told;
   when a change from the session does not check out, editing together stops
   for that person and the document opens again alone, as last saved.
+- **Following along, read-only**: a person who may only read the document
+  joins its session as a watcher - the editor opens it to read (no
+  "Edit"), and shows the others' changes as they land (ONLYOFFICE's live
+  viewer); filex refuses whatever a watcher would write. With nobody
+  editing it, there is nothing to follow and it opens as it is.
+- **Changes kept through a lost connection**: filex 0.56 keeps every change
+  in the browser until its relay placed it, sends it again when the
+  connection is back, and sends what a closed tab left when the document
+  is opened again (after asking, in filex's words, when somebody else
+  changed the document since). The editor opens with them in it: its own
+  member's changes before its start are part of the document it is given,
+  not an answer to a save of its own.
+- Editing together in an **end-to-end encrypted folder** (filex 0.56, with
+  the app's `encrypted_folders` grant): the session's key is sealed with the
+  folder key in the members' browsers; the app does nothing differently.
 - The e2e harness has a stand-in for filex 0.56's relay, and the browser run
-  opens one document in two browser contexts (written, not run yet).
+  opens one document in two browser contexts, then a third that may only
+  read, and a reader alone (written, not run yet).
 
 ### Changed
 
@@ -85,8 +101,9 @@ browser.
   `files:co-edit`, which filex derives from the block - it is not listed in
   `permissions`) and asks for filex `>=0.56.0` (filex 0.55 refuses a
   manifest with a block it does not know; servers on 0.55 keep 0.1.0). Where filex offers no editing together - an older filex, no
-  grant, a file the person cannot write, a vault, the phone's reading view -
-  the editor runs alone, exactly as in 0.1.0.
+  grant, a vault, the phone's reading view, a person who may only read
+  a document nobody is editing - the editor runs alone, exactly as in
+  0.1.0.
 
 ### Fixed
 

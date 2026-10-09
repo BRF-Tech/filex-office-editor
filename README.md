@@ -206,7 +206,10 @@ on the editor page, `src/coedit.ts` for what both derive from the log):
   bridge cannot tell this session from the one-person one. A member's own
   changes, lock requests and releases come back from the log with their
   place, like everybody else's; the bridge starts (answers the editor's
-  auth, with every change so far) once it has read its own join.
+  auth, with every change so far) once it has read its own join and the log
+  as far as filex handed it over - which includes the changes filex kept in
+  this browser from an earlier opening (a lost connection, a closed tab) and
+  sent when the session was joined: they open with the document.
 - **The lease.** Changes go into the log only from the one member that holds
   filex's changes lease, and the lease goes only to a member that has seen
   every change - the Document Server's save lock, kept by the relay.
@@ -225,6 +228,17 @@ on the editor page, `src/coedit.ts` for what both derive from the log):
   everybody's "unsaved" follows it. filex is told "unsaved changes" only by
   the last writer: while somebody else who may write is in, closing leaves
   nothing behind, and filex does not ask.
+- **Following along.** A person who may only read the document joins as a
+  watcher (filex answers `canEdit: false`): the editor opens it to read and
+  shows the others' changes as they land - ONLYOFFICE's live viewer, which
+  the bridge turns on in its license answer for a reader in a session
+  (`liveViewerSupport`); the bridge sends nothing that writes, and filex
+  would refuse it. filex does not let a watcher start a session (its
+  starter chooses the base): with nobody editing, the document opens as it
+  is.
+- **A lost connection** loses nothing: filex keeps every change in the
+  browser until its relay placed it (sealed with the folder key in an
+  encrypted folder) and sends it again; the editor waits meanwhile.
 - **When filex drops this member** (its page was unreachable a while,
   `coedit.dropped` `gone`), the editor opens again in the session, a new
   member with everybody's changes, and the person is told. **When an entry
@@ -232,14 +246,17 @@ on the editor page, `src/coedit.ts` for what both derive from the log):
   the session is left and the document opens again alone, as it was last
   saved, and they are told.
 - **Alone, as before**, wherever filex offers no editing together: an older
-  filex (`unknown_method`), no `files:co-edit` grant, a file this person
-  cannot write, a vault - and on a phone's reading view (ONLYOFFICE's phone
-  app only reads; "Edit" joins the session, "Reading view" saves and leaves
-  it).
+  filex (`unknown_method`), no `files:co-edit` grant, a vault, a document
+  nobody is editing opened by a person who may only read it - and on a
+  phone's reading view (ONLYOFFICE's phone app only reads; "Edit" joins the
+  session, "Reading view" saves and leaves it). In an end-to-end encrypted
+  folder (filex 0.56, the `encrypted_folders` grant) the session is the
+  same, its key sealed with the folder key in the members' browsers.
 
 The e2e harness has a stand-in for filex 0.56's relay
 (`e2e/harness/relay.mjs`), and `npm run e2e` opens one document in two
-browser contexts - two people - in each browser
+browser contexts - two people - and a third that may only read it, in each
+browser
 ([Measured in the browsers](#measured-in-the-browsers)).
 
 ## What filex provides
