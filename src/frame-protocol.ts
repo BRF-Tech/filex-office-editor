@@ -73,6 +73,12 @@ export interface OpenMessage {
 /** Who this editor is in a session it edits together. */
 export interface TogetherInfo {
   me: BridgeMember;
+  /**
+   * The log's head when filex handed the session over (filex 0.56: the
+   * changes it kept in this browser from an earlier opening included). The
+   * bridge answers the editor's auth once it has read this far.
+   */
+  head?: number;
 }
 
 /** The next entry of the session's log, opened and checked by filex. */

@@ -570,9 +570,12 @@ async function main(): Promise<void> {
   // filex 0.55 prints a PDF the app hands it (ui:print); without that grant
   // Print hands the PDF over as a download (print()).
   const canPrintPdf = grants.includes('ui:print');
-  // filex 0.56 lets several people edit the file together (files:co-edit);
-  // a file this person cannot write is opened alone, as it is.
-  const canTogether = canEdit && grants.includes('files:co-edit');
+  // filex 0.56 lets several people edit the file together (files:co-edit).
+  // A person who may only read it joins too, as a watcher: filex answers
+  // `canEdit: false`, refuses whatever they would write, and the editor shows
+  // the others' changes as they land (bridge.ts liveViewerSupport). With
+  // nobody editing it there is nothing to watch, and it opens alone, as it is.
+  const canTogether = grants.includes('files:co-edit');
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
@@ -759,7 +762,7 @@ async function main(): Promise<void> {
       canEdit: editable && app.view === 'editor',
       key,
       userId,
-      ...(tg ? { together: { me: tg.me } } : {}),
+      ...(tg ? { together: { me: tg.me, head: tg.hello.head } } : {}),
     };
     app.link.send(open, [open.bin, ...media.map((m) => m.bytes)]);
     app.setTogether(tg);

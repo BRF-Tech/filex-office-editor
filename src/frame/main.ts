@@ -181,6 +181,7 @@ function begin(): void {
     documentUrls,
     docId: open.key,
     keeperName: 'filex',
+    together: !!open.together,
     host: s.host({
       toEditor: (msg) => {
         socketPort.toEditor(msg);
@@ -222,7 +223,7 @@ function onOpen(m: OpenMessage): void {
   doc = m;
   // Together: the session is there before the bridge, so the log's first
   // entries, which may come before the editor has connected, wait in it.
-  if (m.together) session = new RelaySession({ me: m.together.me, out: post, notice });
+  if (m.together) session = new RelaySession({ me: m.together.me, head: m.together.head, out: post, notice });
   documentUrls['Editor.bin'] = URL.createObjectURL(new Blob([m.bin], { type: 'application/octet-stream' }));
   for (const f of m.media) {
     if (!MEDIA_NAME.test(f.name)) continue;

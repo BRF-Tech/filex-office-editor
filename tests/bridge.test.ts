@@ -285,6 +285,60 @@ describe('opening', () => {
     expect(sent.map((m) => m.type)).toEqual(['auth', 'documentOpen']);
   });
 
+  it('a reader in a session follows it live (the license says liveViewerSupport); alone, or a writer, it does not', () => {
+    const license = (together: boolean | undefined, canEdit: boolean) => {
+      const sent: Msg[] = [];
+      const b = new OfficeBridge({
+        me: { client: 'c1', user: 'u1-', name: 'A', indexUser: 1, canEdit },
+        editorType: EDITOR_TYPE.document,
+        build: BUILD,
+        documentUrls: { 'Editor.bin': 'blob:x' },
+        together,
+        host: { toEditor: (m) => sent.push(m as Msg), append: () => {}, lease: () => {}, cursor: () => {}, save: () => {} },
+      });
+      b.connect();
+      return (sent[0].license as { liveViewerSupport: boolean }).liveViewerSupport;
+    };
+    expect(license(true, false), 'a watcher').toBe(true);
+    expect(license(true, true), 'a writer edits').toBe(false);
+    expect(license(false, false), 'a reader alone').toBe(false);
+    expect(license(undefined, false)).toBe(false);
+  });
+
+  it('its own changes in the log before its auth (kept by filex from an earlier opening) open with the document, not as an answer to a save', () => {
+    const member: BridgeMember = { client: 'c2', user: 'u2-', name: 'A', indexUser: 2, canEdit: true };
+    const sent: Msg[] = [];
+    const leases: string[] = [];
+    const b = new OfficeBridge({
+      me: member,
+      editorType: EDITOR_TYPE.document,
+      build: BUILD,
+      documentUrls: { 'Editor.bin': 'blob:x' },
+      host: {
+        toEditor: (m) => sent.push(m as Msg),
+        append: () => {},
+        lease: (op) => leases.push(op),
+        cursor: () => {},
+        save: () => {},
+      },
+    });
+    b.connect();
+    b.fromEditor({ type: 'auth' });
+    b.onEntry({ seq: 1, at: 1000, client: 'c2', kind: 'join', member });
+    const body = { changes: ['kept'], start: true, end: true, deleteIndex: null, releaseLocks: true, excel: false, coAuthoring: true, excelInfo: null };
+    b.onEntry({ seq: 2, at: 2000, client: 'c2', kind: 'changes', body });
+    b.start();
+    expect(sent.map((m) => m.type)).toEqual(['license', 'authChanges', 'auth', 'documentOpen']);
+    expect((last({ seen: sent } as Editor, 'authChanges')!.changes as StoredChange[]).map((c) => JSON.parse(c.change))).toEqual(['kept']);
+    expect(leases, 'no lease of its own to give back').toEqual([]);
+    expect(b.changeCount).toBe(1);
+    expect(b.dirty).toBe(true);
+    // Its own changes after the auth are the answer to its save, as before.
+    b.onEntry({ seq: 3, at: 3000, client: 'c2', kind: 'changes', body: { ...body, changes: ['typed'] } });
+    expect(sent.at(-1)).toMatchObject({ type: 'unSaveLock', syncChangesIndex: 2 });
+    expect(leases).toEqual(['release']);
+  });
+
   it('a late joiner gets every change so far as authChanges, and the locks held', () => {
     const s = new Session();
     const a = s.join('A');

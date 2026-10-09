@@ -142,6 +142,13 @@ export interface BridgeOptions {
   keeperName?: string;
   /** The document id the editor was configured with. */
   docId?: string;
+  /**
+   * Editing together (filex 0.56): a member that may not write still sees
+   * every change as it lands - ONLYOFFICE's live viewer, which a Document
+   * Server's license turns on (liveViewerSupport). Alone, a reader has
+   * nothing to follow.
+   */
+  together?: boolean;
   now?: () => number;
 }
 
@@ -235,7 +242,7 @@ export class OfficeBridge {
         buildNumber: this.o.build.number,
         protectionSupport: false,
         isAnonymousSupport: true,
-        liveViewerSupport: false,
+        liveViewerSupport: this.o.together === true && !this.me.canEdit,
         branding: false,
         customization: false,
       },
@@ -574,7 +581,13 @@ export class OfficeBridge {
     const total = this.changes.length;
     const changesIndex = !cut && b.start ? startIndex : -1;
     this.changesSeq = seq;
-    const mine = this.isMine(author);
+    // This editor's own changes come back with their place - after it
+    // authorised. Its member's changes before that are the ones filex kept in
+    // the browser from an earlier opening and sent when the session was
+    // joined (filex 0.56): the editor never made them, so they are not an
+    // answer to a save of its own - they reach it with the rest of the log,
+    // in its auth answer.
+    const mine = this.isMine(author) && this.authed;
     if (b.end) {
       if (b.excel && b.coAuthoring && b.excelInfo) this.locks.recalcExcel(authorId, b.excelInfo);
       const released = b.releaseLocks ? this.locks.releaseUser(authorId) : [];

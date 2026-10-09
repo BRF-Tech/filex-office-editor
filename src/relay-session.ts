@@ -14,9 +14,11 @@
 //
 // Two things are this class's own:
 //
-//   - the bridge starts once its member's join is read: everything before it
-//     in the log - the base's changes, the other members, their locks - is in
-//     the bridge then, and its answer to the editor's auth carries all of it;
+//   - the bridge starts once its member's join is read, and the log as far as
+//     its head when filex handed the session over: everything before it - the
+//     base's changes, the other members, their locks, and this member's
+//     changes filex kept from an earlier opening (filex 0.56) - is in the
+//     bridge then, and its answer to the editor's auth carries all of it;
 //   - an image the person inserts goes to the session (co-media-put) before
 //     the change that shows it is appended: a change waits until every
 //     image inserted before it is kept, so another member never applies a
@@ -31,6 +33,8 @@ import type { EditorSide, SessionBridge } from './session';
 
 export interface RelaySessionOptions {
   me: BridgeMember;
+  /** The log's head when filex handed the session over: the bridge starts once it has read this far. */
+  head?: number;
   /** The way to the app page. */
   out: (m: FromFrame, transfer?: Transferable[]) => void;
   /** Something that went wrong (for the frame's diagnostics). */
@@ -44,6 +48,8 @@ export class RelaySession {
   private bridge: RelayBridge | null = null;
   private started = false;
   private live = false;
+  /** Its member's join has been read. */
+  private joinedSeen = false;
   private lastSeq = 0;
   private changesHead = 0;
   private savedThrough = 0;
@@ -227,7 +233,8 @@ export class RelaySession {
       this.stop();
       return;
     }
-    if (!this.live && e.kind === 'join' && e.member.client === this.o.me.client) {
+    if (e.kind === 'join' && e.member.client === this.o.me.client) this.joinedSeen = true;
+    if (!this.live && this.joinedSeen && this.lastSeq >= (this.o.head ?? 0)) {
       this.live = true;
       bridge.start();
     }

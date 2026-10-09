@@ -55,8 +55,13 @@ class Relay {
     return entry.seq;
   }
 
-  /** A member joins: the log so far, then its own join, to it; its join to everybody else. */
-  join(name: string, canEdit = true): Member {
+  /**
+   * A member joins: the log so far, then its own join, to it; its join to
+   * everybody else. `kept`: changes filex kept from this person's earlier
+   * opening, which it sends right after the join (filex 0.56), before it
+   * hands the session over - the head it hands over includes them.
+   */
+  join(name: string, canEdit = true, kept: string[] = []): Member {
     const n = this.members.size + 1;
     const me: BridgeMember = { client: `c${n}`, user: `filex-person-u${n}-`, name, indexUser: n, canEdit };
     const m = {} as Member;
@@ -67,6 +72,7 @@ class Relay {
     m.saves = 0;
     m.session = new RelaySession({
       me,
+      head: this.log.length + 1 + kept.length,
       out: (msg) => {
         m.out.push(msg);
         queueMicrotask(() => this.handle(m, msg));
@@ -83,6 +89,13 @@ class Relay {
     for (const e of this.log) queueMicrotask(() => m.session.entry(e));
     this.members.set(me.client, m);
     this.push({ kind: 'join', client: me.client, member: me } as BridgeEntry);
+    for (const k of kept) {
+      this.push({
+        kind: 'changes',
+        client: me.client,
+        body: { changes: [k], start: true, end: true, deleteIndex: null, releaseLocks: false, excel: false, coAuthoring: true, excelInfo: null },
+      } as BridgeEntry);
+    }
     return m;
   }
 
@@ -309,6 +322,38 @@ describe('RelaySession', () => {
     await settle();
     expect(relay.refused).toEqual(['c1: changes without the lease']);
     expect(a.notices.join()).toMatch(/refused: changes: no_lease/);
+  });
+
+  it('starts once the log is read as far as filex handed it over: changes kept from an earlier opening open with the document', async () => {
+    const relay = new Relay();
+    const a = relay.join('Ayşe');
+    relay.open(a);
+    await settle();
+    const b = relay.join('Ayşe, again', true, ['kept while away']);
+    relay.open(b);
+    await settle();
+    expect(b.sent.map((m) => m.type)).toEqual(['license', 'authChanges', 'auth', 'documentOpen']);
+    expect(last(b.sent, 'authChanges')!.changes.map((c: { change: string }) => JSON.parse(c.change))).toEqual(['kept while away']);
+    expect(last(b.sent, 'unSaveLock'), 'not an answer to a save it made').toBeUndefined();
+    expect(b.out.filter((o) => o.t === 'co-lease'), 'no lease asked or given back').toEqual([]);
+    // The others got it as a change.
+    expect(last(a.sent, 'saveChanges')!.changes.map((c: { change: string }) => JSON.parse(c.change))).toEqual(['kept while away']);
+  });
+
+  it('a watcher follows the others live and writes nothing', async () => {
+    const relay = new Relay();
+    const a = relay.join('Ayşe');
+    relay.open(a);
+    const w = relay.join('Watcher', false);
+    relay.open(w);
+    await settle();
+    await change(a, 'typed');
+    expect(last(w.sent, 'saveChanges')!.changes.map((c: { change: string }) => JSON.parse(c.change))).toEqual(['typed']);
+    w.bridge.fromEditor({ type: 'saveChanges', changes: JSON.stringify(['x']), startSaveChanges: true, endSaveChanges: true });
+    w.bridge.fromEditor({ type: 'getLock', block: ['p1'] });
+    await settle();
+    expect(w.out.filter((o) => o.t === 'co-append')).toEqual([]);
+    expect(last(a.sent, 'connectState')!.participants.find((p: { idOriginal: string }) => p.idOriginal === w.me.user)).toMatchObject({ view: true });
   });
 
   it('starts once', () => {
