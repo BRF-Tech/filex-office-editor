@@ -4,6 +4,8 @@
 //
 // The app page and the converter's worker (worker/x2t-worker.ts).
 
+import type { TextOptions } from '../formats';
+
 export interface WorkerFile {
   name: string;
   bytes: ArrayBuffer;
@@ -18,6 +20,8 @@ export interface WorkerExport {
   pdf?: ArrayBuffer;
   fonts?: WorkerFile[];
   json?: string;
+  /** For txt and csv: the encoding and the delimiter (formats.ts textOptions). */
+  text?: TextOptions;
 }
 
 export type WorkerRequest =

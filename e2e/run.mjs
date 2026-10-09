@@ -21,8 +21,11 @@
 //     of people, and no "2" shows in the header;
 //   - Download as (the Turkish documents): the File menu offers what x2t
 //     writes here (src/formats.ts), the OpenDocument copy and the PDF come
-//     to filex (ui.download) holding the typed text / pages and fonts, and
-//     Print hands filex a PDF to print (the ui.print stand-in);
+//     to filex (ui.download) holding the typed text / pages and fonts, a
+//     txt (the document) and a csv (the workbook) come through the editor's
+//     own dialog - which offers only the encodings x2t writes here - in
+//     UTF-8 with every Turkish letter, and Print hands filex a PDF to print
+//     (the ui.print stand-in);
 //   - the settings, once per engine: a "New" hint closed in one opening is
 //     kept (state.set) and does not show in the next one; and Print where
 //     filex has no print (print=none) hands the PDF over as a download;
@@ -60,6 +63,13 @@ const DOWNLOAD_AS = {
   xlsx: [0x0101, 0x0103, 0x0201, 0x0106, 0x010a, 0x0209],
   pptx: [0x0081, 0x0084, 0x0201, 0x0083, 0x0087, 0x0209, 0x008a],
 };
+/** The text each kind is downloaded as too, through the editor's TXT or CSV dialog (src/formats.ts). */
+const TEXT_DOWNLOAD = {
+  docx: { id: 0x0045, ext: 'txt' },
+  xlsx: { id: 0x0104, ext: 'csv' },
+};
+/** The encodings that dialog offers: the ones x2t writes a txt or a csv in here (src/formats.ts TEXT_ENCODINGS). */
+const TEXT_ENCODINGS = { txt: [46], csv: [46, 48, 49, 50, 51] };
 /** The OpenDocument kin of each, and its type: the copy the measurement downloads. */
 const ODF = {
   docx: { id: 0x0043, ext: 'odt', mime: 'application/vnd.oasis.opendocument.text' },
@@ -352,6 +362,31 @@ async function runOne(browser, server, engine, doc, o) {
       step('download pdf', { bytes: pdfFile.size, ...facts });
       r.pdf = facts;
       if (!facts.pdf || facts.pages < 1 || facts.fonts < 1) r.problems.push(`the PDF is not right: ${JSON.stringify(facts)}`);
+
+      // A txt or csv: the editor's own dialog (the encoding; a csv's
+      // delimiter), with UTF-8 - its default - taken as it is.
+      const text = TEXT_DOWNLOAD[ext];
+      if (text) {
+        await downloadAs(page, text.id);
+        const dialog = editorLocator(page).locator('.asc-window:has(#id-codepages-combo)');
+        await dialog.waitFor({ state: 'visible', timeout: 15_000 });
+        const encodings = await dialog.locator('#id-codepages-combo li[data-value]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-value'))));
+        r.textEncodings = encodings;
+        const offeredEnc = TEXT_ENCODINGS[text.ext];
+        if (JSON.stringify(encodings) !== JSON.stringify(offeredEnc)) r.problems.push(`the ${text.ext} dialog offers the encodings ${encodings.join(',')}, not ${offeredEnc.join(',')}`);
+        await dialog.locator('.footer button[result="ok"]').click();
+        const got = await nextFile(server, tag, n++, `the ${text.ext} download`);
+        const bytes = readFileSync(got.file);
+        const utf8 = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+        const body = utf8 ? bytes.subarray(3).toString('utf8') : '';
+        const TR = o.TR;
+        const want = ext === 'docx' ? [TYPED, TR.title, TR.body, TR.bold, TR.italic, ...TR.cells] : [TYPED, ...TR.cells];
+        const missing = want.filter((t) => !body.includes(t));
+        step(`download ${text.ext}`, { bytes: got.size, utf8, encodings, missing: missing.length });
+        if (got.how !== 'download' || !got.name.endsWith(`.${text.ext}`)) r.problems.push(`the ${text.ext} came as ${got.how} ${got.name}`);
+        if (!utf8) r.problems.push(`the ${text.ext} is not UTF-8 with its BOM`);
+        if (missing.length) r.problems.push(`the ${text.ext} does not hold ${JSON.stringify(missing)}`);
+      }
 
       // Print: the editor's own call, as its File menu and Ctrl+P make it.
       await editorFrame(page).evaluate(() => {

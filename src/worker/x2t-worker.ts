@@ -113,6 +113,7 @@ function exportDocument(m: Extract<WorkerRequest, { t: 'export' }>): void {
       pdf: m.pdf ? new Uint8Array(m.pdf) : undefined,
       fonts: m.fonts ? files(m.fonts) : undefined,
       json: m.json,
+      text: m.text,
     });
     const bytes = exactBuffer(out);
     reply({ t: 'result', id: m.id, bytes, media: [], ms: Date.now() - t0 }, [bytes]);

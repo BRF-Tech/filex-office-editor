@@ -7,19 +7,39 @@
 // app page instead of a server. The browsers run the whole of it (e2e/run.mjs).
 import { describe, expect, it } from 'vitest';
 
-import { EXPORT_FORMATS, PDF, PDFA, exportFormat, exportName, isPdf } from '../src/formats';
+import { CSV, EXPORT_FORMATS, PDF, PDFA, TEXT_ENCODINGS, TXT, UTF8, exportFormat, exportName, isPdf, textEncodings, textOptions } from '../src/formats';
 import { loadedFonts, takeOverDownloads, trimDownloadFormats, type ExportJob } from '../src/frame/export';
 
 describe('the formats', () => {
   it('each kind gets its own and PDF, nothing else', () => {
     const ids = (k: 'word' | 'cell' | 'slide') => EXPORT_FORMATS.filter((f) => exportFormat(f.id, k)).map((f) => f.ext);
-    expect(ids('word')).toEqual(['pdf', 'pdf', 'docx', 'docm', 'dotx', 'odt', 'ott', 'rtf']);
-    expect(ids('cell')).toEqual(['pdf', 'pdf', 'xlsx', 'xlsm', 'xltx', 'ods', 'ots']);
+    expect(ids('word')).toEqual(['pdf', 'pdf', 'docx', 'docm', 'dotx', 'odt', 'ott', 'rtf', 'txt']);
+    expect(ids('cell')).toEqual(['pdf', 'pdf', 'xlsx', 'xlsm', 'xltx', 'ods', 'ots', 'csv']);
     expect(ids('slide')).toEqual(['pdf', 'pdf', 'pptx', 'pptm', 'potx', 'ppsx', 'odp', 'otp']);
     expect(exportFormat(0x0101, 'word')).toBeNull();
-    // Measured broken or impossible in the wasm build (formats.ts): txt, csv, html, epub, fb2, md, images.
-    for (const id of [0x0045, 0x0104, 0x0046, 0x0048, 0x0049, 0x005c, 0x0401, 0x0405, 'x', null]) expect(exportFormat(id, 'word')).toBeNull();
+    // Measured impossible in the wasm build (formats.ts): html, epub, fb2, md, images; a csv is a workbook's.
+    for (const id of [CSV, 0x0046, 0x0048, 0x0049, 0x005c, 0x0401, 0x0405, 'x', null]) expect(exportFormat(id, 'word')).toBeNull();
+    expect(exportFormat(TXT, 'cell')).toBeNull();
     expect(isPdf(PDF) && isPdf(PDFA) && !isPdf(0x0041)).toBe(true);
+  });
+
+  it('a txt or csv takes the encoding and the delimiter chosen, in the encodings x2t writes here', () => {
+    const txt = exportFormat(TXT, 'word')!;
+    const csv = exportFormat(CSV, 'cell')!;
+    expect(TEXT_ENCODINGS).toEqual({ txt: [46], csv: [46, 48, 49, 50, 51] });
+    expect([textEncodings('word'), textEncodings('cell'), textEncodings('slide')]).toEqual([[46], [46, 48, 49, 50, 51], null]);
+    expect(textOptions(txt, {})).toEqual({ codepage: UTF8 });
+    expect(textOptions(txt, { codepage: -1 })).toEqual({ codepage: UTF8 });
+    expect(textOptions(txt, { codepage: 46, delimiter: 2 })).toEqual({ codepage: 46 });
+    // x2t writes a txt in UTF-8 whatever else is asked (and 50, 51 with no text).
+    for (const codepage of [48, 49, 50, 51]) expect(textOptions(txt, { codepage })).toBeNull();
+    expect(textOptions(csv, { codepage: 46, delimiter: 2 })).toEqual({ codepage: 46, delimiter: 2 });
+    expect(textOptions(csv, { codepage: 49, delimiter: 9, delimiterChar: '|' })).toEqual({ codepage: 49, delimiterChar: '|' });
+    expect(textOptions(csv, { delimiterChar: '"' })).toEqual({ codepage: UTF8 });
+    expect(textOptions(csv, { delimiterChar: 'ab' })).toEqual({ codepage: UTF8 });
+    // windows-1254, ISO-8859-9, windows-1252: ICU's tables, which the build does not carry.
+    for (const codepage of [36, 34, 44, 47, 52]) expect(textOptions(csv, { codepage })).toBeNull();
+    expect(textOptions(exportFormat(0x0041, 'word')!, { codepage: 36 })).toBeUndefined();
   });
 
   it("names the file after the document, with the format's extension, never a path", () => {
@@ -50,9 +70,29 @@ describe("the editor's Download as", () => {
     const view = panel();
     win.DE = { Views: { FileMenuPanels: { ViewSaveAs: view } } };
     expect(trimDownloadFormats(win, 'word')).toBe(true);
-    expect(view.prototype.formats.map((r) => r.map((i) => i.type))).toEqual([[0x0041, PDF, 0x0043], [0x004c, 0x004b, PDFA, 0x004f], [0x0044]]);
+    expect(view.prototype.formats.map((r) => r.map((i) => i.type))).toEqual([[0x0041, PDF, 0x0043], [0x004c, 0x004b, PDFA, 0x004f], [0x0044, TXT]]);
     expect(trimDownloadFormats(win, 'word')).toBe(true);
     expect(view.prototype.formats.length).toBe(3);
+  });
+
+  it("offers in the TXT and CSV dialogs only the encodings x2t writes here", () => {
+    const encodings = [
+      [36, 1254, 'windows-1254', 'Turkish (Windows)'],
+      [46, 65001, 'UTF-8', 'Unicode (UTF-8)'],
+      [47, 65000, 'UTF-7', 'Unicode (UTF-7)'],
+      [48, 1200, 'UTF-16LE', 'Unicode (UTF-16)'],
+      [49, 1201, 'UTF-16BE', 'Unicode (UTF-16 Big Endian)'],
+      [50, 12000, 'UTF-32LE', 'Unicode (UTF-32)'],
+      [51, 12001, 'UTF-32BE', 'Unicode (UTF-32 Big Endian)'],
+    ];
+    const common: { c_oAscEncodings: unknown[][] } = { c_oAscEncodings: encodings };
+    const win: Record<string, unknown> = { AscCommon: common, SSE: { Views: { FileMenuPanels: { ViewSaveAs: { prototype: { formats: [[{ type: CSV }]] } } } } } };
+    expect(trimDownloadFormats(win, 'cell')).toBe(true);
+    expect(common.c_oAscEncodings.map((e) => e[0])).toEqual([46, 48, 49, 50, 51]);
+    const words: { c_oAscEncodings: unknown[][] } = { c_oAscEncodings: encodings };
+    const de: Record<string, unknown> = { AscCommon: words, DE: { Views: { FileMenuPanels: { ViewSaveAs: { prototype: { formats: [[{ type: TXT }]] } } } } } };
+    expect(trimDownloadFormats(de, 'word')).toBe(true);
+    expect(words.c_oAscEncodings.map((e) => e[0])).toEqual([46]);
   });
 
   function editor() {
@@ -106,15 +146,28 @@ describe("the editor's Download as", () => {
   it("refuses what it does not write and the server's other commands, and ends the editor's wait", () => {
     const e = editor();
     e.take();
-    call(e.api, 6, { fileType: 0x0045 }, { c: 'save' }, { data: null }, '');
+    call(e.api, 6, { fileType: 0x0046 }, { c: 'save' }, { data: null }, '');
     call(e.api, 6, { fileType: 0x0041 }, { c: 'sendmm' }, { data: null }, '');
     call(e.api, 6, { fileType: PDF }, { c: 'save' }, { data: new Uint8Array(0) }, '');
+    call(e.api, 6, { fileType: TXT }, { c: 'save', codepage: 36 }, { data: null }, '');
     expect(e.jobs).toEqual([]);
-    expect(e.refused.length).toBe(3);
+    expect(e.refused).toEqual(['format 70', 'sendmm', 'the editor drew no pages', 'encoding 36']);
     expect(e.ended).toEqual([
       [1, 6],
       [1, 6],
       [1, 6],
+      [1, 6],
+    ]);
+  });
+
+  it('a txt carries the encoding the dialog chose; any other format none', () => {
+    const e = editor();
+    e.take();
+    call(e.api, 6, { fileType: TXT }, { c: 'save', codepage: 46, title: 'Rapor.txt' }, { data: null }, '');
+    call(e.api, 6, { fileType: 0x0041 }, { c: 'save', codepage: 48 }, { data: null }, '');
+    expect(e.jobs.map((j) => [j.job.format.ext, j.job.text])).toEqual([
+      ['txt', { codepage: 46 }],
+      ['docx', undefined],
     ]);
   });
 

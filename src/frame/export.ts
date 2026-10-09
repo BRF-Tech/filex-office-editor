@@ -15,9 +15,10 @@
 // editor's API object while the page runs.
 //
 // The File menu's "Download as" lists every format a Document Server writes;
-// trimDownloadFormats leaves the ones x2t writes here (formats.ts).
+// trimDownloadFormats leaves the ones x2t writes here (formats.ts), and the
+// encodings its TXT and CSV dialogs offer to the ones x2t writes them in.
 
-import { exportFormat, isPdf, type DocumentKind, type ExportFormat } from '../formats';
+import { exportFormat, isPdf, textEncodings, textOptions, type DocumentKind, type ExportFormat, type TextOptions } from '../formats';
 import { MEDIA_NAME, type MediaFile } from '../frame-protocol';
 
 type AnyWindow = Record<string, unknown>;
@@ -31,6 +32,8 @@ export interface ExportJob {
   pdf?: Uint8Array;
   /** The editor's json parameters (printPages, watermark...). */
   json?: string;
+  /** For txt and csv: the encoding and the delimiter the editor's dialog chose. */
+  text?: TextOptions;
 }
 
 /** The editor's namespace for each kind (its Backbone application). */
@@ -51,6 +54,14 @@ export function trimDownloadFormats(win: AnyWindow, kind: DocumentKind): boolean
   if (!proto || !Array.isArray(proto.formats)) return false;
   if (proto.__fxTrimmed) return true;
   proto.formats = proto.formats.map((row) => row.filter((item) => exportFormat(item?.type, kind) !== null)).filter((row) => row.length > 0);
+  // The TXT (a document) and CSV (a workbook) dialogs list
+  // AscCommon.c_oAscEncodings (getEncodingParams reads it each time): only
+  // the encodings x2t writes that kind's text in here are left in it.
+  const common = win.AscCommon as { c_oAscEncodings?: unknown[][] } | undefined;
+  const keep = textEncodings(kind);
+  if (keep && common && Array.isArray(common.c_oAscEncodings)) {
+    common.c_oAscEncodings = common.c_oAscEncodings.filter((e) => Array.isArray(e) && keep.includes(e[0] as number));
+  }
   proto.__fxTrimmed = true;
   return true;
 }
@@ -155,6 +166,13 @@ export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: 
       onRefused(format ? String(additional?.c ?? 'command') : `format ${String(options?.fileType ?? '?')}`);
       return;
     }
+    // A txt or csv: the encoding and the delimiter the editor's dialog chose.
+    const text = textOptions(format, additional);
+    if (text === null) {
+      end();
+      onRefused(`encoding ${String(additional?.codepage ?? '?')}`);
+      return;
+    }
     const purpose = actionType === PRINT || downloadType === 'asc_onPrintUrl' ? 'print' : 'download';
     let pdf: Uint8Array | undefined;
     if (isPdf(format.id)) {
@@ -174,6 +192,7 @@ export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: 
       title: String(additional?.title ?? this.documentTitle ?? ''),
       pdf,
       json: jp && typeof jp === 'object' && Object.keys(jp).length > 0 ? JSON.stringify(jp) : undefined,
+      text,
     };
     let over = false;
     onExport(job, () => {
