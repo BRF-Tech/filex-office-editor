@@ -9,6 +9,29 @@ update.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
+A patch release: the converter, x2t, is now this project's own build, and
+two faults of the converter 0.1.0 carried are gone with it. The same app
+for the same filex (0.55.0 or later), asking for the same permissions
+(`files:read`, `files:write`).
+
+### Fixed
+
+- **Documents with a formula open.** An odt, ods or odp with a formula as
+  LibreOffice writes one stopped the converter, and the document did not
+  open: 0.1.0's x2t (CryptPad's build) did not carry ONLYOFFICE's StarMath
+  converter, which reads every such formula. The formula now comes into the
+  document (and back out of it, in a docx, as OOXML math).
+- **txt and csv in Download as, with every Turkish letter.** 0.1.0 left both
+  out because its x2t cut every letter outside ASCII to its low byte
+  ("Şifreli" became "^ifreli": its UnicodeConverter handed the text to ICU
+  with `u_strFromWCS`, which fails on such letters in the WebAssembly
+  build). A document now downloads as txt (UTF-8) and a workbook's sheet as
+  csv (UTF-8, UTF-16 or UTF-32), through the editor's own dialog and with
+  the delimiter chosen there. The dialog lists only the encodings x2t
+  writes right here; another one is refused and the person is told.
+
 ### Changed
 
 - **x2t is this project's own build, from ONLYOFFICE core at the editor
@@ -19,29 +42,11 @@ update.
   CryptPad's recipe and its changes for WebAssembly ported to 9.4
   (`scripts/x2t/patches/`), and checks it against the SHA-256 sums pinned
   in `upstream/onlyoffice.json` (`x2t` release `v9.4.0.129+1`). Two builds
-  from empty trees gave the same bytes. `scripts/fetch-x2t.mjs` takes a
-  build made elsewhere (`--dir`, `--from`). The documents x2t writes name
-  their application `ONLYOFFICE/9.4.0.129`, as the Document Server's do.
-
-### Added
-
-- **txt and csv in Download as**, in the encoding the editor's dialog
-  offers and, for a csv, with the delimiter chosen: a document as txt
-  (UTF-8), a workbook's sheet as csv (UTF-8, UTF-16, UTF-32). The dialog
-  lists only the encodings x2t writes right here; another one is refused
-  and the person is told.
-
-### Fixed
-
-- **Turkish letters in a txt or csv**: CryptPad's x2t cut every letter
-  outside ASCII to its low byte ("Şifreli" became "^ifreli") - its
-  UnicodeConverter handed the text to ICU with `u_strFromWCS`, which fails
-  on such letters in the WebAssembly build. This build uses ICU's UTF-32
-  functions there.
-- **An odt, ods or odp with a formula** no longer stops the converter:
-  CryptPad's x2t did not link ONLYOFFICE's StarMath converter, which reads
-  every formula LibreOffice writes. The formula now comes into the
-  document (and back out of it, in a docx, as OOXML math).
+  from empty trees gave the same bytes. The release attaches it as
+  `x2t.zip` next to `ui.zip` (`scripts/fetch-x2t.mjs` downloads and checks
+  it, or takes a build made elsewhere with `--dir` or `--from`). The
+  documents x2t writes name their application `ONLYOFFICE/9.4.0.129`, as
+  the Document Server's do.
 
 ## [0.1.0] - 2026-10-09
 

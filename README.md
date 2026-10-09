@@ -25,27 +25,28 @@ releases, as filex gains what they need ([Roadmap](#roadmap)).
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.1.0, the first release.** One person edits a document in a
-> folder that is not encrypted and saves it as a new version; Download as
-> and Print go through filex; the editor's settings are kept; New document
-> gets three rows; on a phone the document opens in ONLYOFFICE's phone view
-> to read, with "Edit". Measured in a real filex 0.55.0
-> ([Measured in filex 0.55](#measured-in-filex-055)). filex 0.55 opens no
-> app on an encrypted file, so in an encrypted folder filex keeps its own
-> read-only preview.
+> **Status: 0.1.1.** One person edits a document in a folder that is not
+> encrypted and saves it as a new version; Download as and Print go through
+> filex; the editor's settings are kept; New document gets three rows; on a
+> phone the document opens in ONLYOFFICE's phone view to read, with "Edit".
+> 0.1.1 carries this project's own x2t: a document with a formula opens,
+> and txt and csv are in Download as with every Turkish letter. Measured in
+> a real filex 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)).
+> filex 0.55 opens no app on an encrypted file, so in an encrypted folder
+> filex keeps its own read-only preview.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
 | filex | **0.55.0** or later (`"filex": ">=0.55.0"`) |
-| Release | **0.1.0** (tag `v0.1.0`): `ui.zip`, 98.2 MiB, SHA-256 `61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6` ([Installing](#installing), [Building a release](#building-a-release)) |
+| Release | **0.1.1** (tag `v0.1.1`): `ui.zip`, 98.3 MiB, SHA-256 `7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
 
 In filex 0.55.0 or later, as an administrator: **Admin → Plugins → Apps →
 Install an app → GitHub repository**, `BRF-Tech/filex-office-editor`, tag
-`v0.1.0`. filex reads `filex-app.json` at that tag, downloads the release's
+`v0.1.1`. filex reads `filex-app.json` at that tag, downloads the release's
 `ui.zip` and refuses it unless its SHA-256 is the one the manifest names.
 The review lists what the app asks for: `files:read` and `files:write` (the
 file it was opened with, and its new versions), and what its interface is
@@ -267,7 +268,7 @@ the per-theme thumbnails out, below):
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
 | The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
 | **The editor bundle** | **2,623** | **286.1** | **88.5** |
-| **The app's bundle** (`ui.zip` of 0.1.0: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image) | **2,633** | **323.4** | **98.2** |
+| **The app's bundle** (`ui.zip` of 0.1.1: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.1.0's was 98.2 MiB) | **2,633** | **323.4** | **98.3** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
@@ -516,15 +517,31 @@ packages by `package-lock.json`, x2t by its hashes - so anyone can make the
 same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 
 ```bash
-git clone --branch v0.1.0 https://github.com/BRF-Tech/filex-office-editor
+git clone --branch v0.1.1 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
-bash scripts/x2t/build.sh             # x2t, checked against upstream/onlyoffice.json (0.1.0: node scripts/fetch-x2t.mjs)
 docker run --rm -v "$PWD:/src" -w /src \
   docker.io/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 \
-  sh -c 'npm ci && node scripts/build-app.mjs'
+  sh -c 'npm ci && node scripts/fetch-x2t.mjs && node scripts/build-app.mjs'
 sha256sum dist/ui.zip                 # the value in filex-app.json
 ```
+
+`fetch-x2t.mjs` takes x2t from the release's `x2t.zip`, checked by the
+SHA-512 and the two SHA-256 sums in `upstream/onlyoffice.json`. To make x2t
+too rather than take it, run `bash scripts/x2t/build.sh` first (about 20
+minutes, [x2t, the converter](#x2t-the-converter)): it puts the same two
+files in `dist/x2t/`, and `fetch-x2t.mjs` then finds them in place. The
+release's `x2t.zip` is `node scripts/fetch-x2t.mjs --pack dist/x2t.zip`,
+run in the same Node image.
+
+Measured for 0.1.1 (2026-10-10, an x86-64 Linux machine): two complete
+builds in two fresh checkouts, from the image to the zip, each with its own
+build of x2t (the two of [x2t, the converter](#x2t-the-converter)), gave the
+same `ui.zip` - 103,087,642 bytes, 2,633 files, SHA-256
+`7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b` - the
+same `x2t.zip` - 10,221,381 bytes, SHA-512 `4a5ba87a...f9f77335` (and so
+did `--pack` under Node 22.12 on Windows) - and the same `editor.zip` as
+the lock file; about four minutes each from the image to the zip.
 
 Measured for 0.1.0 (2026-10-09, an x86-64 Linux machine): two complete
 builds in two fresh checkouts, from the image to the zip, gave the same
@@ -821,15 +838,16 @@ put the new release in `upstream/onlyoffice.json`, run
 
 ## Roadmap
 
-**0.1.0** (2026-10-09, filex 0.55.0 or later) is what works today:
+**0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
+for filex 0.55.0 or later, are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
    inline scripts moved to files ([The editor bundle](#the-editor-bundle)).
-2. x2t in a worker: CryptPad's WebAssembly build, pinned
-   ([x2t, the converter](#x2t-the-converter)); since then this project's
-   own, from ONLYOFFICE core at the editor's tag, with txt and csv back in
-   Download as and ODF formulas read.
+2. x2t in a worker: in 0.1.0 CryptPad's WebAssembly build, since 0.1.1
+   this project's own, from ONLYOFFICE core at the editor's tag - with txt
+   and csv back in Download as and ODF formulas read
+   ([x2t, the converter](#x2t-the-converter)).
 3. The app: one person editing a document in a folder that is not
    encrypted, saving it as a new version; Download as and Print through
    filex; the editor's settings kept between openings; New document rows;
@@ -853,10 +871,7 @@ Next - the numbers are a plan, and each waits for what filex has to give it
   `files:co-edit` (planned for filex 0.57 or later).
 - **In any release before those**: a corpus of real documents compared
   with what a Document Server makes of them; and, when filex serves an
-  app's package compressed, a lighter download for the browser. This
-  project's own x2t, from ONLYOFFICE core at the editor's tag, is done
-  ([x2t, the converter](#x2t-the-converter)) and goes out with the next
-  release.
+  app's package compressed, a lighter download for the browser.
 
 ## License
 
