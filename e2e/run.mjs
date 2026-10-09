@@ -54,7 +54,9 @@
 //     session and count two people, what one types reaches the other's
 //     bridge (the same changes), both bridges hold the same locks, a save by
 //     the one who did not type holds the other's text and is written into
-//     the log with how far it reaches (`through`), neither is told
+//     the log with how far it reaches (`through`), a third person who may
+//     only read follows in ONLYOFFICE's live viewer and sees the typed text
+//     before anybody saves (read from her editor's document), neither is told
 //     "unsaved changes" while the other may save, and when one leaves the
 //     other counts one again (togetherRun);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
@@ -179,6 +181,22 @@ async function people(page, ext) {
     const box = document.querySelector('#tlb-box-users');
     return { visible: users.getVisibleEditingCount(), all: users.length, badge: !!box && !!box.offsetParent };
   }, NAMESPACE[ext]);
+}
+
+/**
+ * What a document editor shows, read from its own document (sdkjs's
+ * CDocument), and whether it is in view mode and ONLYOFFICE's live viewer.
+ */
+async function viewerFacts(page) {
+  return editorFrame(page).evaluate(() => {
+    const api = (window.Asc && window.Asc.editor) || window.editor;
+    const doc = api && api.WordControl && api.WordControl.m_oLogicDocument;
+    return {
+      text: doc && typeof doc.GetText === 'function' ? String(doc.GetText()) : '',
+      viewMode: !!(api && api.isViewMode),
+      liveViewer: !!(api && typeof api.isLiveViewer === 'function' && api.isLiveViewer()),
+    };
+  });
 }
 
 /** Wait for the next file the app hands filex (ui.download, or the ui.print stand-in). */
@@ -935,6 +953,10 @@ async function encryptedRun(browser, server, engine, o) {
  *   - both editors join the one session (the first starts it and puts the
  *     base, the second opens the base) and each counts two people;
  *   - what Ayşe types reaches Mehmet's bridge: both hold the same changes;
+ *   - Zeynep, who may only read, follows as a watcher: her bridge holds the
+ *     same changes, and her editor - ONLYOFFICE's live viewer, in view mode
+ *     (liveViewerSupport) - shows what Ayşe typed before anybody saves, read
+ *     from the editor's own document; she writes nothing into the log;
  *   - both bridges hold the same locks (every bridge applies the same lock
  *     requests in the same order);
  *   - Mehmet saves (filex's Save): the file holds Ayşe's text, and the save
@@ -943,7 +965,7 @@ async function encryptedRun(browser, server, engine, o) {
  *   - neither is told "unsaved changes" while the other may save;
  *   - Mehmet leaves: the log says so, and Ayşe's editor counts one again.
  */
-async function togetherRun(browser, server, engine) {
+async function togetherRun(browser, server, engine, o) {
   const doc = 'tr.docx';
   const room = `room-${engine}`;
   const r = { engine, doc: `${doc} (two people)`, ok: false, steps: [], problems: [], notes: [] };
@@ -1010,6 +1032,21 @@ async function togetherRun(browser, server, engine) {
       return ca > 0 && ca === cb && ca === cw ? { a: ca, b: cb, w: cw } : false;
     }, 30_000);
     step('the same changes', counts);
+    // What Zeynep's editor shows, read from its own document (not the
+    // bridge's count): ONLYOFFICE's live viewer (liveViewerSupport) puts the
+    // changes in as they land, before anybody saves.
+    const shown = await until("Zeynep's viewer to show what Ayşe typed", async () => {
+      const v = await viewerFacts(w.page);
+      return v.text.includes(TYPED) ? v : false;
+    }, 30_000);
+    step('Zeynep sees it', { viewMode: shown.viewMode, liveViewer: shown.liveViewer });
+    r.watcher = { viewMode: shown.viewMode, liveViewer: shown.liveViewer, afterTypedMs: r.steps.at(-1).ms - r.steps.find((s) => s.name === 'Ayşe typed').ms };
+    if (!shown.viewMode) r.problems.push("Zeynep's editor is not in view mode");
+    if (!shown.liveViewer) r.problems.push("Zeynep's editor is not ONLYOFFICE's live viewer");
+    if (o.shots) {
+      mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+      await w.page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-together-watcher.png`) });
+    }
     const watcher = server.relay.snapshot(room).members.find((m) => m.name === 'Zeynep Kaya');
     if (!watcher || watcher.canEdit) r.problems.push('the watcher is not a member that may not write');
     else if (server.relay.snapshot(room).log.some((e) => e.client === watcher.client && e.kind !== 'join')) r.problems.push('the watcher wrote into the log');
@@ -1155,7 +1192,7 @@ async function main() {
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
       if (o.together) {
-        const r = await togetherRun(browser, server, engine);
+        const r = await togetherRun(browser, server, engine, o);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
