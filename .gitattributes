@@ -12,3 +12,5 @@
 *.ttf binary
 *.woff binary
 *.woff2 binary
+# patches to ONLYOFFICE core: byte for byte (some of core's files end their lines in CRLF)
+scripts/x2t/patches/*.patch -text

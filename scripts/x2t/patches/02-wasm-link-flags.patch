@@ -1,0 +1,51 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-10: what emscripten's
+linker needs of ONLYOFFICE core v9.4.0.129's qmake files, under the
+core_wasm configuration steps.sh passes to every project.
+
+  - Common/base.pri: no -Wl,--disable-new-dtags and no -Wl,--exclude-libs
+    (wasm-ld knows neither and stops);
+  - DesktopEditor/graphics/pro/raster.pri: no HEIF pictures (libheif,
+    libde265 and x265 are not built for WebAssembly; cximage leaves HEIF
+    out the same way for ONLYOFFICE's own wasm modules).
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/Common/base.pri b/Common/base.pri
+index 861109014..f3fbae24b 100644
+--- a/Common/base.pri
++++ b/Common/base.pri
+@@ -361,7 +361,8 @@ core_linux {
+ 	equals(TEMPLATE, app) {
+ 		QMAKE_LFLAGS += "-Wl,-rpath,\'\$$ORIGIN\'"
+ 		QMAKE_LFLAGS += "-Wl,-rpath,\'\$$ORIGIN/system\'"
+-		QMAKE_LFLAGS += -Wl,--disable-new-dtags
++		# filex-office-editor (BRF Tech, 2026-10-10): wasm-ld has no --disable-new-dtags.
++		!core_wasm:QMAKE_LFLAGS += -Wl,--disable-new-dtags
+ 
+ 		!disable_rpath_addon {
+ 			RUN_PATH_ADDON = $$(RUN_PATH_ADDON)
+@@ -581,6 +582,8 @@ config_hidden_symbols {
+ 
+ 	core_mac:CONFIG += clang_no_exclude_libs
+ 	core_ios:CONFIG += clang_no_exclude_libs
++	# filex-office-editor (BRF Tech, 2026-10-10): wasm-ld has no --exclude-libs.
++	core_wasm:CONFIG += clang_no_exclude_libs
+ 
+ 	!clang_no_exclude_libs {
+ 		plugin:QMAKE_LFLAGS += -Wl,--exclude-libs,ALL
+diff --git a/DesktopEditor/graphics/pro/raster.pri b/DesktopEditor/graphics/pro/raster.pri
+index 87a234377..883b01a84 100644
+--- a/DesktopEditor/graphics/pro/raster.pri
++++ b/DesktopEditor/graphics/pro/raster.pri
+@@ -317,7 +317,10 @@ SOURCES += \
+ SOURCES += \
+ 	$$LIB_GRAPHICS_PRI_PATH/raster/PICT/PICFile.cpp
+ 
+-!build_xp {
++# filex-office-editor (BRF Tech, 2026-10-10): the WebAssembly build has no
++# libheif (libheif, libde265 and x265 are not built for it); HEIF pictures
++# are left out, as cximage does for ONLYOFFICE's own wasm modules.
++!build_xp:!core_wasm {
+ 	CONFIG += support_heif
+ }
+ 

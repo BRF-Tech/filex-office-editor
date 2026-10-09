@@ -1,5 +1,7 @@
 # build output (a release attaches ui.zip; the repository does not carry it)
 dist/
+# the x2t build tree (scripts/x2t/build.sh)
+.x2t-build/
 *.wasm
 coverage/
 

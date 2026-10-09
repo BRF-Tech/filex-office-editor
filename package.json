@@ -10,6 +10,7 @@
     "test:x2t": "node scripts/fetch-x2t.mjs && vitest run tests/x2t-wasm.test.ts",
     "typecheck": "tsc -p tsconfig.json",
     "x2t": "node scripts/fetch-x2t.mjs",
+    "x2t:build": "bash scripts/x2t/build.sh",
     "editor": "bash scripts/extract-editor.sh",
     "build": "node scripts/build-app.mjs",
     "e2e": "node e2e/run.mjs"
