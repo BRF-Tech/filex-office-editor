@@ -7,10 +7,11 @@ open in the editor in place of filex's preview, and saving writes a new
 version of the file. Nothing of the editor runs on the server: its files come
 from the app's package and the document is converted in the browser.
 
-The design goes further - documents **inside encrypted folders**, decrypted
-in the browser, edited there and encrypted again before they are saved, and
-**editing together** through filex's relay - and those come with later
-releases, as filex gains what they need ([Roadmap](#roadmap)).
+It goes further with filex 0.56: documents **inside encrypted folders**,
+decrypted in the browser, edited there and encrypted again before they are
+saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-folder),
+0.2.0, not released yet). **Editing together** through filex's relay comes
+with a later release, as filex gains what it needs ([Roadmap](#roadmap)).
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -159,7 +160,7 @@ more, which later filex releases bring.
 | ONLYOFFICE's `DocsAPI.DocEditor` opens the editor page in a frame of its own | `ui.frame_package` → permission `ui:frame-package`: frames from the app's own package only, in the same sandbox | 0.1.0 |
 | The editor page may be framed by the app page | a package page carries no `frame-ancestors` (⚠ measured in Chromium before 0.55: `*` never matches an opaque origin, and the editor page was refused) | 0.1.0 |
 | The editor loads the document from a `blob:` address | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` | 0.1.0 |
-| The plaintext of a document in an encrypted folder | not given: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`) | a later release, with filex's `files:e2e-plaintext`: the explorer decrypts and hands the bytes over, encrypts the save (a conditional write); a separate permission with a stern warning in the review |
+| The plaintext of a document in an encrypted folder | not given in 0.55: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`). **filex 0.56:** the manifest's `encrypted_folders: {"open": true}` → the derived permission `files:e2e-plaintext` (a stern sentence in the review): the person's browser decrypts the document for the app (`FileInfo.plaintext`) and encrypts the save, written only over the file as it was opened | 0.2.0 ([In an encrypted folder](#in-an-encrypted-folder)) |
 | Editing together | the SDK's `coedit.*` methods are defined, and answer `unavailable`: the relay has no routes yet | a later release, with filex's `files:co-edit`: the relay's routes and WebSocket, its tables, the sealed blob store |
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
@@ -723,6 +724,45 @@ next opening. Its settings, all under `mobile-` in its storage, are kept
 with the editor's in the one value (`src/settings.ts`), and its start waits
 for them like the editor's (`src/frame/hold.ts`).
 
+## In an encrypted folder
+
+0.2.0 (on `main`, not released; filex **0.56.0** or later). The manifest
+says `"encrypted_folders": {"open": true}`, and filex derives the permission
+`files:e2e-plaintext` from it - the install review says what it means: the
+app sees every document opened with it in an encrypted folder; the server
+still holds only encrypted data. The app's reason is in `filex-app.json`
+(English and Turkish).
+
+With the folder unlocked in the person's browser, filex offers the editor on
+a document there. filex does both halves of the encryption, in the browser
+(the CryptPad model):
+
+- **Opening:** filex reads the ciphertext the server holds through the app's
+  own door, decrypts it with the folder key and hands the app the plaintext
+  (`FileInfo` says `encrypted: "folder"`, `plaintext: true`). The app reads it
+  through the SDK as it reads any document - `fx.open(0).bytes()` - and x2t
+  converts it in the app's worker, inside the sandbox.
+- **Saving:** the editor's Save, filex's Save and the ten-minute save hand
+  the document to the SDK's `save()` as always; filex encrypts it with the
+  folder key before anything leaves the browser and writes it as a new
+  version, only over the file as the editor opened it.
+- **Download as and Print** still hand the person a copy on their click, as
+  filex's own decrypted download does.
+- **Not here:** a vault, a single encrypted file (`.fxe`), a folder whose
+  names are encrypted, or filex 0.55 and older - filex does not hand the
+  document over (`encrypted` without `plaintext`), and the app says so
+  instead of asking for it (`src/app/config.ts` `encryptedNotHanded`).
+- **Lock** in filex closes the editor with the folder (save first).
+
+The measurement imitates filex 0.56 (`e2e/harness/host.js`, `enc=folder`):
+the harness holds the document as filex's explorer encrypts it (the
+`filexe2e` one-shot format), decrypts it for the app and encrypts the save;
+`npm run e2e` then checks, in each engine, that the server receives only
+ciphertext, that no request carries a document in the clear, and that what
+the server holds decrypts to a document with the typed text - and that on
+filex 0.55 (`enc=055`) the app says the document is encrypted
+(`encryptedRun`). Written for 0.2.0; not run yet.
+
 ## Measured in the browsers
 
 `npm run e2e` (`node e2e/run.mjs`, `--shots` for screenshots) serves the
@@ -964,9 +1004,11 @@ Next - the numbers are a plan, and each waits for what filex has to give it
 ([What filex provides](#what-filex-provides)):
 
 - **0.2.0, encrypted folders**: one person editing a document in an
-  encrypted folder, with filex's `files:e2e-plaintext` (the explorer
-  decrypts the document for the app and encrypts what it saves; planned for
-  filex 0.56).
+  encrypted folder, with filex 0.56's `encrypted_folders` /
+  `files:e2e-plaintext` (filex decrypts the document for the app and
+  encrypts what it saves) - built on `main`
+  ([In an encrypted folder](#in-an-encrypted-folder)), released once filex
+  0.56 is, after its measurement in the three browsers and in filex 0.56.
 - **0.3.0, editing together**: several people in one document, in an
   encrypted folder or a plain one, through filex's relay and its
   `files:co-edit` (planned for filex 0.57 or later).
