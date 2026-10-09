@@ -36,7 +36,7 @@ releases, as filex gains what they need ([Roadmap](#roadmap)).
 
 | | |
 |---|---|
-| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built from ONLYOFFICE core (in 0.1.0 CryptPad's build, pinned under `x2t` in the same file) - see [NOTICE](NOTICE) |
+| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
 | filex | **0.55.0** or later (`"filex": ">=0.55.0"`) |
 | Release | **0.1.0** (tag `v0.1.0`): `ui.zip`, 98.2 MiB, SHA-256 `61a1a9db840c8ab0adad07760f190796ababecbff0fda0fe8c7c8aa0d6986ef6` ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
@@ -176,7 +176,7 @@ more, which later filex releases bring.
 | `src/shim.ts` | A `socket.io` stand-in: the editor's socket is plugged into the bridge |
 | `src/session.ts` | `LocalSession`: the session's log for one person, in the editor page, with the relay's rules (one order, changes only under the lease, the lease only for a member that has seen every change) |
 | `src/x2t.ts` | Drives x2t (WebAssembly) to turn a docx/xlsx/pptx (or odt/ods/odp) into the editor's format and back, and to write the editor's document in another format (Download as, PDF) |
-| `src/formats.ts` | What Download as and Print can make here: the formats x2t writes, by the editor's file type, and what was measured to be left out |
+| `src/formats.ts` | What Download as and Print can make here: the formats x2t writes, by the editor's file type, the encodings it writes a txt or csv in, and what was measured to be left out |
 | `src/settings.ts` | Which of the editor's settings are kept between openings, and how they fit in filex's store |
 | `src/protocol.ts` | The messages and numbers both sides use |
 | `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)) |
@@ -189,7 +189,8 @@ more, which later filex releases bring.
 | `upstream/onlyoffice.json` | The one place the upstream versions are pinned: the ONLYOFFICE Docs release the editor files are taken from (version, build, image tag and digest, source tag, the date it was pinned) and, under `x2t`, the converter build (release, address, SHA-512, each file's SHA-256) |
 | `upstream/editor.lock.json` | What the editor bundle built from that release holds: every file with its SHA-256 and size, what was left out and why, what was changed and why, the zip's size and SHA-256 |
 | `scripts/extract-editor.sh` | Builds the editor bundle from the pinned image ([The editor bundle](#the-editor-bundle)); `scripts/editor/` holds its steps: `in-image.sh` (in the image), `rules.mjs` (what is kept, filex's limits), `html.mjs` (no inline code), `storage.js` (the storage stand-in), `bundle.mjs`, `fontnames.mjs`, `config.mjs` |
-| `scripts/fetch-x2t.mjs` | Fetches the pinned x2t build and checks it ([x2t, the converter](#x2t-the-converter)) |
+| `scripts/x2t/` | Builds x2t from ONLYOFFICE core at the editor's tag ([x2t, the converter](#x2t-the-converter)): `build.sh` (the host's side, docker only), `Dockerfile` (the toolchain), `steps.sh` (the build, in its container), `patches/` (the changes to core), `main1.cpp` and `pre-js.js` (x2t's entry for the page) |
+| `scripts/fetch-x2t.mjs` | Puts an x2t build made elsewhere in `dist/x2t/` (`--dir`, `--from`), checked against the pin |
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
@@ -199,7 +200,8 @@ more, which later filex releases bring.
 npm install
 npm test              # vitest run (the x2t round trips are skipped without the build)
 npm run typecheck     # tsc
-npm run test:x2t      # fetch the pinned x2t build (39 MB, checked), then its round trips
+npm run x2t:build     # bash scripts/x2t/build.sh: x2t from ONLYOFFICE core (needs docker, about 20 minutes)
+npm run test:x2t      # the x2t in dist/x2t (checked against the pin), then its round trips
 npm run editor        # bash scripts/extract-editor.sh: the editor bundle (needs docker)
 npm run build         # node scripts/build-app.mjs: the app's bundle, dist/ui.zip
 npm run e2e           # node e2e/run.mjs: the bundle in Chromium, Firefox and WebKit
@@ -327,55 +329,174 @@ in the bundle says so.
 
 ## x2t, the converter
 
-The converter is pinned under `x2t` in `upstream/onlyoffice.json`. Until
-this project builds its own from ONLYOFFICE core at the editor's tag (a
-later release, [Roadmap](#roadmap)), it is - in 0.1.0 too - **CryptPad's
-build**:
-[onlyoffice-x2t-wasm](https://github.com/cryptpad/onlyoffice-x2t-wasm)
-`v9.3.2+3` (AGPL-3.0-or-later), pinned like CryptPad pins it, by the
-release's SHA-512, and by each file's SHA-256. `node scripts/fetch-x2t.mjs`
-downloads it (or takes a zip with `--from`), checks all three hashes and
-puts `x2t.js` and `x2t.wasm` in `dist/x2t/`.
+x2t is ONLYOFFICE's converter: a Document Server runs it as a program to
+turn a docx, xlsx or pptx into the editor's format and back, and to write
+the other formats of Download as. Here it is the same program, from
+ONLYOFFICE core, compiled to WebAssembly and run in a worker (`src/x2t.ts`
+drives it). It is **this project's own build, from ONLYOFFICE core at the
+editor files' tag** - `v9.4.0.129`, commit `a016fc28` - released here as
+**`v9.4.0.129+1`** and pinned under `x2t` in
+[`upstream/onlyoffice.json`](upstream/onlyoffice.json): how it is built,
+every source by its commit, and the SHA-256 of `x2t.js` and `x2t.wasm`.
+Release 0.1.0 carried CryptPad's build
+([onlyoffice-x2t-wasm](https://github.com/cryptpad/onlyoffice-x2t-wasm)
+`v9.3.2+3`, whose core came from Euro-Office's copy of ONLYOFFICE core at
+9.3.2).
 
-`npm run test:x2t` then drives it with `src/x2t.ts`, in Node, through
-three documents built in the test with Turkish text (ğ Ğ ı İ ş Ş ç ö ü):
-a Word document with bold and italic runs and a table, a workbook with a
-sheet named in Turkish, numbers and a formula, a presentation. Measured:
+### Building it
+
+```bash
+bash scripts/x2t/build.sh     # or: npm run x2t:build - needs bash and docker only
+#   --cpus N --memory SIZE    the build container's share (default 8 and 16g)
+#   --work DIR                the build tree (default .x2t-build/, about 4.5 GB)
+#   --out DIR                 where x2t.js and x2t.wasm go (default dist/x2t)
+```
+
+`build.sh` builds the toolchain image (`scripts/x2t/Dockerfile`:
+emscripten's own image, `emscripten/emsdk:4.0.11`, pinned by digest, with
+qmake and autotools from Ubuntu's snapshot of 2026-10-01, so the same
+packages come every time) and runs the build in a container of it
+(`scripts/x2t/steps.sh`) with the CPUs and memory it is given. It then
+checks the two files against the sums pinned in `upstream/onlyoffice.json`
+and puts them in `dist/x2t/`; a build that gives other bytes fails and
+says so. Every step leaves a stamp, so a build that stopped goes on from
+where it stopped; an empty `--work` builds everything. In the container:
+
+1. every source is fetched by the commit pinned in `x2t.build.sources` -
+   ONLYOFFICE core and build_tools at `v9.4.0.129`, hyphen, OpenSSL
+   1.1.1f (its headers only) - and Boost 1.84.0 by its tarball's SHA-256;
+   core's own fetch scripts bring the rest of its third-party code
+   (harfbuzz, brotli, gumbo, katana, md4c, the iWork readers), each at the
+   commit it names;
+2. the patches in `scripts/x2t/patches/` are applied to core (below);
+3. Boost's date_time and regex and emscripten's ICU port are compiled;
+4. the 28 libraries x2t links - core's qmake projects, from
+   UnicodeConverter and the kernel to the OOXML, Microsoft binary, ODF,
+   RTF, txt, PDF, HTML, EPUB, XPS, DjVu, iWork and HWP readers and writers -
+   are built one after another with `emcc -Os` and CryptPad's flags;
+5. x2t is linked: `main1` exported (the page calls it with the path of a
+   `params.xml`, as the Document Server calls x2t), `ccall` and the
+   in-memory file system, CryptPad's `pre-js.js`. The documents it writes
+   name their application `ONLYOFFICE/9.4.0.129`, as the Document Server's
+   do (CryptPad's build wrote `ONLYOFFICE/2.5.565.0`).
+
+The recipe is CryptPad's - its Dockerfile and `embuild.sh` at commit
+`7debf5e6` - carried over to 9.4, with the libraries built in one container
+instead of a Docker stage each. The patches, each saying what it changes
+and why:
+
+- `01-cryptpad-wasm.patch`: CryptPad's changes to ONLYOFFICE core for
+  WebAssembly - its `core/` at tag `v9.3.0+0` against core `v9.3.0.140`,
+  the commit it was pulled from - applied to `v9.4.0.129` three-way. Kept:
+  the build files of the libraries (emscripten's ICU instead of core's, no
+  second zlib, no library linked into another twice, the text shaper on),
+  doctrenderer without a JavaScript engine (CryptPad's stand-ins), two
+  functions of HtmlFile2 renamed, no FB2 converter, no memory limit,
+  `pdf.bin` read from beside the document. Left out, as 9.4 does not need
+  them: CryptPad's older copy of `Common/base.pri`, a binary reader moved
+  into its header, boost_regex unlinked (it is built here), a list of
+  headers, a renamed test file.
+- `02-wasm-link-flags.patch`: two linker flags emscripten's linker does not
+  know, and no HEIF pictures (libheif is not built for WebAssembly).
+- `03-unicode-utf32.patch`: the Turkish letters of a txt or csv
+  ([below](#txt-and-csv)).
+- `04-starmath.patch`: ONLYOFFICE's StarMath converter linked. CryptPad's
+  build leaves it out, and the ODF reader converts every formula LibreOffice
+  writes with it: an odt, ods or odp with a formula stopped the module
+  ("Aborted(missing function: ...CStarMathConverter...)", measured on
+  CryptPad's `v9.3.2+3`, the x2t of release 0.1.0). Now the formula comes in
+  as OOXML math.
+
+What x2t still does without, as CryptPad's build does: the link lists 86
+functions it does not have, and a conversion that reached one would stop
+the module - OpenSSL's (signing a document, checking a signature), the
+JavaScript engine's (doctrenderer runs none here; html, md and the images,
+which need it, end with x2t's error 80, measured, not with a stop) and the
+OFD reader's. FB2 and HEIF are not built.
+
+**Measured** (2026-10-10, an x86-64 Linux machine, `--cpus 6 --memory 7g`):
+two builds from empty trees, each from a fresh clone of this branch, the
+second with the toolchain image built again without Docker's cache (another
+image id), gave the same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`)
+and `x2t.wasm` (38,763,076 bytes, `8f643075...`), the sums pinned; so did
+the build the recipe was written with, resumed from its stamps again and
+again. About 20 minutes each - fetching the sources 3 minutes, Boost and
+emscripten's ICU 3, the graphics library 4.5, the link 2 - and a 4.5 GB
+build tree.
+
+### txt and csv
+
+CryptPad's build wrote a txt or csv with **every letter outside ASCII cut
+to its low byte** - "Şifreli belge" came out as `^ifreli belge` (Ş is
+U+015E, `^` is 0x5E) - so 0.1.0 left both out of Download as. The cause,
+measured, is UnicodeConverter, the part of core that writes text in an
+encoding: it hands the text (C++ `wchar_t`, UTF-32 on Linux and in
+WebAssembly) to ICU with `u_strFromWCS`. ICU knows that `wchar_t` is UTF-32
+on Linux, but not on emscripten: there it goes through the C library's
+`wcstombs` in the current locale, and in the "C" locale every letter outside
+ASCII fails (`U_ILLEGAL_ARGUMENT_ERROR`, measured with a small program
+against emscripten 4.0.11's ICU, which converts the same text with
+`u_strFromUTF32`). On the failure UnicodeConverter keeps each character's
+low byte. `03-unicode-utf32.patch` has it use ICU's UTF-32 functions
+wherever `wchar_t` holds more than 16 bits (Windows keeps `u_strFromWCS`).
+
+Download as offers **txt** for a document and **csv** for a workbook again.
+Both go through the editor's own dialog (the encoding; for a csv the
+delimiter too), and its choice reaches x2t as a Document Server passes it
+(`m_nCsvTxtEncoding`, `m_nCsvDelimiter`, `m_nCsvDelimiterChar`). The dialog
+lists only what x2t writes right here, measured code page by code page
+(`src/formats.ts`, `TEXT_ENCODINGS`):
+
+| | Offered | Not offered, measured |
+|---|---|---|
+| csv | UTF-8, UTF-16, UTF-16 big endian (each with its byte order mark), UTF-32 and UTF-32 big endian (without one) | every other code page: emscripten's ICU (68.2) has no conversion tables, so windows-1254, ISO-8859-9, windows-1252... do not open and the text came out cut to its low bytes; ISO-8859-1 opens and has no Ş, Ğ or İ |
+| txt | UTF-8 | x2t's txt writer writes UTF-8 for any code page but its "Unicode" (50) and "big endian" (51), and those as UTF-16 with the text left out wherever `wchar_t` is 32 bits - ONLYOFFICE's own, not this build's |
+
+An encoding outside the list that reaches the app anyway is refused, and
+the person is told. `tests/x2t-wasm.test.ts` writes the Turkish document as
+txt and the workbook as csv in each encoding offered and with each
+delimiter: red on CryptPad's build, green on this one.
+
+### The round trips
+
+`npm run test:x2t` drives the build with `src/x2t.ts`, in Node, through
+three documents built in the test with Turkish text (ğ Ğ ı İ ş Ş ç ö ü): a
+Word document with bold and italic runs and a table, a workbook with a
+sheet named in Turkish, numbers and a formula, a presentation; and an odt
+with a LibreOffice formula. Measured on `v9.4.0.129+1`:
 
 | | In | Editor.bin | Back | Same Editor.bin twice | Second save changes |
 |---|---:|---:|---:|---|---|
-| docx | 1,425 B | 1,612 B (`DOCY;v10`) | 8,809 B | yes | `word/theme/theme1.xml` once, then nothing |
-| xlsx | 2,477 B | 1,328 B (`XLSY;v10`) | 6,825 B | not always (below) | nothing |
-| pptx | 4,598 B | 2,076 B (`PPTY;v10`) | 10,901 B | yes | nothing |
+| docx | 1,425 B | 1,612 B (`DOCY;v10`) | 8,811 B | yes | `word/theme/theme1.xml` once, then nothing |
+| xlsx | 2,477 B | 1,328 B (`XLSY;v10`) | 6,827 B | not always (below) | nothing |
+| pptx | 4,598 B | 2,076 B (`PPTY;v10`) | 10,902 B | yes | nothing |
 
 Every text comes back exactly, with its bold and italic, the table's four
-cells, the sheet's name, its numbers and its `SUM` formula. Each conversion
-takes 6-28 ms; the module starts in about 120 ms. The first save adds what
+cells, the sheet's name, its numbers and its `SUM` formula; the odt's
+formula (`a + b`, MathML with its StarMath annotation) comes back in a docx
+as OOXML math (`<m:oMath>`), its Editor.bin 1,634 B. Each conversion
+takes 12-40 ms; the module starts in about 180 ms. The first save adds what
 x2t always writes (styles, settings, a theme, document properties); from
-the second save on, opening and saving again changes nothing. One finding:
-the **workbook's Editor.bin is not byte-for-byte the same** from one
-conversion to the next - x2t writes a block of it from memory it never
-cleared (10 different Editor.bin files in 12 conversions of one workbook,
-with other documents converted in between) -
-while the workbook made from any of them is the same. The test checks the
-workbooks, not those bytes; editing together does not depend on it either
-(everyone opens the one sealed Editor.bin its first editor made). The
-build's documents also name their application `ONLYOFFICE/2.5.565.0`, not
-the release; both are for this project's own build to look at.
+the second save on, opening and saving again changes nothing. As in
+CryptPad's build, the **workbook's Editor.bin is not byte-for-byte the
+same** from one conversion to the next - x2t writes a block of it from
+memory it never cleared (609 bytes differed between two conversions of one
+workbook here) - while the workbook made from any of them is the same. The
+test checks the workbooks, not those bytes; editing together does not
+depend on it either (everyone opens the one sealed Editor.bin its first
+editor made).
 
 **Download as** (`src/formats.ts`, `x2tExport`): from the editor's document
 the same test writes every format the app offers, each as its own type
 (x2t needs the type, `m_nFormatTo`: by the file name alone it writes a
 plain docx for a .dotx), with the Turkish text whole - docx, docm, dotx,
-odt, ott, rtf; xlsx, xlsm, xltx, ods, ots; pptx, pptm, potx, ppsx, odp,
-otp, in 4-53 ms each. PDF is made in the browser from the pages as the
-editor lays them out (its renderer's drawing, `pdf.bin` beside the
+odt, ott, rtf, txt; xlsx, xlsm, xltx, ods, ots, csv; pptx, pptm, potx,
+ppsx, odp, otp, in 4-51 ms each. PDF is made in the browser from the pages
+as the editor lays them out (its renderer's drawing, `pdf.bin` beside the
 document) and the fonts it drew them with: x2t has no layout of its own,
-and without them it writes nothing. Left out, measured on this build:
-**txt and csv**, which come out with every letter outside ASCII cut to its
-low byte ("Şehir" → "^ehir"; a test keeps watching it); html, md, fb2 and
-the images (jpg, png), which need the Document Server's renderer; and epub,
-which stops the module.
+and without them it writes nothing. Left out, measured again on this
+build: html, md, mht, fb2 and the images (jpg, png), which need the
+Document Server's renderer; and epub, which stops the module.
 
 ## The app
 
@@ -398,9 +519,10 @@ same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 git clone --branch v0.1.0 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
+bash scripts/x2t/build.sh             # x2t, checked against upstream/onlyoffice.json (0.1.0: node scripts/fetch-x2t.mjs)
 docker run --rm -v "$PWD:/src" -w /src \
   docker.io/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 \
-  sh -c 'npm ci && node scripts/fetch-x2t.mjs && node scripts/build-app.mjs'
+  sh -c 'npm ci && node scripts/build-app.mjs'
 sha256sum dist/ui.zip                 # the value in filex-app.json
 ```
 
@@ -579,6 +701,15 @@ outside the package and no failed request; openings 1.1-1.4 s in Chromium,
 run: `npm test` 212 of 212, `npm run typecheck` clean, `npm run test:x2t`
 9 of 9.
 
+**With this project's x2t** (`v9.4.0.129+1`, 2026-10-10; Windows,
+headless; the Turkish documents, `--no-settings --no-phone`), 9 of 9 in
+Chromium 147, Firefox 148 and WebKit 26.4: Download as offers TXT after RTF
+for a document and CSV after ODS for a workbook; the editor's own dialog
+offers UTF-8 alone for a txt and UTF-8, UTF-16 and UTF-32 for a csv; the
+txt (382 B) and the csv (106 B) come to filex in UTF-8 with every Turkish
+letter and the typed text; the OpenDocument copy, the PDF and Print as
+before; no request outside the package.
+
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
 three faces), the workbook's total `39,5` as the Turkish locale writes it.
@@ -696,7 +827,9 @@ put the new release in `upstream/onlyoffice.json`, run
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
    inline scripts moved to files ([The editor bundle](#the-editor-bundle)).
 2. x2t in a worker: CryptPad's WebAssembly build, pinned
-   ([x2t, the converter](#x2t-the-converter)).
+   ([x2t, the converter](#x2t-the-converter)); since then this project's
+   own, from ONLYOFFICE core at the editor's tag, with txt and csv back in
+   Download as and ODF formulas read.
 3. The app: one person editing a document in a folder that is not
    encrypted, saving it as a new version; Download as and Print through
    filex; the editor's settings kept between openings; New document rows;
@@ -718,11 +851,12 @@ Next - the numbers are a plan, and each waits for what filex has to give it
 - **0.3.0, editing together**: several people in one document, in an
   encrypted folder or a plain one, through filex's relay and its
   `files:co-edit` (planned for filex 0.57 or later).
-- **In any release before those**: this project's own x2t, built from
-  ONLYOFFICE core at the editor's tag in place of CryptPad's build (it also
-  decides whether txt and csv can be offered); a corpus of real documents
-  compared with what a Document Server makes of them; and, when filex serves
-  an app's package compressed, a lighter download for the browser.
+- **In any release before those**: a corpus of real documents compared
+  with what a Document Server makes of them; and, when filex serves an
+  app's package compressed, a lighter download for the browser. This
+  project's own x2t, from ONLYOFFICE core at the editor's tag, is done
+  ([x2t, the converter](#x2t-the-converter)) and goes out with the next
+  release.
 
 ## License
 

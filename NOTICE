@@ -115,16 +115,51 @@ sponsored by Ascensio System SIA.
    page like the editor's. ONLYOFFICE's files are not edited for any of
    these.
 
-4. The x2t WebAssembly build is ONLYOFFICE's converter (ONLYOFFICE core),
-   pinned under "x2t" in upstream/onlyoffice.json. Today it is CryptPad's
-   build, https://github.com/cryptpad/onlyoffice-x2t-wasm release v9.3.2+3
-   (commit 7debf5e6d6d4f19874d764cd34446f7e63c6bc32; AGPL-3.0-or-later):
-   ONLYOFFICE core with CryptPad's changes for WebAssembly, whose core/ was
-   pulled from Euro-Office's copy of ONLYOFFICE core at v9.3.2. This
-   project does not change it; scripts/fetch-x2t.mjs checks it against the
-   pinned SHA-512 and SHA-256 sums. Release 0.1.0 carries this build; a
-   later release replaces it with this project's own build from ONLYOFFICE
-   core at the editor files' tag.
+4. The x2t WebAssembly build (x2t/x2t.js, x2t/x2t.wasm in the app's
+   bundle) is ONLYOFFICE's converter, x2t, built by this project from
+   ONLYOFFICE core (https://github.com/ONLYOFFICE/core) at tag v9.4.0.129,
+   the editor files' own tag, with emscripten. scripts/x2t/ builds it
+   (build.sh, Dockerfile, steps.sh) and upstream/onlyoffice.json pins it
+   ("x2t": every source by its commit, the toolchain by its digest, the two
+   files by their SHA-256). It is a modified version of ONLYOFFICE core.
+   The changes are made at build time, by the patches in scripts/x2t/patches/
+   and two files of this project (scripts/x2t/main1.cpp, appended to
+   X2tConverter/src/main.cpp, and scripts/x2t/pre-js.js, put before the
+   module's JavaScript):
+     - 01-cryptpad-wasm.patch: CryptPad's changes to ONLYOFFICE core for
+       WebAssembly, from https://github.com/cryptpad/onlyoffice-x2t-wasm
+       (AGPL-3.0-or-later; its core/ at tag v9.3.0+0 against ONLYOFFICE
+       core v9.3.0.140, its build recipe at commit
+       7debf5e6d6d4f19874d764cd34446f7e63c6bc32): the build files of the
+       libraries x2t links, doctrenderer without a JavaScript engine
+       (DesktopEditor/doctrenderer/*_empty.cpp, CryptPad's), two functions
+       of HtmlFile2 renamed, the FB2 converter left out, x2t's memory limit
+       left out, pdf.bin read from beside the document. Ported to core
+       v9.4.0.129 by BRF Tech on 2026-10-10, with the parts that do not
+       apply there left out (README.md, "x2t, the converter");
+     - 02-wasm-link-flags.patch (BRF Tech, 2026-10-10): two linker flags
+       emscripten's linker does not know are not passed to it, and HEIF
+       pictures (libheif, not built for WebAssembly) are left out;
+     - 03-unicode-utf32.patch (BRF Tech, 2026-10-10): UnicodeConverter
+       turns wchar_t (UTF-32 here) into ICU's UTF-16 with ICU's UTF-32
+       functions; through u_strFromWCS every letter outside ASCII of a txt
+       or csv lost all but its low byte in the WebAssembly build;
+     - 04-starmath.patch (BRF Tech, 2026-10-10): x2t links ONLYOFFICE's
+       StarMath converter (OdfFile/Reader/Converter/StarMath2OOXML), which
+       CryptPad's build leaves out and without which an ODF formula stops
+       the module.
+   The build is CryptPad's recipe (its Dockerfile and embuild.sh) carried
+   over to that tag. The third-party code ONLYOFFICE core builds into x2t
+   is fetched by core's own scripts at the commits they name, and keeps its
+   license (core's 3DPARTY.md); it is a part of the third-party code the
+   Document Server's own x2t carries, whose license files travel in the
+   bundle (editor/license/, editor/3rd-Party.txt). The build adds:
+   Boost 1.84.0 (Boost Software License 1.0), the headers of OpenSSL
+   1.1.1f (no OpenSSL code is linked), hyphen (MPL 1.1, GPL 2.0 or LGPL
+   2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
+   port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
+   LLVM exception, the Unicode license). Release 0.1.0 carried CryptPad's
+   own build of x2t (release v9.3.2+3) unchanged.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:
