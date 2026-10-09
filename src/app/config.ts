@@ -100,6 +100,27 @@ export function encryptedNotHanded(info: object | null | undefined): boolean {
   return (encrypted === 'folder' || encrypted === 'vault' || encrypted === 'file') && plaintext !== true;
 }
 
+/**
+ * Why filex did not take a save, when it says which (filex 0.56, a document
+ * it hands over in the clear): `changed` - somebody saved the file after the
+ * editor opened it (in an encrypted folder or a vault); `vault_locked` -
+ * somebody else is writing the vault right now; `vault_lock_lost` - this
+ * session's write lock on the vault ended before the save was committed.
+ * Nothing was written in any of them, and the editor still holds the
+ * changes. null: any other failure, said with its reason.
+ */
+export type SaveRefusal = 'changed' | 'vault_locked' | 'vault_lock_lost';
+
+const SAVE_REFUSALS: readonly string[] = ['changed', 'vault_locked', 'vault_lock_lost'];
+
+/** The refusal a failed save carries (the SDK's FilexError: `failed` and the word), or null. */
+export function saveRefusal(e: unknown): SaveRefusal | null {
+  const code = (e as { code?: unknown } | null)?.code;
+  const message = (e as { message?: unknown } | null)?.message;
+  if (code !== 'failed' || typeof message !== 'string') return null;
+  return SAVE_REFUSALS.includes(message) ? (message as SaveRefusal) : null;
+}
+
 /** The languages the app's own words come in. */
 export type UiLang = 'en' | 'tr';
 

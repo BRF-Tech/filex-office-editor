@@ -15,6 +15,7 @@ import {
   editorRegion,
   encryptedNotHanded,
   isPhone,
+  saveRefusal,
   kindOf,
   narrowLayout,
   phoneLayout,
@@ -350,5 +351,49 @@ describe('the editor page', () => {
     const w = new InertWorker();
     expect(() => w.postMessage()).not.toThrow();
     expect(() => w.terminate()).not.toThrow();
+  });
+});
+
+// filex 0.56: a save filex refuses says why - the file saved by someone else
+// since it was opened (a folder or a vault), somebody else writing the vault,
+// the vault's write lock ended before the commit - and the app says it in a
+// person's words, not "changed (failed)". Red before: saveRefusal and
+// saveRefused did not exist and every refusal was "could not be saved: <code>".
+describe('a save filex refused, said in a person’s words', () => {
+  const failure = (message: string, code = 'failed') => Object.assign(new Error(message), { code });
+
+  it('reads the refusal filex said', () => {
+    expect(saveRefusal(failure('changed'))).toBe('changed');
+    expect(saveRefusal(failure('vault_locked'))).toBe('vault_locked');
+    expect(saveRefusal(failure('vault_lock_lost'))).toBe('vault_lock_lost');
+  });
+
+  it('anything else is not one: said with its reason, as before', () => {
+    expect(saveRefusal(failure('quota_exceeded'))).toBeNull();
+    expect(saveRefusal(failure('changed', 'unavailable'))).toBeNull();
+    expect(saveRefusal(new Error('changed'))).toBeNull();
+    expect(saveRefusal(null)).toBeNull();
+    expect(saveRefusal('vault_locked')).toBeNull();
+  });
+
+  it('the words, in both languages: what happened, that the changes are kept, what to do', () => {
+    for (const lang of ['en', 'tr'] as const) {
+      const said = STRINGS[lang].saveRefused;
+      expect(Object.keys(said).sort(), lang).toEqual(['changed', 'vault_lock_lost', 'vault_locked']);
+      for (const [k, v] of Object.entries(said)) {
+        expect(v.length, `${lang} ${k}`).toBeGreaterThan(40);
+        expect(v, `${lang} ${k}: no code in the words`).not.toMatch(/vault_lock|_locked|\(failed\)/);
+      }
+    }
+    expect(STRINGS.en.saveRefused.vault_locked).toMatch(/vault/);
+    expect(STRINGS.en.saveRefused.vault_lock_lost).toMatch(/nothing was saved/);
+    expect(STRINGS.tr.saveRefused.vault_locked).toMatch(/kasaya başka biri yazıyor/);
+    expect(STRINGS.tr.saveRefused.changed).toMatch(/kaydedilmedi/);
+  });
+
+  it('a document of a vault filex hands over is not "not handed": the old words said a vault never was', () => {
+    expect(encryptedNotHanded({ encrypted: 'vault', plaintext: true })).toBe(false);
+    expect(STRINGS.en.encryptedNotHanded).not.toMatch(/vault/);
+    expect(STRINGS.tr.encryptedNotHanded).not.toMatch(/kasa/);
   });
 });

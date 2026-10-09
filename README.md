@@ -748,10 +748,19 @@ a document there. filex does both halves of the encryption, in the browser
   version, only over the file as the editor opened it.
 - **Download as and Print** still hand the person a copy on their click, as
   filex's own decrypted download does.
-- **Not here:** a vault, a single encrypted file (`.fxe`), a folder whose
-  names are encrypted, or filex 0.55 and older - filex does not hand the
-  document over (`encrypted` without `plaintext`), and the app says so
-  instead of asking for it (`src/app/config.ts` `encryptedNotHanded`).
+- **In a vault** (filex 0.56): the same - `FileInfo` says `encrypted:
+  "vault"`, `plaintext: true`; filex reads the document from the vault and
+  writes the save as the vault's next generation. One person writes a vault
+  at a time: a save filex refuses because somebody else is writing it
+  (`vault_locked`), because the vault's write lock ended before the save
+  finished (`vault_lock_lost`), or because somebody saved the document since
+  it was opened (`changed`, in a folder too) writes nothing, and the app says
+  so in a person's words (`src/app/config.ts` `saveRefusal`, `saveRefused`
+  in `src/app/strings.ts`) - the changes stay in the editor.
+- **Not here:** a single encrypted file (`.fxe`), or filex 0.55 and older -
+  filex does not hand the document over (`encrypted` without `plaintext`),
+  and the app says so instead of asking for it (`src/app/config.ts`
+  `encryptedNotHanded`).
 - **Lock** in filex closes the editor with the folder (save first).
 
 The measurement imitates filex 0.56 (`e2e/harness/host.js`, `enc=folder`):

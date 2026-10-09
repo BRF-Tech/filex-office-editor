@@ -18,10 +18,17 @@ update.
   document of an unlocked encrypted folder for the editor (`FileInfo`
   `encrypted: "folder"`, `plaintext: true`) and encrypts what it saves; the
   app reads and saves it through the SDK as any document, and the server
-  sees only ciphertext. A document filex does not hand over (filex 0.55, a
-  vault, a `.fxe`, a folder with encrypted names, switched off by an
-  administrator) is said in the app's words instead of asked for
+  sees only ciphertext - in a vault too (`encrypted: "vault"`: filex reads
+  it from the vault and writes the save as the vault's next generation). A
+  document filex does not hand over (filex 0.55, a `.fxe`, switched off by
+  an administrator) is said in the app's words instead of asked for
   (`encryptedNotHanded`).
+- **A save filex refuses is said in a person's words** (`saveRefusal`):
+  somebody saved the document since it was opened (`changed`), somebody
+  else is writing the vault (`vault_locked`), the vault's write lock ended
+  before the save finished (`vault_lock_lost`) - nothing was written, the
+  changes stay in the editor, and the message says what to do, in English
+  and Turkish, instead of "could not be saved: changed (failed)".
 - The measurement imitates filex 0.56 (`enc=folder`: the harness holds the
   document as filex encrypts it, decrypts it for the app and encrypts the
   save; `enc=055`: filex 0.55) and `npm run e2e` checks it once per engine
