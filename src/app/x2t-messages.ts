@@ -34,5 +34,14 @@ export type WorkerRequest =
 
 export type WorkerReply =
   | { t: 'ready'; ms: number }
+  /** x2t could not start (the reason, in English). */
   | { t: 'failed'; message: string }
+  /**
+   * x2t stopped after it started (an abort, a trap, the stack or memory
+   * running out: x2t.ts stopsX2t), with why (x2t.ts x2tStopReason). The
+   * module cannot be used again: the page ends the worker and starts another
+   * for the next conversion. Comes before the result of the conversion that
+   * stopped it.
+   */
+  | { t: 'stopped'; message: string }
   | { t: 'result'; id: number; bytes?: ArrayBuffer; media?: WorkerFile[]; ms?: number; error?: string; code?: number | null };

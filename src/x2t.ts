@@ -57,6 +57,65 @@ export class X2tError extends Error {
 }
 
 /**
+ * A C++ symbol as a person can read it: `_ZN8COFDFileC1EPN7NSFonts17IApplicationFontsE`
+ * is `COFDFile::COFDFile`. Only the name (its nested names, a constructor or
+ * a destructor), not the parameters; anything else comes back as it is.
+ */
+export function readableSymbol(sym: string): string {
+  if (!sym.startsWith('_Z')) return sym;
+  const s = sym.slice(2);
+  const nested = s.startsWith('N');
+  let i = nested ? 1 : 0;
+  while (nested && 'KVr'.includes(s[i] ?? '-')) i++;
+  const parts: string[] = [];
+  for (;;) {
+    const m = /^\d+/.exec(s.slice(i));
+    if (!m) break;
+    const n = Number(m[0]);
+    i += m[0].length;
+    if (n <= 0 || i + n > s.length) return sym;
+    parts.push(s.slice(i, i + n));
+    i += n;
+    if (!nested) break;
+  }
+  if (parts.length === 0) return sym;
+  const last = parts[parts.length - 1];
+  if (nested && /^C[1-5]/.test(s.slice(i))) parts.push(last);
+  else if (nested && /^D[0-5]/.test(s.slice(i))) parts.push(`~${last}`);
+  return parts.join('::');
+}
+
+/**
+ * Why the module stopped, in one line: what emscripten's abort() was given
+ * (Module.onAbort), or the text of the error it threw ("Aborted(missing
+ * function: _ZN8COFDFile...). Build with -sASSERTIONS for more info."),
+ * without emscripten's wrapping and with a missing function's name made
+ * readable ("missing function: COFDFile::COFDFile").
+ */
+export function x2tStopReason(what: unknown): string {
+  let s = String((what as Error | null)?.message ?? what ?? '').trim();
+  s = s.replace(/^RuntimeError:\s*/, '');
+  s = s.replace(/\.?\s*Build with -sASSERTIONS for more info\.?$/, '');
+  const wrapped = /^Aborted\(([\s\S]*)\)$/.exec(s);
+  if (wrapped) s = wrapped[1].trim();
+  s = s.replace(/missing function: (\S+)/, (_, sym: string) => `missing function: ${readableSymbol(sym)}`);
+  return s.slice(0, 200) || 'aborted';
+}
+
+/**
+ * Whether an error out of x2t means the module cannot be used again: an
+ * abort (emscripten calls Module.onAbort, then throws a
+ * WebAssembly.RuntimeError), a trap (unreachable, an access out of bounds:
+ * also a RuntimeError) or the stack or the memory running out (RangeError).
+ * The module is then in whatever state it stopped in; only a new one
+ * converts reliably.
+ */
+export function stopsX2t(e: unknown): boolean {
+  const wasm = (globalThis as { WebAssembly?: { RuntimeError?: abstract new (...a: never[]) => Error } }).WebAssembly;
+  return (!!wasm?.RuntimeError && e instanceof wasm.RuntimeError) || e instanceof RangeError;
+}
+
+/**
  * The conversion order. Every path in it is one this file chose (fixed names
  * under /working), never a document's name, so nothing in it needs escaping.
  */

@@ -137,6 +137,29 @@ export function pptx(): Uint8Array {
   });
 }
 
+/**
+ * An OFD package (the Chinese fixed-layout format, GB/T 33190): OFD.xml, a
+ * document and an empty page. x2t knows a file by what it holds, not by its
+ * name, and the build has no OFD reader (the link leaves COFDFile out,
+ * README.md "x2t, the converter"): converting it stops the module -
+ * "Aborted(missing function: _ZN8COFDFileC1EPN7NSFonts17IApplicationFontsE)",
+ * measured. Named .docx, it is the document the measurements open to see
+ * x2t stop (e2e/make-docs.mjs stops.docx).
+ */
+export function ofdPackage(): Uint8Array {
+  const X = '<?xml version="1.0" encoding="UTF-8"?>';
+  const NS = 'xmlns:ofd="http://www.ofdspec.org/2016"';
+  return zip({
+    'OFD.xml':
+      `${X}<ofd:OFD ${NS} Version="1.0" DocType="OFD"><ofd:DocBody><ofd:DocInfo><ofd:DocID>0</ofd:DocID></ofd:DocInfo>` +
+      '<ofd:DocRoot>Doc_0/Document.xml</ofd:DocRoot></ofd:DocBody></ofd:OFD>',
+    'Doc_0/Document.xml':
+      `${X}<ofd:Document ${NS}><ofd:CommonData><ofd:MaxUnitID>1</ofd:MaxUnitID><ofd:PageArea><ofd:PhysicalBox>0 0 210 297</ofd:PhysicalBox></ofd:PageArea></ofd:CommonData>` +
+      '<ofd:Pages><ofd:Page ID="1" BaseLoc="Pages/Page_0/Content.xml"/></ofd:Pages></ofd:Document>',
+    'Doc_0/Pages/Page_0/Content.xml': `${X}<ofd:Page ${NS}><ofd:Content/></ofd:Page>`,
+  });
+}
+
 // ---- reading what comes back -------------------------------------------
 
 const unesc = (s: string) =>

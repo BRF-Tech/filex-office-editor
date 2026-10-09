@@ -24,9 +24,9 @@ import vm from 'node:vm';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CSV, EXPORT_FORMATS, PDF, TEXT_ENCODINGS, TXT, type DocumentKind } from '../src/formats';
-import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../src/x2t';
+import { X2tError, stopsX2t, x2tConvert, x2tExport, x2tStopReason, type X2tFormat, type X2tModule } from '../src/x2t';
 import { writeZip } from '../scripts/lib/zip.mjs';
-import { TR, docx, docxParagraphs, docxRuns, parts, pptx, texts, xlsx } from './fixtures/office';
+import { TR, docx, docxParagraphs, docxRuns, ofdPackage, parts, pptx, texts, xlsx } from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIR = process.env.X2T_DIR ? path.resolve(process.env.X2T_DIR) : path.join(here, '..', 'dist', 'x2t');
@@ -37,7 +37,7 @@ if (!present && required) {
   throw new Error(`x2t is not in ${DIR}: run bash scripts/x2t/build.sh (or node scripts/fetch-x2t.mjs --dir DIR)`);
 }
 
-type EmModule = X2tModule & { onRuntimeInitialized?: () => void };
+type EmModule = X2tModule & { onRuntimeInitialized?: () => void; onAbort?: (what: unknown) => void };
 
 // x2t.js is emscripten's CommonJS script; this package is "type": "module",
 // so it is run as CommonJS by hand, the way Node would.
@@ -354,4 +354,30 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     console.log(`x2t smoke (${DIR}):\n  ${measured.join('\n  ')}`);
     expect(measured.length).toBeGreaterThan(1);
   });
+});
+
+// x2t stops - emscripten's abort() - on a document that needs a function the
+// build does not have: here an OFD package (x2t knows it by what it holds,
+// whatever its name, and has no OFD reader). The worker must see it as the
+// module stopping, not as a failed conversion (src/worker/x2t-worker.ts,
+// #220): Module.onAbort first, then a WebAssembly.RuntimeError out of ccall.
+// A module of its own: after an abort it cannot be used again.
+describe.skipIf(!present)('x2t (WebAssembly) stopping on a document', () => {
+  it('an OFD package named .docx stops the module: onAbort, then a RuntimeError, both read as "missing function: COFDFile::COFDFile"', async () => {
+    const m = await loadX2t();
+    const aborts: unknown[] = [];
+    m.onAbort = (what) => aborts.push(what);
+    let thrown: unknown = null;
+    try {
+      x2tConvert(m, { bytes: ofdPackage(), format: 'docx' }, 'bin');
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown, 'the conversion threw').not.toBeNull();
+    expect(thrown).not.toBeInstanceOf(X2tError);
+    expect(stopsX2t(thrown)).toBe(true);
+    expect(String((thrown as Error).message)).toMatch(/^Aborted\(missing function: _ZN8COFDFile/);
+    expect(aborts.map(x2tStopReason)).toEqual(['missing function: COFDFile::COFDFile']);
+    expect(x2tStopReason(thrown)).toBe('missing function: COFDFile::COFDFile');
+  }, 180_000);
 });

@@ -7,6 +7,8 @@
 //                                          filex's New menu makes)
 //   tr.docx / tr.xlsx / tr.pptx            the Turkish test documents of the
 //                                          x2t smoke test (tests/fixtures/office.ts)
+//   stops.docx                             an OFD package under a .docx name: x2t
+//                                          stops on it (ofdPackage)
 //
 //   node e2e/make-docs.mjs [--ui dist/ui] [--out dist/e2e-docs]
 
@@ -40,6 +42,7 @@ export async function makeDocs({ ui = path.join(ROOT, 'dist', 'ui'), out = path.
   writeFileSync(path.join(out, 'tr.docx'), f.docx());
   writeFileSync(path.join(out, 'tr.xlsx'), f.xlsx());
   writeFileSync(path.join(out, 'tr.pptx'), f.pptx());
+  writeFileSync(path.join(out, 'stops.docx'), f.ofdPackage());
   return { out, TR: f.TR, fixtures: f };
 }
 

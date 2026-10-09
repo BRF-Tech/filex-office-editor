@@ -34,13 +34,17 @@
 //     and Print reach filex, a format x2t does not write here is refused and
 //     said, "Edit" opens the editor folded and its save holds the typed
 //     text, "Reading view" goes back (phoneRun);
+//   - x2t stopping, once per engine: a document x2t stops on (stops.docx, an
+//     OFD package under a .docx name) ends the opening with the app's own
+//     error, in the person's language and with why, and the page stays
+//     "failed" after the editor would have been ready (stopRun, #220);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-stop]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -86,6 +90,7 @@ function args(argv) {
     keep: false,
     settings: true,
     phone: true,
+    stop: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -96,6 +101,7 @@ function args(argv) {
     else if (a === '--keep') o.keep = true;
     else if (a === '--no-settings') o.settings = false;
     else if (a === '--no-phone') o.phone = false;
+    else if (a === '--no-stop') o.stop = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -690,6 +696,66 @@ async function phoneRun(browser, server, engine, o) {
   return r;
 }
 
+/** What the person reads when x2t stops on the document (src/app/strings.ts, tr: openFailed + x2tStopped). */
+const STOPPED_TR = 'Belge açılamadı: dönüştürücü bu belgede durdu (missing function: COFDFile::COFDFile)';
+/** Longer than the editor takes to say it is ready (0.7-2.2 s measured): the late phase that used to undo "failed". */
+const AFTER_FAILED_MS = 6000;
+
+/**
+ * x2t stops on stops.docx (an OFD package: x2t has no OFD reader, and knows a
+ * file by what it holds). The opening ends "failed" with the app's error in
+ * Turkish, saying why; the page is still "failed" well after the editor
+ * would have said it was ready (the phase a late "editor-app-ready" used to
+ * overwrite, Chromium and Firefox, #220); the editor is not left loading
+ * behind the message.
+ */
+async function stopRun(browser, server, engine) {
+  const r = { engine, doc: 'stops.docx (x2t stops)', ok: false, steps: [], problems: [], notes: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  try {
+    await page.goto(`${server.origin}/?doc=stops.docx&locale=tr&tag=${engine}-stops`);
+    const phaseOf = async () => (appFrame(page) ? await appFrame(page).evaluate(() => document.documentElement.dataset.fxPhase || '') : '');
+    const first = await until('the opening to end', async () => {
+      const ph = await phaseOf();
+      return ph === 'failed' || ph === 'ready' ? ph : false;
+    }, OPEN_MS);
+    step(first);
+    if (first !== 'failed') throw new Error(`the opening ended "${first}", not "failed"`);
+    await sleep(AFTER_FAILED_MS);
+    const st = await appFrame(page).evaluate(() => {
+      const box = document.getElementById('fx-status');
+      return {
+        phase: document.documentElement.dataset.fxPhase || '',
+        phases: (window.__fxPhases || []).map((x) => x[0]),
+        shown: !!box && !box.hidden,
+        error: !!box && box.classList.contains('fx-error'),
+        text: document.getElementById('fx-status-text')?.textContent || '',
+        editorFrames: document.querySelectorAll('#fx-editor-box iframe').length,
+      };
+    });
+    step('after the editor would be ready', { phase: st.phase });
+    r.status = st;
+    if (st.phase !== 'failed') r.problems.push(`${AFTER_FAILED_MS / 1000} s after it failed the page says "${st.phase}" (${st.phases.join(' > ')})`);
+    if (!st.shown || !st.error) r.problems.push('the error is not on the screen');
+    if (st.text !== STOPPED_TR) r.problems.push(`the person reads ${JSON.stringify(st.text)}, not ${JSON.stringify(STOPPED_TR)}`);
+    if (st.editorFrames !== 0) r.problems.push('the editor is still loading behind the error');
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+  }
+  try {
+    mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+    await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-stops${r.problems.length ? '-FAILED' : ''}.png`) });
+  } catch {
+    /* the page is gone */
+  }
+  r.ok = r.problems.length === 0;
+  await ctx.close();
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -757,6 +823,11 @@ async function main() {
       }
       if (o.phone) {
         const r = await phoneRun(browser, server, engine, o);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.stop) {
+        const r = await stopRun(browser, server, engine);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }
