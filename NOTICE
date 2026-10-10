@@ -147,7 +147,11 @@ sponsored by Ascensio System SIA.
      - 04-starmath.patch (BRF Tech, 2026-10-10): x2t links ONLYOFFICE's
        StarMath converter (OdfFile/Reader/Converter/StarMath2OOXML), which
        CryptPad's build leaves out and without which an ODF formula stops
-       the module.
+       the module;
+     - 05-frame-anchor.patch (BRF Tech, 2026-10-10): the ODF reader reads a
+       frame's anchor (text:anchor-type) from the frame whether or not the
+       frame has a graphic style (OdfFile/Reader/Format/draw_frame_docx.cpp);
+       a frame without a style lost its anchor and became a floating shape.
    The build is CryptPad's recipe (its Dockerfile and embuild.sh) carried
    over to that tag. The third-party code ONLYOFFICE core builds into x2t
    is fetched by core's own scripts at the commits they name, and keeps its
@@ -159,7 +163,8 @@ sponsored by Ascensio System SIA.
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
    LLVM exception, the Unicode license). Release 0.1.1 carries this build
-   (x2t v9.4.0.129+1); release 0.1.0 carried CryptPad's own build of x2t
+   without 05-frame-anchor.patch (x2t v9.4.0.129+1), the build with it is
+   x2t v9.4.0.129+2; release 0.1.0 carried CryptPad's own build of x2t
    (release v9.3.2+3) unchanged.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that

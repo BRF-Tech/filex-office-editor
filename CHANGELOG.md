@@ -9,6 +9,36 @@ update.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A document the converter stops on ends the opening, and says why, in
+  every browser.** When x2t stopped on a document (an abort: a function its
+  build does not have), the error was on the screen, but the page's state
+  went back to "opening" as soon as the editor, loading beside the
+  conversion, said it was ready - in Chromium nearly always, as x2t is
+  ready first there - so filex and anything watching the opening waited for
+  one that had ended, and the editor kept loading behind the message. The
+  opening now stays failed, the editor is ended, and the person reads why,
+  in their language: "The document could not be opened: the converter
+  stopped on this document (missing function: COFDFile::COFDFile)" ("Belge
+  açılamadı: dönüştürücü bu belgede durdu (...)"). A conversion that does
+  not finish in time (a minute, and five seconds more per MiB) fails the
+  same way. After either, the next conversion - a save, a Download as -
+  starts a new converter instead of using the one that stopped.
+- **A formula is where its sentence puts it.** An odt whose formula frame
+  has no style (valid OpenDocument, written by producers other than
+  LibreOffice) showed the formula at the top left of the page, in front of
+  the sentence it ends: x2t read a frame's anchor only from its style.
+  x2t now reads it from the frame (`scripts/x2t/patches/05-frame-anchor.patch`).
+  Files LibreOffice writes give every formula a style and kept their place.
+
+### Changed
+
+- x2t is `v9.4.0.129+2`: the same build with the frame anchor fix, its two
+  files' SHA-256 pinned in `upstream/onlyoffice.json` (two builds from empty
+  trees give the same bytes). No release has published its `x2t.zip` yet:
+  `bash scripts/x2t/build.sh` makes it.
+
 ## [0.1.1] - 2026-10-10
 
 A patch release: the converter, x2t, is now this project's own build, and
