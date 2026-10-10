@@ -52,11 +52,12 @@ saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-f
 > in Chromium, Firefox and WebKit against a stand-in for filex 0.56; not
 > yet measured in a real filex 0.56; not released.
 >
-> **Unreleased (the next release, 0.3.0): editing together**, for filex
-> 0.56 or later - several people in one document in a folder that is not
-> encrypted, through filex's relay, with the Document Server's lock rules
-> ([Editing together](#editing-together)). Built, with its unit and browser
-> tests written but not run yet; not released.
+> **Unreleased (0.3.0): editing together**, for filex 0.56 or later -
+> several people in one document, through filex's relay, with the Document
+> Server's lock rules, and a person who may only read following it live
+> ([Editing together](#editing-together)). Built and measured in Chromium,
+> Firefox and WebKit against a stand-in for filex 0.56; not yet measured in
+> a real filex 0.56; not released.
 
 | | |
 |---|---|
@@ -930,7 +931,12 @@ join and count two people, what one types reaches the other's bridge, both
 bridges hold the same locks, the other one's save holds the typed text and
 is written into the log with how far it reaches, neither is asked about
 unsaved changes while the other may save, and when one leaves the other
-counts one again (written for the next release, not measured yet).
+counts one again. A third person who may only read joins as a watcher: her
+editor is ONLYOFFICE's live viewer, and the run reads from her editor's own
+document that it shows the typed text before anybody saves. A page that
+closes leaves the session; the relay stand-in also drops a member whose
+page went away (its event stream closed and not opened again within 5 s),
+as filex drops one it has not heard from for 45 s.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -991,7 +997,7 @@ x2t `v9.4.0.129+1`, `formula-nostyle.odt` in all three (two floating
 shapes). In the same tree: `npm test` 237 of 237, `npm run typecheck`
 clean, `npm run test:x2t` 13 of 13.
 
-**Encrypted folders** (the next release, 0.2.0, on the tree above with x2t
+**Encrypted folders** (the next release, 0.2.0 alone, on the tree above with x2t
 `v9.4.0.129+2`; run on 2026-10-10 on Linux in Playwright 1.59's image,
 Node 24.14.1, on a Windows PC's docker): `npm run e2e -- --shots` 36 of
 36 - the 33 above and, in each browser, a document of an encrypted folder
@@ -1001,6 +1007,40 @@ outside the package and no failed request; openings 2.0-2.6 s in Chromium,
 3.4-3.8 s in Firefox, 4.8-5.5 s in WebKit; 63 screenshots. In the same
 tree on Windows: `npm test` 245 of 245 (the `dist/editor` and `dist/ui`
 tests included), `npm run typecheck` clean, `npm run test:x2t` 13 of 13.
+
+**Editing together, with encrypted folders** (0.3.0 on 0.2.0; run on
+2026-10-10, the same image and machine): `npm run e2e -- --shots` 30 of 30 -
+the 24 above, the encrypted folder and two people in each browser - with no
+request outside the package and no failed request; openings 2.3-3.2 s in
+Chromium, 3.6-4.4 s in Firefox, 5.3-12.8 s in WebKit; 57 screenshots (the
+watcher's editor in each browser among them). In the same tree on Windows:
+`npm test` 281 of 281, `npm run typecheck` clean, `npm run test:x2t` 11 of
+11.
+
+| Two people and a watcher, one document (`togetherRun`) | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| Ayşe starts the session and puts the base, Mehmet joins; each editor counts two people, no two share an editor user id | yes | yes | yes |
+| Zeynep, who may only read, follows: a member that may not write, her editor in view mode and ONLYOFFICE's live viewer | yes | yes | yes |
+| What Ayşe types reaches every bridge: the same change batches in all three | yes (78) | yes (116) | yes (73) |
+| ... and shows in Zeynep's editor, read from its own document, before anybody saves (the check polls every 0.25 s) | 0.27 s after the typing | 0.28 s | 0.30 s |
+| Zeynep writes nothing into the log; her page closes and the log says she left | yes | yes | yes |
+| Ayşe's and Mehmet's bridges hold the same locks | yes | yes | yes |
+| Mehmet's Save holds Ayşe's text and is written into the log past the last change (`through`) | yes (45) | yes (39) | yes (35) |
+| Neither is told "unsaved changes"; Mehmet leaves and Ayşe counts one again | yes | yes | yes |
+| A reader alone: no session to follow, the document opens as it is | yes | yes | yes |
+
+The first run of it was red in Firefox and WebKit ("timed out (20 s)
+waiting for the log to say Zeynep left"), and it was the measurement's,
+not the app's: the leave a closing page sends on `pagehide` (a keepalive
+request, as filex's own page sends it) did not always get out of a tab
+Playwright closes - Firefox let it out now and then, WebKit not at all -
+and Playwright 1.59's WebKit leaves a page open after `close({
+runBeforeUnload: true })`, even a page with no handler. filex covers the
+first with its 45-second drop, which the relay stand-in now does too (in
+5 s); the run closes a WebKit page that stays open without its
+beforeunload. In the run above every page's leave got out; on Windows,
+Firefox's and WebKit's members were dropped instead, 5 s after their pages
+closed.
 
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
@@ -1168,8 +1208,10 @@ Next - the numbers are a plan, and each waits for what filex has to give it
   0.56 is, after its measurement in filex 0.56 itself.
 - **0.3.0, editing together**: several people in one document, in an
   encrypted folder or a plain one, through filex's relay and its
-  `files:co-edit` (filex 0.56) - built on `main`, not released or measured
-  in the browsers yet ([Editing together](#editing-together)).
+  `files:co-edit` (filex 0.56) - built on `main`
+  ([Editing together](#editing-together)) and measured in the three
+  browsers against a stand-in for filex 0.56; released once filex 0.56 is,
+  after its measurement in filex 0.56 itself.
 - **In any release before those**: a corpus of real documents compared
   with what a Document Server makes of them; and, when filex serves an
   app's package compressed, a lighter download for the browser.

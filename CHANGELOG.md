@@ -85,7 +85,11 @@ browser.
   folder key in the members' browsers; the app does nothing differently.
 - The e2e harness has a stand-in for filex 0.56's relay, and the browser run
   opens one document in two browser contexts, then a third that may only
-  read, and a reader alone (written, not run yet).
+  read, and a reader alone - measured in Chromium, Firefox and WebKit: the
+  watcher's editor, ONLYOFFICE's live viewer, shows what another person
+  types before anybody saves (read from the editor's own document). The
+  stand-in drops a member whose page went away, as filex does after 45 s
+  (a closing tab does not always let its leave out).
 
 ### Changed
 
@@ -100,10 +104,10 @@ browser.
 - The manifest says `"co_edit": {"open": true}` (granted as
   `files:co-edit`, which filex derives from the block - it is not listed in
   `permissions`) and asks for filex `>=0.56.0` (filex 0.55 refuses a
-  manifest with a block it does not know; servers on 0.55 keep 0.1.0). Where filex offers no editing together - an older filex, no
-  grant, a vault, the phone's reading view, a person who may only read
-  a document nobody is editing - the editor runs alone, exactly as in
-  0.1.0.
+  manifest with a block it does not know; servers on 0.55 keep 0.1.1).
+  Where filex offers no editing together - an older filex, no grant, a
+  vault, the phone's reading view, a person who may only read a document
+  nobody is editing - the editor runs alone, exactly as in 0.1.1.
 
 ### Fixed
 
