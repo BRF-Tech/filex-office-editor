@@ -35,7 +35,7 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.3.0**, for filex 0.56 or later. Several people edit one
+> **Status: 0.3.1**, for filex 0.56 or later. Several people edit one
 > document together through filex's relay, with the Document Server's lock
 > rules, and a person who may only read follows it live
 > ([Editing together](#editing-together)); no Document Server is needed for
@@ -50,16 +50,17 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > formula opens with the formula in its line, txt and csv are in Download
 > as with every Turkish letter, and a document x2t stops on ends its
 > opening with the reason ([When x2t stops](#when-x2t-stops)). Measured in
-> Chromium, Firefox and WebKit against a stand-in for filex 0.56; 0.1.1, the
-> same app without encrypted folders or editing together, in a real filex
-> 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)). On filex 0.55,
-> install 0.1.1: 0.55 refuses the manifests of 0.2.0 and 0.3.0.
+> Chromium, Firefox and WebKit against a stand-in for filex 0.56 and in a
+> filex built from 0.56's code ([Measured in filex 0.56](#measured-in-filex-056));
+> 0.1.1, the same app without encrypted folders or editing together, in a
+> real filex 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)). On
+> filex 0.55, install 0.1.1: 0.55 refuses the manifests from 0.2.0 on.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.3.0 (and 0.2.0): **0.56.0** or later (`"filex": ">=0.56.0"`; editing together, the manifest's `co_edit` block, granted as `files:co-edit`; encrypted folders, its `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.3.0** (tag `v0.3.0`): `ui.zip`, 98.3 MiB, SHA-256 `028e24765531f6183bf7527ab2eaf5c7b1b52d78882a7371a69037bbab001c00`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| filex | 0.3.1 (and 0.2.0, 0.3.0): **0.56.0** or later (`"filex": ">=0.56.0"`; editing together, the manifest's `co_edit` block, granted as `files:co-edit`; encrypted folders, its `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
+| Release | **0.3.1** (tag `v0.3.1`): `ui.zip`, 98.3 MiB, SHA-256 `cd3bc0741f97e471ec26d639da65835fccff2605fc255974ecb5f21d2b179baf`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
@@ -67,7 +68,7 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
 or together. In filex 0.56.0 or later, as an administrator: **Admin →
 Plugins → Apps → Install an app → GitHub repository**,
-`BRF-Tech/filex-office-editor`, tag `v0.3.0` (in filex 0.55, `v0.1.1`).
+`BRF-Tech/filex-office-editor`, tag `v0.3.1` (in filex 0.55, `v0.1.1`).
 filex reads `filex-app.json` at that tag, downloads the release's `ui.zip`
 and refuses it unless its SHA-256 is the one the manifest names.
 The review lists what the app asks for: `files:read` and `files:write` (the
@@ -388,7 +389,7 @@ the per-theme thumbnails out, below):
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
 | The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
 | **The editor bundle** | **2,623** | **286.1** | **88.5** |
-| **The app's bundle** (`ui.zip` of 0.3.0: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,633** | **323.4** | **98.3** |
+| **The app's bundle** (`ui.zip` of 0.3.1: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.3.0's, 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,633** | **323.4** | **98.3** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
@@ -692,7 +693,7 @@ packages by `package-lock.json`, x2t by its hashes - so anyone can make the
 same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 
 ```bash
-git clone --branch v0.3.0 https://github.com/BRF-Tech/filex-office-editor
+git clone --branch v0.3.1 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
 docker run --rm -v "$PWD:/src" -w /src \
@@ -708,6 +709,12 @@ minutes, [x2t, the converter](#x2t-the-converter)): it puts the same two
 files in `dist/x2t/`, and `fetch-x2t.mjs` then finds them in place. The
 release's `x2t.zip` is `node scripts/fetch-x2t.mjs --pack dist/x2t.zip`,
 run in the same Node image.
+
+Measured for 0.3.1 (2026-10-10, an x86-64 Linux machine), the same way as
+0.2.0: the same `ui.zip` from both builds - 103,098,008 bytes, 2,633
+files, SHA-256
+`cd3bc0741f97e471ec26d639da65835fccff2605fc255974ecb5f21d2b179baf` - and
+0.2.0's `x2t.zip`; three to four minutes each from the image to the zip.
 
 Measured for 0.3.0 (2026-10-10, an x86-64 Linux machine), the same way as
 0.2.0: the same `ui.zip` from both builds - 103,097,729 bytes,
@@ -1166,6 +1173,44 @@ screenshot shows it), while the page's phase, which the measurement read,
 had gone back to the editor's - fixed since ([When x2t
 stops](#when-x2t-stops)).
 
+## Measured in filex 0.56
+
+2026-10-10, in a filex built from `main` (commit `065ac845c`, the code
+that becomes filex 0.56.0): a throwaway container on the loopback,
+SQLite, its files in a local storage with per-item permissions - Ayşe and
+Mehmet editors there, Zeynep a viewer, all three in Turkish - reached
+through an SSH tunnel by Playwright 1.59 on Windows (headless, 1440 x 900).
+Each release from its GitHub release's own files (**Upload files**): 0.2.0
+installed, 0.3.0 and 0.3.1 over it as updates - the dry runs `compat` ok
+for `>=0.56.0`, the review adding `files:e2e-plaintext` (0.2.0) and
+`files:co-edit` (0.3.0).
+
+| 0.3.1 | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| (a) An ordinary folder: a docx opened, a line typed, Ctrl+S - the file on disk a docx with the line | yes | yes | yes |
+| (b) An encrypted folder (contents only): created, unlocked, a docx uploaded (on disk it starts `filexe2e`), opened, a line typed, saved - on disk still `filexe2e`, no zip inside, the line in no request the page sent; the folder locked by the reload, unlocked, the document opens with the line | yes | yes | yes |
+| (c) Two people and a watcher: Ayşe's and Mehmet's editors count two; Zeynep's opens in view mode as ONLYOFFICE's live viewer | yes | yes | yes |
+| ... Ayşe's line in Mehmet's and in Zeynep's editor, read from each editor's own document, before anybody saves (from her first keystroke, the typing included) | 4.1 s | 5.6 s | 4.8 s |
+| ... Mehmet's Save writes the file with her line | yes | yes | yes |
+| (d) A document x2t stops on (`stops.docx`): "Belge açılamadı: dönüştürücü bu belgede durdu (missing function: COFDFile::COFDFile)", still "failed" six seconds on, no editor | yes | yes | yes |
+| Requests outside filex / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
+
+The relay answered Chromium's (c) twice `409 coedit_conflict` ("somebody
+else's entry came first"), which filex's SDK answers by sealing the entry
+again for its new place: the protocol, not a failure. 0.2.0 passed (a), (b)
+and (d) in Chromium the same way. **0.3.0 did not pass (b)**: in two fresh
+encrypted folders of two the save stayed "saving" - a lease release had
+reached the relay after the next acquire, and the next batch was refused
+(`409 coedit_no_lease`); 0.3.1 sends the lease calls one after another
+(CHANGELOG [0.3.1]), and passed (b) three times in a row in Chromium with
+no refusal, then in Firefox and WebKit.
+
+filex's side, seen here: its pages tell an app's interface no name yet
+(`session.user.name` is empty), so the editor names its own person
+"filex" - its avatar, and the author on its comments and tracked changes -
+while the names of the others, which the relay knows, are right. The fix
+belongs to filex.
+
 ## Keeping up with ONLYOFFICE
 
 The editor files come from one ONLYOFFICE Docs release, written down in
@@ -1200,8 +1245,8 @@ put the new release in `upstream/onlyoffice.json`, run
 
 **0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
 for filex 0.55.0 or later, and **0.2.0** (2026-10-10, encrypted folders)
-and **0.3.0** (2026-10-10, editing together), for filex 0.56.0 or later,
-are what works today:
+and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
+0.56.0 or later, are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
@@ -1219,7 +1264,8 @@ are what works today:
    ([Building a release](#building-a-release)), measured in the three
    browsers against a stand-in for filex
    ([Measured in the browsers](#measured-in-the-browsers)) and in filex
-   0.55 itself ([Measured in filex 0.55](#measured-in-filex-055)).
+   itself ([Measured in filex 0.55](#measured-in-filex-055),
+   [Measured in filex 0.56](#measured-in-filex-056)).
 5. Documents in encrypted folders and vaults, with filex 0.56's
    `encrypted_folders` / `files:e2e-plaintext`: filex decrypts the document
    for the app in the person's browser and encrypts what it saves
