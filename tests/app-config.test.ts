@@ -24,6 +24,7 @@ import {
   THEME_LIGHT,
 } from '../src/app/config';
 import { STRINGS } from '../src/app/strings';
+import { editorIdOf } from '../src/coedit';
 import { EDITOR_USER_ID, isFrameHello, isFramePort, mediaType, FRAME_HELLO, FRAME_PORT } from '../src/frame-protocol';
 import { HELD_SCRIPTS, holdScripts } from '../src/frame/hold';
 import { SaveRetry } from '../src/frame/save-retry';
@@ -134,6 +135,20 @@ describe('the editor configuration', () => {
     const c = editorConfig({ ...base, userName: `Ayşe${String.fromCharCode(160)}Yılmaz` }) as any;
     expect(c.document.permissions.userInfoGroups).toEqual(['']);
     expect(c.editorConfig.user.name).toBe('Ayşe Yılmaz');
+  });
+
+  it("editing together, as the member: the editor's user id is the session's for this person (each differs)", () => {
+    const a = editorConfig({ ...base, userId: editorIdOf('u1') }) as any;
+    const b = editorConfig({ ...base, userId: editorIdOf('u2') }) as any;
+    expect(a.editorConfig.user).toEqual({ id: EDITOR_USER_ID + 'u1-', name: 'Ayşe' });
+    expect(a.editorConfig.user.id).not.toBe(b.editorConfig.user.id);
+    expect(STRINGS.tr.rejoined).toMatch(/yeniden açıldı/);
+    expect(STRINGS.en.togetherBroken).toMatch(/Editing together stopped/);
+    for (const lang of ['en', 'tr'] as const) {
+      expect(STRINGS[lang].aloneNow('x')).toContain('x');
+      expect(STRINGS[lang].changeRefused('no_lease')).toContain('no_lease');
+      expect(STRINGS[lang].logFull.length).toBeGreaterThan(20);
+    }
   });
 
   it('Download as and Print where filex can hand the file over', () => {

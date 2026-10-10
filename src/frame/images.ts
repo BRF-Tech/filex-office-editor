@@ -13,6 +13,11 @@
 //
 // The limits are the Document Server's (bridge.ts sends them in the auth
 // answer): the types the editor may upload, 25 MiB.
+//
+// Editing together (filex 0.56), the other members need the image too: the
+// hook hands it to the session (relay-session.ts imageInserted), which keeps
+// it with filex before the change that shows it goes out. Its name is the
+// one the change carries (`image_fx<16 hex>.<ext>`, coedit.ts INSERTED_IMAGE).
 
 import { MEDIA_NAME } from '../frame-protocol';
 
@@ -54,7 +59,10 @@ export function imageExt(file: { type?: string; name?: string }): string | null 
   return e === 'jpeg' || e === 'jpe' ? 'jpg' : e === 'tif' ? 'tiff' : e;
 }
 
-export function keepImagesInPage(common: Common | undefined): void {
+/** Told about every image the person inserts, by its name in the document (without "media/"). */
+export type ImageInserted = (name: string, file: Blob) => void;
+
+export function keepImagesInPage(common: Common | undefined, inserted?: ImageInserted): void {
   if (!common || common.__filexImages || typeof common.UploadImageFiles !== 'function') return;
   common.__filexImages = true;
   common.UploadImageFiles = function (files: ArrayLike<Blob>, ...rest: unknown[]) {
@@ -78,6 +86,7 @@ export function keepImagesInPage(common: Common | undefined): void {
       const url = URL.createObjectURL(f);
       urls[`media/${name}`] = url;
       out.push(url);
+      inserted?.(name, f);
     }
     common.g_oDocumentUrls?.addUrls?.(urls);
     callback(ERR_NO, out);

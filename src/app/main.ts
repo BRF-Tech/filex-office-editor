@@ -20,11 +20,18 @@
 //      (state.get/set, settings.ts) and given back at the next opening;
 //   7. on a phone: ONLYOFFICE's phone app to read (it only reads, see
 //      config.ts phoneLayout), and "Edit" / "Reading view" to switch to the
-//      editor (folded) and back, with the document as it is.
+//      editor (folded) and back, with the document as it is;
+//   8. editing together (filex 0.56, `coedit.*`, together.ts): the editor
+//      joins the document's session before it is configured; the session's
+//      base is what it opens, and the session's log - everybody's changes,
+//      locks, who is in - flows to the editor page and back. Where filex
+//      offers none (an older filex, no `files:co-edit` grant, a vault, the
+//      server turned it off) the editor runs alone, as before.
 //
-// One person, one document (plan step A3). Nothing leaves the browser but
-// the saves, the files the person asks for and the settings, and those go
-// to filex through the SDK.
+// Nothing leaves the browser but the saves, the files the person asks for,
+// the settings and - editing together - the session's entries, which filex
+// seals before they leave the page; all of it goes to filex through the
+// SDK.
 //
 // A document of an encrypted folder (filex 0.56, the manifest's
 // `encrypted_folders`): filex says `encrypted: "folder"` and `plaintext:
@@ -41,8 +48,11 @@
 
 import { connect, FilexError, type FilexApp } from '@brftech/filex-app-ui';
 
+import type { CoEditDropped } from '../coedit';
+
 import { exportFormat, exportName } from '../formats';
 import {
+  EDITOR_USER_ID,
   FRAME_PORT,
   FRAME_VERSION,
   isFrameHello,
@@ -54,8 +64,10 @@ import {
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
-import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type Kind, type View } from './config';
+import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type EncryptionInfo, type Kind, type View } from './config';
+import { coeditApi } from './coedit-client';
 import { STRINGS, type Strings } from './strings';
+import { Together, joinSession } from './together';
 import { X2tClient, X2tFailure, type Converted } from './x2t-client';
 
 declare const __OO_BUILD__: { version: string; number: number };
@@ -264,6 +276,8 @@ class OfficeApp {
   view: View = 'editor';
   /** What filex granted for handing files over: ui:download, ui:print (filex 0.55). */
   grants = { download: false, print: false };
+  /** The session the editor edits together in (filex 0.56), or null: alone. */
+  together: Together | null = null;
 
   constructor(
     private readonly fx: FilexApp,
@@ -333,7 +347,26 @@ class OfficeApp {
     this.fx.state.set(SETTINGS_KEY, next).catch((e) => console.warn('[office-editor] settings not kept:', reason(e)));
   }
 
+  /** The editor now edits in `t` (or alone): what is "unsaved" and who saves follow it. */
+  setTogether(t: Together | null): void {
+    this.together = t;
+    this.updateDirty();
+  }
+
+  /** Leave the session (the editor that edited in it is going); the last writer saves first (current() does). */
+  async leaveTogether(): Promise<void> {
+    const t = this.together;
+    this.together = null;
+    if (t) await t.leave();
+    this.updateDirty();
+  }
+
   private onFrame(m: FromFrame): void {
+    // The session's own messages (relay-session.ts) are the session's.
+    if (m.t.startsWith('co-')) {
+      if (!this.together?.fromFrame(m)) console.warn('[office-editor] a session message without a session:', m.t);
+      return;
+    }
     switch (m.t) {
       case 'save':
         void this.save().catch(() => {});
@@ -367,8 +400,17 @@ class OfficeApp {
     this.updateDirty();
   }
 
-  private updateDirty(): void {
-    const dirty = this.editing && (this.frameDirty || this.editorDirty);
+  /**
+   * What filex is told: "unsaved changes" while the editor holds changes it
+   * has not handed over, or the log holds changes no save has - together,
+   * the latter only for the last writer in the session: while somebody else
+   * who may write is in, closing leaves nothing behind (they save it), and
+   * filex should not ask.
+   */
+  updateDirty(): void {
+    const t = this.together;
+    const logged = t ? this.frameDirty && t.lastWriter : this.frameDirty;
+    const dirty = this.editing && (this.editorDirty || logged);
     if (dirty === this.shownDirty) return;
     this.shownDirty = dirty;
     this.fx.dirty(dirty);
@@ -398,7 +440,11 @@ class OfficeApp {
         if (snap.error || typeof snap.bin !== 'string') throw new Error(snap.error ?? 'no document');
         through = snap.through ?? 0;
         const out = await this.x2t.convert('bin', this.kind.ext, snap.bin, snap.media ?? []);
-        await this.fx.save(out.bytes, { mime: this.kind.mime });
+        // Together, the save says how far into the log it reaches; filex
+        // writes that into the log, and every member's "unsaved" follows it.
+        const t = this.together;
+        if (t?.active) await t.saveFile(out.bytes, this.kind.mime, through);
+        else await this.fx.save(out.bytes, { mime: this.kind.mime });
         this.lastSave = Date.now();
         this.link.send({ t: 'saved', ok: true, through });
       } catch (e) {
@@ -458,9 +504,27 @@ class OfficeApp {
     this.fx.toast(this.t.printAsDownload, 'info');
   }
 
-  /** The ten-minute save, while there are changes. */
+  /**
+   * The ten-minute save, while there are changes. Together, only the saver
+   * writes it (the writer in the session who joined first), timed from the
+   * first change after the last save, on the relay's clock: every member
+   * reaches the same answer from the same log.
+   */
   tick(): void {
-    if (this.shownDirty && !this.saving && Date.now() - this.lastSave >= AUTOSAVE_MS) void this.save().catch(() => {});
+    if (this.saving || !this.editing) return;
+    const t = this.together;
+    if (t?.active) {
+      if (t.autosaveDue()) void this.save().catch(() => {});
+      return;
+    }
+    if (this.shownDirty && Date.now() - this.lastSave >= AUTOSAVE_MS) void this.save().catch(() => {});
+  }
+
+  /** The last writer leaves with changes no save has: they are saved first. */
+  async saveIfLast(): Promise<void> {
+    const t = this.together;
+    if (!t?.active || !this.editing || !t.lastWriter) return;
+    if (t.unsaved || this.editorDirty) await this.save().catch(() => {});
   }
 }
 
@@ -506,6 +570,14 @@ async function main(): Promise<void> {
   // filex 0.55 prints a PDF the app hands it (ui:print); without that grant
   // Print hands the PDF over as a download (print()).
   const canPrintPdf = grants.includes('ui:print');
+  // filex 0.56 lets several people edit the file together (files:co-edit).
+  // A person who may only read it joins too, as a watcher: filex answers
+  // `canEdit: false`, refuses whatever they would write, and the editor shows
+  // the others' changes as they land (bridge.ts liveViewerSupport). With
+  // nobody editing it there is nothing to watch, and it opens alone, as it is.
+  // A vault is one person's at a time: its document is never edited
+  // together (filex refuses the join there too).
+  const canTogether = grants.includes('files:co-edit') && (info as EncryptionInfo).encrypted !== 'vault';
 
   const x2t = new X2tClient(new URL('filex/x2t-worker.js', BASE).href, new URL('x2t/', BASE).href);
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
@@ -525,15 +597,76 @@ async function main(): Promise<void> {
     .get(SETTINGS_KEY)
     .then(readSettings, () => ({}))
     .then((values) => app.giveSettings(values));
-  fx.on('close.request', () => app.keepSettings());
-  window.addEventListener('pagehide', () => app.keepSettings());
-
-  // The document is read and converted while the editor loads.
-  void x2t.started().then(() => phase('x2t-ready'), () => {});
-  const converted = readDocument(fx, kind).then((bytes) => {
-    phase('read');
-    return x2t.convert(kind.ext, 'bin', bytes);
+  fx.on('close.request', () => {
+    app.keepSettings();
+    // Together, the last writer to leave saves what is not saved yet.
+    void app.saveIfLast();
   });
+  window.addEventListener('pagehide', () => {
+    app.keepSettings();
+    void app.leaveTogether();
+  });
+
+  void x2t.started().then(() => phase('x2t-ready'), () => {});
+
+  // ---- Editing together (filex 0.56): the session, where filex offers it.
+  const api = coeditApi(fx);
+  /** filex dropped this member (together.ts onDropped): set below, once the editor can be reopened. */
+  let onDropped: (d: CoEditDropped) => void = () => {};
+
+  /** Join the document's session; null: the editor runs alone (filex offers none here, or it failed - then said). */
+  const joinTogether = async (): Promise<Together | null> => {
+    if (!canTogether) return null;
+    const r = await joinSession(api);
+    if (!r.ok) {
+      if (!r.expected) fx.toast(t.aloneNow(r.message || r.code), 'info');
+      return null;
+    }
+    phase('joined');
+    return new Together({
+      api,
+      hello: r.hello,
+      notice: (what, detail) => console.warn('[office-editor] session', what, detail ?? ''),
+      onChange: () => app.updateDirty(),
+      onDropped: (d) => onDropped(d),
+      onRefused: (_kind, code) => fx.toast(code === 'log_full' ? t.logFull : t.changeRefused(code), code === 'log_full' ? 'warning' : 'error'),
+    });
+  };
+
+  /**
+   * What the editor opens, converted: together, the session's base (the
+   * member that started the session puts the bytes it opened); alone, the
+   * file. A base that cannot be put or fetched: the session is left, and the
+   * file opens alone.
+   */
+  const openDocument = async (joined: Together | null): Promise<{ doc: Converted; tg: Together | null }> => {
+    let tg = joined;
+    let bytes: ArrayBuffer | null = null;
+    if (tg) {
+      try {
+        bytes = await tg.base(() => readDocument(fx, kind));
+      } catch (e) {
+        console.warn('[office-editor] the session base:', reason(e));
+        await tg.leave();
+        tg = null;
+        fx.toast(t.aloneNow(reason(e, t)), 'info');
+      }
+    }
+    if (!bytes) bytes = await readDocument(fx, kind);
+    phase('read');
+    const doc = await x2t.convert(kind.ext, 'bin', bytes);
+    tg?.haveMedia(doc.media.map((m) => m.name));
+    return { doc, tg };
+  };
+
+  // The phone app only reads: it opens the file alone. The editor joins the
+  // session first - its user id is the member's - and the document is read
+  // and converted while api.js loads.
+  app.frameReplaced(phone ? 'reader' : 'editor');
+  const joined = app.view === 'editor' ? joinTogether() : Promise.resolve(null);
+  const opened = joined.then((tg) => openDocument(tg));
+  // Unhandled until it is awaited below; a failure there is said there.
+  opened.catch(() => {});
 
   let docsApi: NonNullable<DocsApiWindow['DocsAPI']>;
   try {
@@ -545,6 +678,8 @@ async function main(): Promise<void> {
   } catch (e) {
     phase('failed');
     setStatus(t.openFailed(reason(e, t)), true);
+    // Nobody waits on a member whose editor never starts.
+    void joined.then((tg) => tg?.leave(), () => {});
     return;
   }
 
@@ -559,9 +694,26 @@ async function main(): Promise<void> {
     }
     editor = null;
   };
+  /**
+   * An opening that failed: it stays "failed" (phase), the person reads why,
+   * the editor is ended - and the session joined for it is left (`tg`, and
+   * the one the app holds), so nobody waits on a member whose editor did not
+   * start.
+   */
+  const openingFailed = (e: unknown, tg: Together | null): void => {
+    phase('failed');
+    setStatus(t.openFailed(reason(e, t)), true);
+    stopEditor();
+    void app.leaveTogether();
+    if (tg) void tg.leave();
+  };
 
-  /** Start ONLYOFFICE's editor (`view` "editor") or its phone app ("reader"); returns the document key of this frame. */
-  const start = (view: View): string => {
+  /**
+   * Start ONLYOFFICE's editor (`view` "editor") or its phone app ("reader")
+   * as `userId` (the member's, together); returns the document key of this
+   * frame.
+   */
+  const start = (view: View, userId: string, editable: boolean): string => {
     const key = randomKey();
     document.documentElement.dataset.fxView = view;
     const config = editorConfig({
@@ -571,7 +723,8 @@ async function main(): Promise<void> {
       locale: s.locale,
       dark,
       userName,
-      canEdit,
+      userId,
+      canEdit: editable,
       canDownload,
       // Print needs filex's print (ui:print) or, where filex has none, a download.
       canPrint: canPrintPdf || canDownload,
@@ -594,8 +747,12 @@ async function main(): Promise<void> {
     return key;
   };
 
-  /** Hand the editor page of this frame a copy of the document (the app keeps its own for a switch). */
-  const handOver = (doc: Converted, key: string): void => {
+  /**
+   * Hand the editor page of this frame a copy of the document (the app keeps
+   * its own for a switch) and, together, the session: its log flows once the
+   * editor page has the document.
+   */
+  const handOver = (doc: Converted, key: string, tg: Together | null, userId: string, editable: boolean): void => {
     const media = doc.media.map((m) => ({ name: m.name, bytes: m.bytes.slice(0) }));
     const open: OpenMessage = {
       t: 'open',
@@ -604,31 +761,22 @@ async function main(): Promise<void> {
       media,
       name: userName,
       // The phone app reads only; the bridge then lets no change in either.
-      canEdit: canEdit && app.view === 'editor',
+      canEdit: editable && app.view === 'editor',
       key,
+      userId,
+      ...(tg ? { together: { me: tg.me, head: tg.hello.head } } : {}),
     };
     app.link.send(open, [open.bin, ...media.map((m) => m.bytes)]);
+    app.setTogether(tg);
+    if (tg) {
+      tg.attach((m, transfer) => app.link.send(m, transfer)).catch((e) => {
+        // No log, no start: the editor would wait for its own join forever.
+        console.warn('[office-editor] the session log:', reason(e));
+        fx.toast(t.aloneNow(reason(e, t)), 'info');
+        void reopen('editor', true);
+      });
+    }
   };
-
-  app.frameReplaced(phone ? 'reader' : 'editor');
-  let key: string;
-  /** The document as the app last converted it: what the next frame is given. */
-  let latest: Converted;
-  try {
-    key = start(app.view);
-    fx.on('theme', (th) => {
-      dark = (th as { mode?: string })?.mode === 'dark';
-      app.link.send({ t: 'theme', dark });
-    });
-    latest = await converted;
-    phase('converted');
-    handOver(latest, key);
-  } catch (e) {
-    phase('failed');
-    setStatus(t.openFailed(reason(e, t)), true);
-    stopEditor();
-    return;
-  }
 
   // ---- The switch between the phone app and the editor (a phone, a file that can be written).
   const button = el('fx-switch') as HTMLButtonElement;
@@ -643,45 +791,110 @@ async function main(): Promise<void> {
     button.textContent = reading ? t.edit : t.read;
     button.title = reading ? t.editHint : t.readHint;
   };
+
+  let key = '';
+  /** The document as the app last converted it: what the next frame is given. */
+  let latest: Converted | null = null;
   let switching = false;
-  const switchTo = async (view: View): Promise<void> => {
-    if (switching || view === app.view) return;
+
+  /**
+   * Replace the editor's frame with one showing `view`: the person switched
+   * between the phone app and the editor, or the session needs the editor
+   * opened again (filex dropped this member: join again; the log broke:
+   * `alone`). Back to reading: the document as the editor holds it, saved
+   * first, and the session is left. To the editor: the session joined again
+   * (its base, everybody's changes), or - alone - the file as the phone app
+   * had it, or read again.
+   */
+  const reopen = async (view: View, alone = false): Promise<boolean> => {
+    if (switching) return false;
     switching = true;
     button.disabled = true;
-    let doc: Converted;
     try {
-      // Back to reading: the document as the editor holds it, saved first.
-      // To the editor: the phone app changed nothing, the last one stands.
-      doc = view === 'reader' ? await app.current() : latest;
-    } catch (e) {
-      fx.toast(t.switchFailed(reason(e, t)), 'error');
-      switching = false;
-      button.disabled = false;
-      return;
-    }
-    phase('switching');
-    setStatus(t.opening(info.name));
-    try {
-      app.keepSettings();
-      editor?.destroyEditor?.();
-      editor = null;
-      app.link.reset();
-      app.frameReplaced(view);
-      latest = doc;
-      key = start(view);
-      app.resendSettings();
-      handOver(latest, key);
-      showSwitch();
-    } catch (e) {
-      phase('failed');
-      setStatus(t.openFailed(reason(e, t)), true);
+      let doc: Converted;
+      let tg: Together | null = null;
+      try {
+        if (view === 'reader') {
+          doc = await app.current();
+          await app.leaveTogether();
+        } else {
+          const wasEditor = app.view === 'editor';
+          await app.leaveTogether();
+          tg = alone ? null : await joinTogether();
+          if (tg || wasEditor || !latest) {
+            const o = await openDocument(tg);
+            doc = o.doc;
+            tg = o.tg;
+          } else {
+            // From the phone app, alone: it changed nothing, the last one stands.
+            doc = latest;
+          }
+        }
+      } catch (e) {
+        fx.toast(t.switchFailed(reason(e, t)), 'error');
+        return false;
+      }
+      phase('switching');
+      setStatus(t.opening(info.name));
+      const userId = tg ? tg.me.user : EDITOR_USER_ID;
+      const editable = canEdit && (!tg || tg.me.canEdit);
+      try {
+        app.keepSettings();
+        editor?.destroyEditor?.();
+        editor = null;
+        app.link.reset();
+        app.frameReplaced(view);
+        latest = doc;
+        key = start(view, userId, editable);
+        app.resendSettings();
+        handOver(latest, key, tg, userId, editable);
+        showSwitch();
+        return true;
+      } catch (e) {
+        openingFailed(e, tg);
+        return false;
+      }
     } finally {
       switching = false;
       button.disabled = false;
     }
   };
+
+  onDropped = (d) => {
+    if (d.reason === 'broken') {
+      // The log no longer checks out: this member stops editing together, and
+      // the document opens again alone, as it was last saved.
+      fx.toast(t.togetherBroken, 'error');
+      void reopen('editor', true);
+      return;
+    }
+    // The membership ended (filex could not reach this page a while): join
+    // again, a new member, with everybody's changes.
+    void reopen('editor').then((ok) => {
+      if (ok) fx.toast(t.rejoined, 'info');
+    });
+  };
+
+  try {
+    const tg0 = await joined;
+    const userId = tg0 ? tg0.me.user : EDITOR_USER_ID;
+    const editable = canEdit && (!tg0 || tg0.me.canEdit);
+    key = start(app.view, userId, editable);
+    fx.on('theme', (th) => {
+      dark = (th as { mode?: string })?.mode === 'dark';
+      app.link.send({ t: 'theme', dark });
+    });
+    const o = await opened;
+    latest = o.doc;
+    phase('converted');
+    handOver(latest, key, o.tg, userId, editable);
+  } catch (e) {
+    openingFailed(e, await joined.catch(() => null));
+    return;
+  }
+
   button.addEventListener('click', () => {
-    void switchTo(app.view === 'reader' ? 'editor' : 'reader');
+    void reopen(app.view === 'reader' ? 'editor' : 'reader');
   });
   showSwitch();
 

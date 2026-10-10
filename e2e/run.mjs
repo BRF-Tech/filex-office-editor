@@ -49,13 +49,24 @@
 //     it holds decrypts with the folder key to a document holding the typed
 //     text; on filex 0.55 the app says the document is encrypted instead of
 //     asking for it;
+//   - two people on one document, once per engine (filex 0.56's coedit.*,
+//     through the harness's relay stand-in): both editors join the same
+//     session and count two people, what one types reaches the other's
+//     bridge (the same changes), both bridges hold the same locks, a save by
+//     the one who did not type holds the other's text and is written into
+//     the log with how far it reaches (`through`), a third person who may
+//     only read follows in ONLYOFFICE's live viewer and sees the typed text
+//     before anybody saves (read from her editor's document), neither is told
+//     "unsaved changes" while the other may save, and when one leaves the
+//     other counts one again; a document x2t stops on, opened together,
+//     stays "failed" and its member leaves the session (togetherRun);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted] [--no-together]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -104,6 +115,7 @@ function args(argv) {
     formula: true,
     stop: true,
     encrypted: true,
+    together: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -117,6 +129,7 @@ function args(argv) {
     else if (a === '--no-formula') o.formula = false;
     else if (a === '--no-stop') o.stop = false;
     else if (a === '--no-encrypted') o.encrypted = false;
+    else if (a === '--no-together') o.together = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -169,6 +182,39 @@ async function people(page, ext) {
     const box = document.querySelector('#tlb-box-users');
     return { visible: users.getVisibleEditingCount(), all: users.length, badge: !!box && !!box.offsetParent };
   }, NAMESPACE[ext]);
+}
+
+/**
+ * What a document editor shows, read from its own document (sdkjs's
+ * CDocument), and whether it is in view mode and ONLYOFFICE's live viewer.
+ */
+async function viewerFacts(page) {
+  return editorFrame(page).evaluate(() => {
+    const api = (window.Asc && window.Asc.editor) || window.editor;
+    const doc = api && api.WordControl && api.WordControl.m_oLogicDocument;
+    return {
+      text: doc && typeof doc.GetText === 'function' ? String(doc.GetText()) : '',
+      viewMode: !!(api && api.isViewMode),
+      liveViewer: !!(api && typeof api.isLiveViewer === 'function' && api.isLiveViewer()),
+    };
+  });
+}
+
+/**
+ * Close a page as a person closes the tab: its beforeunload and pagehide
+ * handlers run. Playwright 1.59's WebKit leaves the page open after
+ * close({ runBeforeUnload: true }) - measured even for a page with no
+ * handler at all - so there, after a moment, the page is closed without
+ * them (the relay then drops the member whose stream closed, as filex does
+ * a member whose page went away). Returns how the page was closed.
+ */
+async function closeTab(page) {
+  await page.close({ runBeforeUnload: true });
+  const end = Date.now() + 2000;
+  while (!page.isClosed() && Date.now() < end) await sleep(100);
+  if (page.isClosed()) return 'closed';
+  await page.close();
+  return 'closed without beforeunload';
 }
 
 /** Wait for the next file the app hands filex (ui.download, or the ui.print stand-in). */
@@ -918,6 +964,208 @@ async function encryptedRun(browser, server, engine, o) {
   return r;
 }
 
+/**
+ * Once per engine, two people - two browser contexts - on the same document,
+ * through the harness's stand-in for filex 0.56's relay (harness/relay.mjs):
+ *
+ *   - both editors join the one session (the first starts it and puts the
+ *     base, the second opens the base) and each counts two people;
+ *   - what Ayşe types reaches Mehmet's bridge: both hold the same changes;
+ *   - Zeynep, who may only read, follows as a watcher: her bridge holds the
+ *     same changes, and her editor - ONLYOFFICE's live viewer, in view mode
+ *     (liveViewerSupport) - shows what Ayşe typed before anybody saves, read
+ *     from the editor's own document; she writes nothing into the log;
+ *   - both bridges hold the same locks (every bridge applies the same lock
+ *     requests in the same order);
+ *   - Mehmet saves (filex's Save): the file holds Ayşe's text, and the save
+ *     is written into the log with how far it reaches (`through`), past the
+ *     last change;
+ *   - neither is told "unsaved changes" while the other may save;
+ *   - Mehmet leaves: the log says so, and Ayşe's editor counts one again;
+ *   - a document x2t stops on, opened together: the opening stays "failed"
+ *     with the app's error and no editor, and the member leaves the session
+ *     it started (#220 with editing together).
+ */
+async function togetherRun(browser, server, engine, o) {
+  const doc = 'tr.docx';
+  const room = `room-${engine}`;
+  const r = { engine, doc: `${doc} (two people)`, ok: false, steps: [], problems: [], notes: [] };
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const failures = [];
+  const consoleErrors = [];
+  const people2 = [];
+  const open = async (who, uname, extra = '', coRoom = room) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+    const page = await ctx.newPage();
+    page.on('response', (q) => {
+      if (q.status() >= 400 && !q.url().includes('/__co/join')) failures.push(`${who}: ${q.status()} ${q.url()}`);
+    });
+    page.on('console', (m) => {
+      if (m.type() === 'error') consoleErrors.push(`${who}: ${m.text().slice(0, 300)}`);
+    });
+    page.on('pageerror', (e) => consoleErrors.push(`${who}: pageerror: ${String(e.message ?? e).slice(0, 300)}`));
+    await page.goto(`${server.origin}/?doc=${doc}&locale=tr&tag=${engine}-co-${who}&co=${coRoom}&who=${who}&uname=${encodeURIComponent(uname)}${extra}`);
+    await until(`${uname}'s editor to open the document`, async () => {
+      const a = appFrame(page);
+      if (!a) return false;
+      const ph = await a.evaluate(() => document.documentElement.dataset.fxPhase || '');
+      if (ph === 'failed') throw new Error(await a.evaluate(() => document.getElementById('fx-status-text')?.textContent || 'failed'));
+      return ph === 'ready';
+    }, OPEN_MS);
+    const x = { who, uname, ctx, page };
+    people2.push(x);
+    return x;
+  };
+  const bridge = (x, what) => editorFrame(x.page).evaluate((w) => {
+    const b = window.__fxBridge;
+    return b ? b[w]() : null;
+  }, what);
+  try {
+    const a = await open('a', 'Ayşe Yılmaz');
+    step('Ayşe opened');
+    const b = await open('b', 'Mehmet Demir');
+    step('Mehmet opened');
+    for (const x of [a, b]) {
+      if ((await bridge(x, 'together')) !== true) r.problems.push(`${x.uname}'s editor is not editing together`);
+    }
+    const first = server.relay.snapshot(room);
+    r.relayAtStart = first;
+    if (!first || !first.blobs.includes('base')) r.problems.push('the session has no base');
+    if (!first || first.members.length !== 2) r.problems.push(`the session has ${first?.members.length ?? 0} members, not 2`);
+    const ids = await Promise.all([a, b].map((x) => bridge(x, 'people')));
+    if (new Set(ids[0]).size !== ids[0].length) r.problems.push(`two people share an editor user id: ${JSON.stringify(ids[0])}`);
+    await until('each editor to count two people', async () => (await people(a.page, 'docx')).visible === 2 && (await people(b.page, 'docx')).visible === 2, 30_000);
+    step('two people');
+
+    // Zeynep may only read the file: she joins as a watcher (filex 0.56).
+    const w = await open('w', 'Zeynep Kaya', '&ro=1');
+    step('Zeynep opened (watching)');
+    if ((await bridge(w, 'together')) !== true) r.problems.push("Zeynep's editor is not following the session");
+
+    // Ayşe types: her changes reach Mehmet's bridge, and the watcher's.
+    await typeInto(a.page, 'docx');
+    step('Ayşe typed');
+    const counts = await until('the three bridges to hold the same changes', async () => {
+      const ca = await bridge(a, 'changes');
+      const cb = await bridge(b, 'changes');
+      const cw = await bridge(w, 'changes');
+      return ca > 0 && ca === cb && ca === cw ? { a: ca, b: cb, w: cw } : false;
+    }, 30_000);
+    step('the same changes', counts);
+    // What Zeynep's editor shows, read from its own document (not the
+    // bridge's count): ONLYOFFICE's live viewer (liveViewerSupport) puts the
+    // changes in as they land, before anybody saves.
+    const shown = await until("Zeynep's viewer to show what Ayşe typed", async () => {
+      const v = await viewerFacts(w.page);
+      return v.text.includes(TYPED) ? v : false;
+    }, 30_000);
+    step('Zeynep sees it', { viewMode: shown.viewMode, liveViewer: shown.liveViewer });
+    r.watcher = { viewMode: shown.viewMode, liveViewer: shown.liveViewer, afterTypedMs: r.steps.at(-1).ms - r.steps.find((s) => s.name === 'Ayşe typed').ms };
+    if (!shown.viewMode) r.problems.push("Zeynep's editor is not in view mode");
+    if (!shown.liveViewer) r.problems.push("Zeynep's editor is not ONLYOFFICE's live viewer");
+    if (o.shots) {
+      mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+      await w.page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-together-watcher.png`) });
+    }
+    const watcher = server.relay.snapshot(room).members.find((m) => m.name === 'Zeynep Kaya');
+    if (!watcher || watcher.canEdit) r.problems.push('the watcher is not a member that may not write');
+    else if (server.relay.snapshot(room).log.some((e) => e.client === watcher.client && e.kind !== 'join')) r.problems.push('the watcher wrote into the log');
+    const closedW = await closeTab(w.page);
+    await until('the log to say Zeynep left', () => server.relay.snapshot(room).log.some((e) => e.kind === 'leave' && e.client === watcher?.client), 20_000);
+    step('Zeynep left', { page: closedW, how: server.relay.snapshot(room).departures.find((d) => d.client === watcher?.client)?.how });
+    await sleep(1500);
+    const la = JSON.stringify(await bridge(a, 'locks'));
+    const lb = JSON.stringify(await bridge(b, 'locks'));
+    r.locks = { a: la.length, b: lb.length };
+    if (la !== lb) r.problems.push('the two bridges hold different locks');
+    step('the same locks');
+
+    // Mehmet saves: the file holds Ayşe's text, and the log says how far the save reaches.
+    const tagB = `${engine}-co-b`;
+    const before = server.saves.filter((x) => x.tag === tagB).length;
+    const answer = await b.page.evaluate(() => window.__fx.hostSave());
+    if (answer?.error) r.problems.push(`Mehmet's Save: ${JSON.stringify(answer.error)}`);
+    const saved = await until("Mehmet's save to write the file", () => server.saves.filter((x) => x.tag === tagB)[before], 60_000);
+    step('saved (Mehmet)', { bytes: saved.size, through: saved.through });
+    if (!documentText(readFileSync(saved.file), 'docx').includes(TYPED)) r.problems.push("Mehmet's save does not hold what Ayşe typed");
+    if (saved.through === null || !saved.together) r.problems.push(`the save was not written into the log (through ${saved.through})`);
+    const afterSave = server.relay.snapshot(room);
+    const savedEntry = afterSave.log.filter((e) => e.kind === 'saved').pop();
+    if (!savedEntry || savedEntry.through < afterSave.changesHead) r.problems.push(`the log's save reaches ${savedEntry?.through ?? 'nothing'}, the last change is ${afterSave.changesHead}`);
+    await until('neither to be told "unsaved changes"', async () => !(await a.page.evaluate(() => window.__fx.dirty)) && !(await b.page.evaluate(() => window.__fx.dirty)), 20_000);
+    step('nothing unsaved');
+
+    // Mehmet leaves: the log says so, Ayşe counts one again.
+    const closedB = await closeTab(b.page);
+    await until('the log to say Mehmet left', () => server.relay.snapshot(room).log.filter((e) => e.kind === 'leave').length >= 2, 20_000);
+    await until("Ayşe's editor to count one person again", async () => (await people(a.page, 'docx')).visible === 1, 30_000);
+    step('Mehmet left', { page: closedB, how: server.relay.snapshot(room).departures.at(-1)?.how });
+    r.relayAtEnd = server.relay.snapshot(room).log.map((e) => `${e.seq}:${e.kind}:${e.client}`);
+
+    // A person who may only read a document nobody is editing: nothing to
+    // follow, it opens as it is (filex 0.56: a watcher starts no session).
+    const alone = await open('v', 'Can Aydın', '&ro=1', `${room}-nobody`);
+    if ((await bridge(alone, 'together')) !== false) r.problems.push('a watcher started a session nobody edits');
+    step('a reader alone');
+
+    // A document x2t stops on, opened together (#220 with editing together):
+    // the person starts its session and puts the base, the conversion
+    // stops; the opening ends "failed" and stays so, says why, the editor is
+    // ended - and the member leaves the session it joined (the app's leave,
+    // not a drop: the page stays open).
+    const sRoom = `${room}-stops`;
+    const sctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+    try {
+      const sp = await sctx.newPage();
+      await sp.goto(`${server.origin}/?doc=stops.docx&locale=tr&tag=${engine}-co-s&co=${sRoom}&who=s&uname=${encodeURIComponent('Deniz Kara')}`);
+      const phaseOf = async () => (appFrame(sp) ? await appFrame(sp).evaluate(() => document.documentElement.dataset.fxPhase || '') : '');
+      const ended = await until('the opening together to end', async () => {
+        const ph = await phaseOf();
+        return ph === 'failed' || ph === 'ready' ? ph : false;
+      }, OPEN_MS);
+      if (ended !== 'failed') r.problems.push(`stops.docx together ended "${ended}", not "failed"`);
+      const left = await until('the log to say the member whose opening failed left', () => {
+        const snap = server.relay.snapshot(sRoom);
+        return snap && snap.log.some((e) => e.kind === 'leave') ? snap : false;
+      }, 20_000);
+      const how = left.departures.at(-1)?.how;
+      if (!left.log.some((e) => e.kind === 'join')) r.problems.push('stops.docx together did not join the session');
+      if (how !== 'left') r.problems.push(`the member whose opening failed went "${how}", not by leaving`);
+      if (left.members.length !== 0) r.problems.push(`${left.members.length} member(s) still in the failed session`);
+      await sleep(AFTER_FAILED_MS);
+      const st = await appFrame(sp).evaluate(() => ({
+        phase: document.documentElement.dataset.fxPhase || '',
+        text: document.getElementById('fx-status-text')?.textContent || '',
+        editorFrames: document.querySelectorAll('#fx-editor-box iframe').length,
+      }));
+      step('failed together, left', { how, phase: st.phase });
+      r.failedTogether = { how, ...st };
+      if (st.phase !== 'failed') r.problems.push(`${AFTER_FAILED_MS / 1000} s after it failed together the page says "${st.phase}"`);
+      if (st.text !== STOPPED_TR) r.problems.push(`together, the person reads ${JSON.stringify(st.text)}, not ${JSON.stringify(STOPPED_TR)}`);
+      if (st.editorFrames !== 0) r.problems.push('together, the editor is still loading behind the error');
+    } finally {
+      await sctx.close().catch(() => {});
+    }
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+    for (const x of people2) {
+      try {
+        mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+        if (!x.page.isClosed()) await x.page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-together-${x.who}-FAILED.png`) });
+      } catch {
+        /* the page is gone */
+      }
+    }
+  }
+  for (const x of people2) await x.ctx.close().catch(() => {});
+  r.failures = [...new Set(failures)];
+  r.consoleErrors = [...new Set(consoleErrors)];
+  if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
+  r.ok = r.problems.length === 0;
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -1000,6 +1248,11 @@ async function main() {
       }
       if (o.encrypted) {
         const r = await encryptedRun(browser, server, engine, o);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.together) {
+        const r = await togetherRun(browser, server, engine, o);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }

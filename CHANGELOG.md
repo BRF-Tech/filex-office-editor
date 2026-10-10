@@ -9,6 +9,78 @@ update.
 
 ## [Unreleased]
 
+Editing together, for filex 0.56.0 or later. **No ONLYOFFICE Document Server
+is needed** - not to edit office documents, and not to edit them together:
+this app with filex 0.56 is all it takes. filex keeps its Document Server
+support, and it is optional (an instance that has one may stay connected).
+What still needs one is what filex itself does with an office file on the
+server through it (a conversion run there, an office thumbnail made there);
+this app does neither - its Download as, PDF and Print run x2t in the
+browser.
+
+### Added
+
+- **Editing together** (filex 0.56, `files:co-edit`): everyone who has a
+  document open in the editor edits the same document, sees the others in
+  the editor's list of people, their cursors, their locks and their changes
+  as they make them, through filex's relay - filex seals what they share and
+  puts it in one order; the app holds no key and talks to no server. The
+  editor joins the document's session before it is configured (each member
+  is its own user in the editor); the one who starts the session puts the
+  document it opened as the session's base, and everyone after opens that
+  base and the session's log, never the file. Every bridge applies the same
+  entries in the same order with the Document Server's lock rules; changes
+  go in only under filex's changes lease.
+- **Images inserted while editing together** reach the others: the image is
+  kept with the session before the change that shows it, and fetched by the
+  others before they apply that change (also by someone who joins later).
+- **Saving together**: a version every ten minutes while there are unsaved
+  changes, written by one member (the writer who joined first and is still
+  in); Save saves at once, by whoever pressed it; the last writer to leave
+  saves what is not saved. Every save says how far into the session it
+  reaches, and filex records it for everyone. filex asks about unsaved
+  changes only the last writer, so closing while others edit asks nothing.
+- When filex drops a member whose page was unreachable, the editor opens
+  again in the session with everybody's changes, and the person is told;
+  when a change from the session does not check out, editing together stops
+  for that person and the document opens again alone, as last saved.
+- **Following along, read-only**: a person who may only read the document
+  joins its session as a watcher - the editor opens it to read (no
+  "Edit"), and shows the others' changes as they land (ONLYOFFICE's live
+  viewer); filex refuses whatever a watcher would write. With nobody
+  editing it, there is nothing to follow and it opens as it is.
+- **Changes kept through a lost connection**: filex 0.56 keeps every change
+  in the browser until its relay placed it, sends it again when the
+  connection is back, and sends what a closed tab left when the document
+  is opened again (after asking, in filex's words, when somebody else
+  changed the document since). The editor opens with them in it: its own
+  member's changes before its start are part of the document it is given,
+  not an answer to a save of its own.
+- Editing together in an **end-to-end encrypted folder** (filex 0.56, with
+  the app's `encrypted_folders` grant): the session's key is sealed with the
+  folder key in the members' browsers; the app does nothing differently.
+- The e2e harness has a stand-in for filex 0.56's relay, and the browser run
+  opens one document in two browser contexts, then a third that may only
+  read, and a reader alone - measured in Chromium, Firefox and WebKit: the
+  watcher's editor, ONLYOFFICE's live viewer, shows what another person
+  types before anybody saves (read from the editor's own document). The
+  stand-in drops a member whose page went away, as filex does after 45 s
+  (a closing tab does not always let its leave out).
+- An opening that fails while editing together (the converter stops on the
+  document, or does not finish in time, or the editor's script does not
+  load) stays failed and ends the editor, as alone, and leaves the session
+  it joined - nobody waits on a member whose editor never started.
+
+### Changed
+
+- The manifest says `"co_edit": {"open": true}` (granted as
+  `files:co-edit`, which filex derives from the block - it is not listed in
+  `permissions`) and asks for filex `>=0.56.0` (filex 0.55 refuses a
+  manifest with a block it does not know; servers on 0.55 keep 0.1.1).
+  Where filex offers no editing together - an older filex, no grant, a
+  vault, the phone's reading view, a person who may only read a document
+  nobody is editing - the editor runs alone, exactly as in 0.1.1.
+
 ## [0.2.0] - 2026-10-10
 
 Documents in encrypted folders and vaults: filex 0.56 decrypts the document

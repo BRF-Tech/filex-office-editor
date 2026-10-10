@@ -175,6 +175,12 @@ export interface ConfigInput {
   locale: string;
   dark: boolean;
   userName: string;
+  /**
+   * The editor's user id: the member's when the document is edited
+   * together (coedit.ts editorIdOf - every member's differs), EDITOR_USER_ID
+   * alone. The editor page's bridge uses the same.
+   */
+  userId?: string;
   canEdit: boolean;
   /** filex hands the person a file (the app's ui:download grant): "Download as" is on. */
   canDownload?: boolean;
@@ -295,7 +301,7 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
       mode: edit ? 'edit' : 'view',
       lang: editorLang(o.locale),
       region: editorRegion(o.locale),
-      user: { id: EDITOR_USER_ID, name: personName(o.userName) },
+      user: { id: o.userId || EDITOR_USER_ID, name: personName(o.userName) },
       coEditing: { mode: 'fast', change: false },
       plugins: { autostart: [], pluginsData: [] },
       customization: {
