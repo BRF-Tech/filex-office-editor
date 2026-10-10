@@ -1193,7 +1193,13 @@ for `>=0.56.0`, the review adding `files:e2e-plaintext` (0.2.0) and
 | ... Ayşe's line in Mehmet's and in Zeynep's editor, read from each editor's own document, before anybody saves (from her first keystroke, the typing included) | 4.1 s | 5.6 s | 4.8 s |
 | ... Mehmet's Save writes the file with her line | yes | yes | yes |
 | (d) A document x2t stops on (`stops.docx`): "Belge açılamadı: dönüştürücü bu belgede durdu (missing function: COFDFile::COFDFile)", still "failed" six seconds on, no editor | yes | yes | yes |
+| (e) Two people in an encrypted folder: Mehmet unlocks the folder Ayşe made and opens her document; both editors count two, her line shows in his (3.9 s from her first keystroke), his Save writes the file still `filexe2e`, the line in no request either page sent | yes | not measured | not measured |
 | Requests outside filex / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
+
+The same four, (a) to (d), ran again in the three browsers on a fresh
+install from v0.3.1's release files (the same `ui.zip`, byte for byte):
+all twelve green, her line in the other two editors 4.5 s, 4.6 s and 4.8 s
+from her first keystroke.
 
 The relay answered Chromium's (c) twice `409 coedit_conflict` ("somebody
 else's entry came first"), which filex's SDK answers by sealing the entry
