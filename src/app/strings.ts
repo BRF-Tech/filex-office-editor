@@ -5,14 +5,19 @@
 // The app page's own words (the editor has its own translations). English
 // and Turkish, like the manifest.
 
-import type { UiLang } from './config';
+import type { SaveRefusal, UiLang } from './config';
 
 export interface Strings {
   opening: (name: string) => string;
   notInFilex: string;
   unsupported: (ext: string) => string;
+  /** The document is in an encrypted folder (or is encrypted) and filex does not hand it over here. */
+  encryptedNotHanded: string;
   openFailed: (reason: string) => string;
   saveFailed: (reason: string) => string;
+  /** A save filex refused and said why (config.ts saveRefusal): nothing was
+   *  written, the editor still holds the changes. */
+  saveRefused: Record<SaveRefusal, string>;
   /** "Download as" or Print could not be written. */
   exportFailed: (reason: string) => string;
   /** The reason in those three when the converter (x2t) stopped on the document: `detail` is x2t's own words. */
@@ -58,8 +63,18 @@ export const STRINGS: Record<UiLang, Strings> = {
     opening: (name) => `Opening ${name}…`,
     notInFilex: 'This page is the office editor app for filex; it opens inside filex.',
     unsupported: (ext) => `This app does not open .${ext} files.`,
+    encryptedNotHanded:
+      'This document is encrypted, and filex does not hand it to this app here. Editing an encrypted document needs filex 0.56 or later and an administrator who allows it; until then filex opens it in its own viewer.',
     openFailed: (reason) => `The document could not be opened: ${reason}`,
     saveFailed: (reason) => `The document could not be saved: ${reason}`,
+    saveRefused: {
+      changed:
+        'Someone saved this document after you opened it, so your version was not saved over theirs. To keep your changes, download the document, then open it again.',
+      vault_locked:
+        'Someone else is writing to this vault right now, so the document was not saved. Your changes are still here: save again when they are done.',
+      vault_lock_lost:
+        "The vault's write lock ended before the save was finished, so nothing was saved. Your changes are still here: save again.",
+    },
     exportFailed: (reason) => `The file could not be made: ${reason}`,
     x2tStopped: (detail) => `the converter stopped on this document (${detail})`,
     x2tTimeout: (seconds) => `the converter did not finish in ${seconds} seconds`,
@@ -80,8 +95,18 @@ export const STRINGS: Record<UiLang, Strings> = {
     opening: (name) => `${name} açılıyor…`,
     notInFilex: "Bu sayfa filex'in ofis düzenleyici uygulamasıdır; filex'in içinde açılır.",
     unsupported: (ext) => `Bu uygulama .${ext} dosyalarını açmaz.`,
+    encryptedNotHanded:
+      "Bu belge şifreli ve filex onu burada bu uygulamaya vermiyor. Şifreli bir belgeyi düzenlemek için filex 0.56 ya da sonrası ve buna izin veren bir yönetici gerekir; o zamana kadar filex onu kendi görüntüleyicisinde açar.",
     openFailed: (reason) => `Belge açılamadı: ${reason}`,
     saveFailed: (reason) => `Belge kaydedilemedi: ${reason}`,
+    saveRefused: {
+      changed:
+        'Bu belge siz açtıktan sonra başka biri tarafından kaydedildi, bu yüzden sizin sürümünüz onunkinin üzerine kaydedilmedi. Değişikliklerinizi korumak için belgeyi indirin, sonra yeniden açın.',
+      vault_locked:
+        'Şu anda bu kasaya başka biri yazıyor, bu yüzden belge kaydedilmedi. Değişiklikleriniz hâlâ burada: o bitirdiğinde yeniden kaydedin.',
+      vault_lock_lost:
+        'Kasanın yazma kilidi kayıt bitmeden sona erdi, bu yüzden hiçbir şey kaydedilmedi. Değişiklikleriniz hâlâ burada: yeniden kaydedin.',
+    },
     exportFailed: (reason) => `Dosya hazırlanamadı: ${reason}`,
     x2tStopped: (detail) => `dönüştürücü bu belgede durdu (${detail})`,
     x2tTimeout: (seconds) => `dönüştürücü ${seconds} saniyede bitiremedi`,

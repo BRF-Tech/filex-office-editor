@@ -75,6 +75,52 @@ export function kindOf(ext: string | undefined | null): Kind | null {
   return Object.prototype.hasOwnProperty.call(KINDS, e) ? KINDS[e] : null;
 }
 
+/**
+ * What filex says of the file's encryption (FileInfo, filex 0.55 and 0.56):
+ * `encrypted` - "folder", "vault" or "file" for a file the server holds only
+ * as ciphertext; `plaintext` - filex 0.56 hands it to this app in the clear
+ * (the person's browser decrypts it for `file.read` and encrypts what
+ * `file.save` hands back; the manifest's `encrypted_folders`). Read off the
+ * object as it came: the SDK version the app builds with may not name them.
+ */
+export interface EncryptionInfo {
+  encrypted?: unknown;
+  plaintext?: unknown;
+}
+
+/**
+ * The file is encrypted and filex does not hand it over: an older filex, an
+ * administrator who turned it off, a vault or a single encrypted file - the
+ * app says so instead of asking for bytes filex refuses. A file filex hands
+ * over in the clear is edited like any other.
+ */
+export function encryptedNotHanded(info: object | null | undefined): boolean {
+  if (!info) return false;
+  const { encrypted, plaintext } = info as EncryptionInfo;
+  return (encrypted === 'folder' || encrypted === 'vault' || encrypted === 'file') && plaintext !== true;
+}
+
+/**
+ * Why filex did not take a save, when it says which (filex 0.56, a document
+ * it hands over in the clear): `changed` - somebody saved the file after the
+ * editor opened it (in an encrypted folder or a vault); `vault_locked` -
+ * somebody else is writing the vault right now; `vault_lock_lost` - this
+ * session's write lock on the vault ended before the save was committed.
+ * Nothing was written in any of them, and the editor still holds the
+ * changes. null: any other failure, said with its reason.
+ */
+export type SaveRefusal = 'changed' | 'vault_locked' | 'vault_lock_lost';
+
+const SAVE_REFUSALS: readonly string[] = ['changed', 'vault_locked', 'vault_lock_lost'];
+
+/** The refusal a failed save carries (the SDK's FilexError: `failed` and the word), or null. */
+export function saveRefusal(e: unknown): SaveRefusal | null {
+  const code = (e as { code?: unknown } | null)?.code;
+  const message = (e as { message?: unknown } | null)?.message;
+  if (code !== 'failed' || typeof message !== 'string') return null;
+  return SAVE_REFUSALS.includes(message) ? (message as SaveRefusal) : null;
+}
+
 /** The languages the app's own words come in. */
 export type UiLang = 'en' | 'tr';
 

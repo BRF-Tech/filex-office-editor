@@ -9,6 +9,44 @@ update.
 
 ## [Unreleased]
 
+### Added
+
+- **Documents in encrypted folders** (filex 0.56.0 or later). The manifest
+  asks for `"encrypted_folders": {"open": true}` - filex derives the
+  permission `files:e2e-plaintext`, whose reason the manifest gives in
+  English and Turkish - and filex, in the person's browser, decrypts a
+  document of an unlocked encrypted folder for the editor (`FileInfo`
+  `encrypted: "folder"`, `plaintext: true`) and encrypts what it saves; the
+  app reads and saves it through the SDK as any document, and the server
+  sees only ciphertext - in a vault too (`encrypted: "vault"`: filex reads
+  it from the vault and writes the save as the vault's next generation). A
+  document filex does not hand over (filex 0.55, a `.fxe`, switched off by
+  an administrator) is said in the app's words instead of asked for
+  (`encryptedNotHanded`).
+- **A save filex refuses is said in a person's words** (`saveRefusal`):
+  somebody saved the document since it was opened (`changed`), somebody
+  else is writing the vault (`vault_locked`), the vault's write lock ended
+  before the save finished (`vault_lock_lost`) - nothing was written, the
+  changes stay in the editor, and the message says what to do, in English
+  and Turkish, instead of "could not be saved: changed (failed)".
+- The measurement imitates filex 0.56 (`enc=folder`: the harness holds the
+  document as filex encrypts it, decrypts it for the app and encrypts the
+  save; `enc=055`: filex 0.55) and `npm run e2e` checks it once per engine
+  (`encryptedRun`): only ciphertext reaches the server, nothing in the clear
+  in any request, what the server holds decrypts to the typed text; on
+  0.55 the app says the document is encrypted.
+
+### Changed
+
+- x2t is `v9.4.0.129+2`: the same build with the frame anchor fix, its two
+  files' SHA-256 pinned in `upstream/onlyoffice.json` (two builds from empty
+  trees give the same bytes). No release has published its `x2t.zip` yet:
+  `bash scripts/x2t/build.sh` makes it.
+- **filex 0.56.0 or later** (`"filex": ">=0.56.0"`): 0.55 refuses a manifest
+  with `encrypted_folders`.
+- The description says encrypted folders again, and the `ui:connect-blob`
+  reason the document the browser decrypted or converted.
+
 ### Fixed
 
 - **A document the converter stops on ends the opening, and says why, in
@@ -31,13 +69,6 @@ update.
   the sentence it ends: x2t read a frame's anchor only from its style.
   x2t now reads it from the frame (`scripts/x2t/patches/05-frame-anchor.patch`).
   Files LibreOffice writes give every formula a style and kept their place.
-
-### Changed
-
-- x2t is `v9.4.0.129+2`: the same build with the frame anchor fix, its two
-  files' SHA-256 pinned in `upstream/onlyoffice.json` (two builds from empty
-  trees give the same bytes). No release has published its `x2t.zip` yet:
-  `bash scripts/x2t/build.sh` makes it.
 
 ## [0.1.1] - 2026-10-10
 

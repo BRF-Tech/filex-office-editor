@@ -17,6 +17,16 @@
 // name, a PDF - "%PDF-" - and {printed, size}) but records the PDF the same
 // way instead of printing it; print=none answers unknown_method, as filex
 // 0.54 and older do.
+//
+// enc=folder is filex 0.56 with a document of an unlocked encrypted folder
+// (FileInfo `encrypted: "folder"`, `plaintext: true`): what "the server"
+// holds is the document encrypted the way filex's explorer encrypts it (the
+// `filexe2e` one-shot format: a random DEK sealed with the folder key, the
+// content under the DEK, AES-GCM), the folder key lives in this page only,
+// file.read decrypts it here and hands the app the plaintext, and file.save
+// encrypts what the app hands over before it goes to the server - which
+// receives and keeps only that ciphertext. enc=055 is filex 0.55 with the
+// same file: `encrypted: "folder"`, read-only, and its read refused.
 'use strict';
 
 (function () {
@@ -28,7 +38,8 @@
   const readOnly = q.get('ro') === '1';
   const tag = q.get('tag') || 'run';
   const canPrint = q.get('print') !== 'none';
-  const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download', 'ui:print'];
+  const enc = q.get('enc') || '';
+  const GRANTS = ['files:read', 'files:write', 'ui', 'ui:eval', 'ui:wasm-eval', 'ui:package-fetch', 'ui:frame-package', 'ui:connect-blob', 'ui:download', 'ui:print', 'files:e2e-plaintext'];
   const without = (q.get('grants') || '').split(',').filter((g) => g.startsWith('-')).map((g) => g.slice(1));
   const grants = GRANTS.filter((g) => !without.includes(g));
   const STATE = 'fx-app-state:office-editor';
@@ -50,6 +61,56 @@
 
   const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], stateSets: 0, ready: false, hostSave: null });
 
+  // ---- enc=folder: filex 0.56's encrypted folder, its key in this page only.
+  const E2E_MAGIC = new TextEncoder().encode('filexe2e');
+  let folderKey = null;
+  /** The document as "the server" holds it now: ciphertext. */
+  let held = null;
+
+  async function e2eKey() {
+    if (!folderKey) folderKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    return folderKey;
+  }
+
+  /** filex's encryptFile: 'filexe2e', 0x01, the wrap IV, the DEK sealed with the folder key, the data IV, 16 zero bytes, the content. */
+  async function e2eSeal(plain) {
+    const fmk = await e2eKey();
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    const dek = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt']);
+    const wrapIV = crypto.getRandomValues(new Uint8Array(12));
+    const dataIV = crypto.getRandomValues(new Uint8Array(12));
+    const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: wrapIV }, fmk, raw));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: dataIV }, dek, plain));
+    raw.fill(0);
+    const out = new Uint8Array(97 + ct.length);
+    out.set(E2E_MAGIC, 0);
+    out[8] = 1;
+    out.set(wrapIV, 9);
+    out.set(wrapped, 21);
+    out.set(dataIV, 69);
+    out.set(ct, 97);
+    return out.buffer;
+  }
+
+  /** filex's decryptFile, for the one-shot format e2eSeal writes. */
+  async function e2eOpen(buf) {
+    const b = new Uint8Array(buf);
+    if (b.length < 97 || !E2E_MAGIC.every((c, i) => b[i] === c) || b[8] !== 1) throw new Error('not a file of an encrypted folder');
+    const fmk = await e2eKey();
+    const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(9, 21) }, fmk, b.slice(21, 69));
+    const dek = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['decrypt']);
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(69, 81) }, dek, b.slice(97));
+  }
+
+  /** What the measurement reads back: the document "the server" holds, decrypted with the folder key (base64), and its first bytes as stored. */
+  fx.heldDocument = async function () {
+    if (!held) return null;
+    const plain = new Uint8Array(await e2eOpen(held));
+    let s = '';
+    for (let i = 0; i < plain.length; i += 0x8000) s += String.fromCharCode.apply(null, plain.subarray(i, i + 0x8000));
+    return { plain: btoa(s), head: String.fromCharCode.apply(null, new Uint8Array(held, 0, 8)) };
+  };
+
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.setAttribute('referrerpolicy', 'no-referrer');
@@ -69,6 +130,17 @@
   }
 
   async function read(id) {
+    if (enc === '055') return fail(id, 'failed', 'encrypted');
+    if (enc === 'folder') {
+      if (!held) {
+        const first = await fetch(`/__doc/${encodeURIComponent(name)}`);
+        if (!first.ok) return fail(id, 'not_found');
+        held = await e2eSeal(await first.arrayBuffer());
+      }
+      // Decrypted here, transferred to the app: filex 0.56's AppFrame.
+      const plain = await e2eOpen(held);
+      return reply(id, { name, size: plain.byteLength, mime: MIME[ext] || 'application/octet-stream', bytes: plain }, [plain]);
+    }
     const res = await fetch(`/__doc/${encodeURIComponent(name)}`);
     if (!res.ok) return fail(id, 'not_found');
     const bytes = await res.arrayBuffer();
@@ -81,6 +153,17 @@
     if (typeof data === 'string') data = new TextEncoder().encode(data);
     if (data && typeof data.getReader === 'function') data = await new Response(data).arrayBuffer();
     if (!(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) return fail(id, 'invalid');
+    if (enc === '055') return fail(id, 'read_only');
+    if (enc === 'folder') {
+      // Encrypted here: the server receives and keeps only the ciphertext.
+      const plain = ArrayBuffer.isView(data) ? data : new Uint8Array(data);
+      const sealed = await e2eSeal(plain);
+      const res = await fetch(`/__save?name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}&enc=1`, { method: 'POST', body: sealed });
+      const r = await res.json();
+      held = sealed;
+      fx.saves.push({ size: r.size, at: Date.now(), encrypted: true });
+      return reply(id, { saved: true, size: plain.byteLength });
+    }
     const res = await fetch(`/__save?name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`, { method: 'POST', body: data });
     const r = await res.json();
     fx.saves.push({ size: r.size, at: Date.now() });
@@ -152,7 +235,18 @@
             dir: 'ltr',
             theme: { mode, tokens: TOKENS[mode] },
             user: { name: 'Ayşe Yılmaz' },
-            files: [{ index: 0, name, ext, size: 0, mime: MIME[ext] || '', readOnly }],
+            files: [
+              {
+                index: 0,
+                name,
+                ext,
+                size: 0,
+                mime: MIME[ext] || '',
+                readOnly: readOnly || enc === '055',
+                ...(enc ? { encrypted: 'folder' } : {}),
+                ...(enc === 'folder' ? { plaintext: true } : {}),
+              },
+            ],
             grants,
           });
         case 'file.read':

@@ -43,13 +43,19 @@
 //     OFD package under a .docx name) ends the opening with the app's own
 //     error, in the person's language and with why, and the page stays
 //     "failed" after the editor would have been ready (stopRun, #220);
+//   - an encrypted folder, once per engine (encryptedRun, filex 0.56's
+//     `encrypted_folders`): the document filex hands over in the clear opens
+//     and saves, the server receives only ciphertext (`filexe2e`), and what
+//     it holds decrypts with the folder key to a document holding the typed
+//     text; on filex 0.55 the app says the document is encrypted instead of
+//     asking for it;
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -97,6 +103,7 @@ function args(argv) {
     phone: true,
     formula: true,
     stop: true,
+    encrypted: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -109,6 +116,7 @@ function args(argv) {
     else if (a === '--no-phone') o.phone = false;
     else if (a === '--no-formula') o.formula = false;
     else if (a === '--no-stop') o.stop = false;
+    else if (a === '--no-encrypted') o.encrypted = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -835,6 +843,81 @@ async function formulaRun(browser, server, engine, doc) {
   return r;
 }
 
+/**
+ * Once per engine: a document of an encrypted folder. filex 0.56
+ * (`enc=folder`): the harness holds the document as filex's explorer
+ * encrypts it, hands the app the plaintext, and encrypts what the app saves
+ * before it goes to the server. The app opens it, the typed text is saved,
+ * the server receives only ciphertext - no request the pages sent carries a
+ * document in the clear - and what it holds decrypts, with the folder key,
+ * to a document with the typed text and the Turkish document's own. filex
+ * 0.55 (`enc=055`): the same file, encrypted and not handed over - the app
+ * says so and asks for nothing.
+ */
+async function encryptedRun(browser, server, engine, o) {
+  const r = { engine, doc: 'tr.docx (encrypted folder)', ok: false, steps: [], problems: [], notes: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const tag = `${engine}-enc`;
+  const sent = [];
+  try {
+    const page = await ctx.newPage();
+    page.on('request', (q) => sent.push(q));
+    await page.goto(`${server.origin}/?doc=tr.docx&locale=tr&tag=${tag}&enc=folder`);
+    await until('the editor to open the encrypted document', async () => {
+      const a = appFrame(page);
+      if (!a) return false;
+      const ph = await a.evaluate(() => document.documentElement.dataset.fxPhase || '');
+      if (ph === 'failed') throw new Error(await a.evaluate(() => document.getElementById('fx-status-text')?.textContent || 'failed'));
+      return ph === 'ready';
+    }, OPEN_MS);
+    step('opened');
+    await sleep(800);
+    await typeInto(page, 'docx');
+    await until('filex to be told there are unsaved changes', () => page.evaluate(() => window.__fx.dirty === true), 20_000);
+    const before = server.saves.filter((s) => s.tag === tag).length;
+    await page.keyboard.press('Control+S');
+    const saved = await until('the save to reach the server', () => server.saves.filter((s) => s.tag === tag)[before], 60_000);
+    step('saved', { bytes: saved.size });
+    const stored = readFileSync(saved.file);
+    if (!saved.enc) r.problems.push('the save did not go through the encrypted folder');
+    if (stored.subarray(0, 8).toString('latin1') !== 'filexe2e') r.problems.push(`the server received ${JSON.stringify(stored.subarray(0, 8).toString('latin1'))}, not ciphertext`);
+    // A document in the clear is a zip: its local header is "PK\x03\x04".
+    for (const q of sent) {
+      const b = q.postDataBuffer();
+      if (b && b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4) r.problems.push(`${q.url()} carried a document in the clear`);
+    }
+    const held = await page.evaluate(() => window.__fx.heldDocument());
+    if (!held || held.head !== 'filexe2e') r.problems.push('the server does not hold ciphertext');
+    const text = held ? documentText(Buffer.from(held.plain, 'base64'), 'docx') : '';
+    if (!text.includes(TYPED)) r.problems.push('what the server holds, decrypted with the folder key, does not hold the typed text');
+    for (const k of [o.TR.title, o.TR.body]) if (!text.includes(k)) r.problems.push(`what the server holds lost "${k}"`);
+    step('decrypted');
+    await page.close();
+
+    // filex 0.55: encrypted, not handed over - said, not asked for.
+    const old = await ctx.newPage();
+    await old.goto(`${server.origin}/?doc=tr.docx&locale=tr&tag=${tag}-055&enc=055`);
+    const said = await until('the app to say the document is encrypted', async () => {
+      const a = appFrame(old);
+      if (!a) return false;
+      const ph = await a.evaluate(() => document.documentElement.dataset.fxPhase || '');
+      return ph === 'failed' ? a.evaluate(() => document.getElementById('fx-status-text')?.textContent || '') : false;
+    }, OPEN_MS);
+    step('0.55 said', { said });
+    if (!/şifreli/.test(said)) r.problems.push(`on filex 0.55 the app said "${said}"`);
+    const asked = await old.evaluate(() => window.__fx.calls);
+    if (asked.includes('file.read')) r.problems.push('on filex 0.55 the app asked for the encrypted document');
+    if (server.saves.some((s) => s.tag === `${tag}-055`)) r.problems.push('on filex 0.55 something was saved');
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+  }
+  r.ok = r.problems.length === 0;
+  await ctx.close();
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -912,6 +995,11 @@ async function main() {
       }
       if (o.stop) {
         const r = await stopRun(browser, server, engine);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.encrypted) {
+        const r = await encryptedRun(browser, server, engine, o);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }

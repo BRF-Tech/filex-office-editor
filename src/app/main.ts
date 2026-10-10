@@ -25,6 +25,19 @@
 // One person, one document (plan step A3). Nothing leaves the browser but
 // the saves, the files the person asks for and the settings, and those go
 // to filex through the SDK.
+//
+// A document of an encrypted folder (filex 0.56, the manifest's
+// `encrypted_folders`): filex says `encrypted: "folder"` and `plaintext:
+// true`, decrypts it in the person's browser for `file.read` and encrypts
+// what `file.save` hands back - the app reads and saves it like any other,
+// and the server sees only ciphertext. In a vault (`encrypted: "vault"`,
+// filex 0.56) the same: filex reads it from the vault and writes the save as
+// the vault's next generation, one writer at a time - a save it refuses
+// (somebody else writing the vault, the write lock lost, the file saved
+// meanwhile) is said in the app's words (config.ts saveRefusal), the
+// changes kept. An encrypted file filex does not hand over (`plaintext`
+// absent: an older filex, a `.fxe`, an administrator who turned it off) is
+// said, not asked for.
 
 import { connect, FilexError, type FilexApp } from '@brftech/filex-app-ui';
 
@@ -41,7 +54,7 @@ import {
 } from '../frame-protocol';
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
-import { NARROW_PX, editorConfig, isPhone, kindOf, uiLang, type Kind, type View } from './config';
+import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type Kind, type View } from './config';
 import { STRINGS, type Strings } from './strings';
 import { X2tClient, X2tFailure, type Converted } from './x2t-client';
 
@@ -390,7 +403,9 @@ class OfficeApp {
         this.link.send({ t: 'saved', ok: true, through });
       } catch (e) {
         this.link.send({ t: 'saved', ok: false, through: 0 });
-        this.fx.toast(this.t.saveFailed(reason(e, this.t)), 'error');
+        // A refusal filex said the reason of, in words a person can act on.
+        const refused = saveRefusal(e);
+        this.fx.toast(refused ? this.t.saveRefused[refused] : this.t.saveFailed(reason(e, this.t)), 'error');
         throw e;
       }
     })();
@@ -477,6 +492,11 @@ async function main(): Promise<void> {
   const kind = kindOf(info?.ext);
   if (!info || !kind) {
     setStatus(t.unsupported(info?.ext ?? '?'), true);
+    return;
+  }
+  if (encryptedNotHanded(info)) {
+    phase('failed');
+    setStatus(t.encryptedNotHanded, true);
     return;
   }
   setStatus(t.opening(info.name));

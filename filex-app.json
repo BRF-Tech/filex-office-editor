@@ -2,14 +2,14 @@
   "manifest_version": 1,
   "name": "office-editor",
   "version": "0.1.1",
-  "filex": ">=0.55.0",
+  "filex": ">=0.56.0",
   "label": {
     "en": "Office editor",
     "tr": "Ofis düzenleyici"
   },
   "description": {
-    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server: nothing of the editor runs on the server, and saving writes a new version of the file. Based on ONLYOFFICE Docs by Ascensio System SIA. ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio System SIA; this app is not affiliated with or endorsed by Ascensio System SIA.",
-    "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin: düzenleyicinin hiçbir parçası sunucuda çalışmaz, kaydetmek dosyanın yeni bir sürümünü yazar. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır. ONLYOFFICE® ve ONLYOFFICE Docs™, Ascensio System SIA'nın tescilli markaları ya da ticari markalarıdır; bu uygulama Ascensio System SIA ile bağlantılı değildir ve onun tarafından onaylanmamıştır."
+    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in your browser, with ONLYOFFICE's editor and without a Document Server: nothing of the editor runs on the server, and saving writes a new version of the file - also inside encrypted folders, where your browser decrypts the document for the editor and encrypts it again before it is saved, so no server ever reads it. Based on ONLYOFFICE Docs by Ascensio System SIA. ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio System SIA; this app is not affiliated with or endorsed by Ascensio System SIA.",
+    "tr": "Word, Excel ve PowerPoint belgelerini (ve OpenDocument karşılıklarını) tarayıcınızda, ONLYOFFICE düzenleyicisiyle ve Document Server olmadan düzenleyin: düzenleyicinin hiçbir parçası sunucuda çalışmaz, kaydetmek dosyanın yeni bir sürümünü yazar - şifreli klasörlerde de; orada belgenin şifresini tarayıcınız düzenleyici için çözer ve kaydedilmeden önce yeniden şifreler, belgeyi hiçbir sunucu okumaz. Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır. ONLYOFFICE® ve ONLYOFFICE Docs™, Ascensio System SIA'nın tescilli markaları ya da ticari markalarıdır; bu uygulama Ascensio System SIA ile bağlantılı değildir ve onun tarafından onaylanmamıştır."
   },
   "homepage": "https://github.com/BRF-Tech/filex-office-editor",
   "permissions": [
@@ -25,6 +25,10 @@
       "en": "To save the document back as a new version, or a new document where you choose.",
       "tr": "Belgeyi yeni sürüm olarak geri kaydetmek ya da seçtiğiniz yere yeni belge olarak kaydetmek için."
     },
+    "files:e2e-plaintext": {
+      "en": "To edit documents in encrypted folders you have unlocked: your browser decrypts the document and hands this app its contents in the clear, and encrypts what it saves before it leaves your browser. The app sees every document you open with it in an encrypted folder; the server still sees only encrypted data.",
+      "tr": "Kilidini açtığınız şifreli klasörlerdeki belgeleri düzenlemek için: belgenin şifresini tarayıcınız çözer, içeriğini bu uygulamaya şifresiz verir ve kaydedileni tarayıcınızdan çıkmadan yeniden şifreler. Uygulama, şifreli bir klasörde onunla açtığınız her belgenin içeriğini görür; sunucu yine yalnızca şifreli veri görür."
+    },
     "ui": {
       "en": "The editor is this app: it runs in your browser, in the sandbox filex draws for it. Nothing of it runs on the server.",
       "tr": "Düzenleyici bu uygulamanın kendisidir: filex'in onun için çizdiği yalıtım alanında, tarayıcınızda çalışır. Hiçbir parçası sunucuda çalışmaz."
@@ -38,8 +42,8 @@
       "tr": "Düzenleyici kendi sayfasını, aynı paketten ve aynı yalıtım alanında, kendine ait bir çerçevede açar."
     },
     "ui:connect-blob": {
-      "en": "The editor reads the document your browser converted from an in-memory address (blob:) that never leaves the page.",
-      "tr": "Düzenleyici, tarayıcınızın dönüştürdüğü belgeyi sayfadan hiç çıkmayan bir bellek adresinden (blob:) okur."
+      "en": "The editor reads the document your browser decrypted or converted from an in-memory address (blob:) that never leaves the page.",
+      "tr": "Düzenleyici, tarayıcınızın çözdüğü ya da dönüştürdüğü belgeyi sayfadan hiç çıkmayan bir bellek adresinden (blob:) okur."
     },
     "ui:eval": {
       "en": "ONLYOFFICE's editor builds some of its code while it runs.",
@@ -112,6 +116,9 @@
     "connect_blob": true,
     "download": true,
     "print": true
+  },
+  "encrypted_folders": {
+    "open": true
   },
   "views": [
     {
