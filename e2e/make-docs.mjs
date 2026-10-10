@@ -7,6 +7,10 @@
 //                                          filex's New menu makes)
 //   tr.docx / tr.xlsx / tr.pptx            the Turkish test documents of the
 //                                          x2t smoke test (tests/fixtures/office.ts)
+//   formula.odt / formula-nostyle.odt      a formula at the end of a sentence and
+//                                          between two words, the frames styled
+//                                          as LibreOffice writes them / without
+//                                          a style (odtWithFormula)
 //   stops.docx                             an OFD package under a .docx name: x2t
 //                                          stops on it (ofdPackage)
 //
@@ -42,6 +46,8 @@ export async function makeDocs({ ui = path.join(ROOT, 'dist', 'ui'), out = path.
   writeFileSync(path.join(out, 'tr.docx'), f.docx());
   writeFileSync(path.join(out, 'tr.xlsx'), f.xlsx());
   writeFileSync(path.join(out, 'tr.pptx'), f.pptx());
+  writeFileSync(path.join(out, 'formula.odt'), f.odtWithFormula({ styled: true }));
+  writeFileSync(path.join(out, 'formula-nostyle.odt'), f.odtWithFormula({ styled: false }));
   writeFileSync(path.join(out, 'stops.docx'), f.ofdPackage());
   return { out, TR: f.TR, fixtures: f };
 }

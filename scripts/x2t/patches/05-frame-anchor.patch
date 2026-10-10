@@ -1,0 +1,47 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-10: a frame's anchor
+(text:anchor-type) is read from the frame whether or not it has a graphic
+style.
+
+Measured (2026-10-10): an odt whose formula frame has no draw:style-name -
+<text:p>Toplam: <draw:frame text:anchor-type="as-char">...formula...
+</draw:frame></text:p> - came into the document as a floating text box at
+the top left of the page's margin (wp:anchor, posOffset 0, wrapSquare), so
+the editor drew the formula in front of the sentence it ends.
+common_draw_docx_convert (OdfFile/Reader/Format/draw_frame_docx.cpp) read the
+frame's anchor only inside "if (graphicProperties)", which is empty for a
+frame without a style; the frame was then not inline. LibreOffice gives
+every frame a style (fr1, parent "Formula"), so its files kept their place;
+other producers need not. With the anchor read first, an "as-char" formula
+is inline (the OOXML math in the paragraph where the frame is), and a frame
+anchored to the paragraph, the page or a character is placed relative to it
+as one with a style is.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/OdfFile/Reader/Format/draw_frame_docx.cpp b/OdfFile/Reader/Format/draw_frame_docx.cpp
+index 8b3f66d..cc6464d 100644
+--- a/OdfFile/Reader/Format/draw_frame_docx.cpp
++++ b/OdfFile/Reader/Format/draw_frame_docx.cpp
+@@ -836,7 +836,13 @@ void common_draw_docx_convert(oox::docx_conversion_context & Context, union_comm
+ 		pagePropertiesNode ? pagePropertiesNode->attlist_ : emptyPageProperties;
+ 
+ /////////////////////////////////////////////////////////////////////////////////////////////
+-	_CP_OPT(anchor_type) anchor;
++	// filex-office-editor (BRF Tech, 2026-10-10): the frame's own anchor
++	// (text:anchor-type is an attribute of the frame), whether or not the
++	// frame has a graphic style. It was read only inside the block below, so a
++	// frame without draw:style-name - a formula "as-char" at the end of a
++	// sentence - lost its anchor and became a floating shape at the top left
++	// of the page's margin, in front of the sentence.
++	_CP_OPT(anchor_type) anchor = attlists_.shape_with_text_and_styles_.common_text_anchor_attlist_.type_;
+ 	_CP_OPT(run_through) styleRunThrough;
+ 
+ 	if (graphicProperties)
+@@ -851,7 +857,6 @@ void common_draw_docx_convert(oox::docx_conversion_context & Context, union_comm
+ 		}
+ 
+ 		styleRunThrough = graphicProperties->style_run_through_;
+-		anchor = attlists_.shape_with_text_and_styles_.common_text_anchor_attlist_.type_;
+ 
+ 		drawing->styleHorizontalRel = graphicProperties->common_horizontal_rel_attlist_.style_horizontal_rel_;
+ 		drawing->styleHorizontalPos = graphicProperties->common_horizontal_pos_attlist_.style_horizontal_pos_;
