@@ -11,8 +11,17 @@
 // starts one whose only line imports this file from the package; this file
 // then imports x2t.js the same way. Both are scripts of the package
 // (script-src), and x2t.wasm is read with fetch (connect-src: the package).
+//
+// When x2t stops - emscripten's abort() (a function the build does not have,
+// "Aborted(missing function: ...)"), a trap, the stack or the memory running
+// out - the module cannot be used again. The worker says so once ("stopped",
+// with why), then answers the conversion that stopped it with the same
+// reason and refuses any other; the page ends it and starts a new one for
+// the next conversion (app/x2t-client.ts). Measured (2026-10-10): the abort
+// reaches the worker the same way in Chromium, Firefox and WebKit -
+// Module.onAbort, then a WebAssembly.RuntimeError out of ccall.
 
-import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../x2t';
+import { X2tError, stopsX2t, x2tConvert, x2tExport, x2tStopReason, type X2tFormat, type X2tModule } from '../x2t';
 import type { WorkerReply, WorkerRequest } from '../app/x2t-messages';
 
 interface WorkerScope {
@@ -25,9 +34,19 @@ interface WorkerScope {
 const scope = self as unknown as WorkerScope;
 let mod: X2tModule | null = null;
 let starting = false;
+/** Why x2t stopped, once it has: nothing more is converted here. */
+let stopped: string | null = null;
 
 function reply(m: WorkerReply, transfer: Transferable[] = []): void {
   scope.postMessage(m, transfer);
+}
+
+/** x2t stopped: said once, before the answer to the conversion it stopped in. */
+function stop(why: string): void {
+  if (stopped !== null) return;
+  stopped = why;
+  if (mod) reply({ t: 'stopped', message: why });
+  else reply({ t: 'failed', message: `x2t stopped: ${why}` });
 }
 
 function exactBuffer(b: Uint8Array): ArrayBuffer {
@@ -64,8 +83,9 @@ function start(base: string): void {
     locateFile: (p: string) => base + p,
     print: () => {},
     printErr: () => {},
-    onAbort: (what: unknown) => reply({ t: 'failed', message: `x2t stopped: ${String(what).slice(0, 200)}` }),
+    onAbort: (what: unknown) => stop(x2tStopReason(what)),
     onRuntimeInitialized: () => {
+      if (stopped !== null) return;
       mod = scope.Module as X2tModule;
       reply({ t: 'ready', ms: Date.now() - t0 });
     },
@@ -77,35 +97,48 @@ function start(base: string): void {
   }
 }
 
-function convert(m: Extract<WorkerRequest, { t: 'convert' }>): void {
-  if (!mod) {
-    reply({ t: 'result', id: m.id, error: 'x2t is not loaded' });
-    return;
+/** The answer to a conversion that threw: x2t's own error, or x2t stopping (said first). */
+function failure(id: number, e: unknown): WorkerReply {
+  if (stopped !== null || stopsX2t(e)) {
+    stop(x2tStopReason(e));
+    return { t: 'result', id, error: `x2t stopped: ${stopped}`, code: null };
   }
+  const code = e instanceof X2tError ? e.code : null;
+  return { t: 'result', id, error: String((e as Error)?.message ?? e).slice(0, 300), code };
+}
+
+/** The module, or why there is none to convert with. */
+function ready(id: number): X2tModule | null {
+  if (stopped !== null) reply({ t: 'result', id, error: `x2t stopped: ${stopped}`, code: null });
+  else if (!mod) reply({ t: 'result', id, error: 'x2t is not loaded' });
+  else return mod;
+  return null;
+}
+
+function convert(m: Extract<WorkerRequest, { t: 'convert' }>): void {
+  const x2t = ready(m.id);
+  if (!x2t) return;
   const t0 = Date.now();
   try {
     const media: Record<string, Uint8Array> = {};
     for (const f of m.media ?? []) media[f.name] = new Uint8Array(f.bytes);
     const input = typeof m.bytes === 'string' ? m.bytes : new Uint8Array(m.bytes);
-    const out = x2tConvert(mod, { bytes: input, format: m.from as X2tFormat, media }, m.to as X2tFormat);
+    const out = x2tConvert(x2t, { bytes: input, format: m.from as X2tFormat, media }, m.to as X2tFormat);
     const bytes = exactBuffer(out.bytes);
     const outMedia = Object.entries(out.media).map(([name, b]) => ({ name, bytes: exactBuffer(b) }));
     reply({ t: 'result', id: m.id, bytes, media: outMedia, ms: Date.now() - t0 }, [bytes, ...outMedia.map((f) => f.bytes)]);
   } catch (e) {
-    const code = e instanceof X2tError ? e.code : null;
-    reply({ t: 'result', id: m.id, error: String((e as Error)?.message ?? e).slice(0, 300), code });
+    reply(failure(m.id, e));
   }
 }
 
 function exportDocument(m: Extract<WorkerRequest, { t: 'export' }>): void {
-  if (!mod) {
-    reply({ t: 'result', id: m.id, error: 'x2t is not loaded' });
-    return;
-  }
+  const x2t = ready(m.id);
+  if (!x2t) return;
   const t0 = Date.now();
   try {
     const files = (list: { name: string; bytes: ArrayBuffer }[] | undefined) => Object.fromEntries((list ?? []).map((f) => [f.name, new Uint8Array(f.bytes)]));
-    const out = x2tExport(mod, {
+    const out = x2tExport(x2t, {
       bin: m.bin,
       media: files(m.media),
       formatTo: m.formatTo,
@@ -118,8 +151,7 @@ function exportDocument(m: Extract<WorkerRequest, { t: 'export' }>): void {
     const bytes = exactBuffer(out);
     reply({ t: 'result', id: m.id, bytes, media: [], ms: Date.now() - t0 }, [bytes]);
   } catch (e) {
-    const code = e instanceof X2tError ? e.code : null;
-    reply({ t: 'result', id: m.id, error: String((e as Error)?.message ?? e).slice(0, 300), code });
+    reply(failure(m.id, e));
   }
 }
 

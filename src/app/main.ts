@@ -43,7 +43,7 @@ import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
 import { NARROW_PX, editorConfig, isPhone, kindOf, uiLang, type Kind, type View } from './config';
 import { STRINGS, type Strings } from './strings';
-import { X2tClient, type Converted } from './x2t-client';
+import { X2tClient, X2tFailure, type Converted } from './x2t-client';
 
 declare const __OO_BUILD__: { version: string; number: number };
 declare const __OO_SOURCE_TAG__: string;
@@ -77,9 +77,17 @@ interface DocsApiWindow {
  * Where the opening is: on <html data-fx-phase>, and with its time in
  * window.__fxPhases, for the measurements (e2e/run.mjs) and anyone looking
  * at a page that does not open.
+ *
+ * "failed" stays until the editor is started again ("switching"): the
+ * editor, loading beside the conversion, can say it is ready after the
+ * conversion failed (x2t is often ready first), and that took the page out
+ * of "failed" - the error stayed on screen, but the phase said the opening
+ * went on (measured in Chromium and Firefox, #220). The late phase is still
+ * written down in __fxPhases.
  */
 function phase(name: string): void {
-  document.documentElement.dataset.fxPhase = name;
+  const root = document.documentElement;
+  if (root.dataset.fxPhase !== 'failed' || name === 'switching') root.dataset.fxPhase = name;
   const w = window as unknown as { __fxPhases?: [string, number][] };
   (w.__fxPhases ??= []).push([name, Math.round(performance.now())]);
 }
@@ -123,7 +131,9 @@ function randomKey(): string {
   return `fx${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function reason(e: unknown): string {
+/** Why something failed, for the person: the converter's failures in their words (strings.ts), anything else as it says. */
+function reason(e: unknown, t?: Strings): string {
+  if (t && e instanceof X2tFailure) return e.kind === 'timeout' ? t.x2tTimeout(e.seconds) : t.x2tStopped(e.detail);
   const code = (e as { code?: unknown })?.code;
   const msg = String((e as Error)?.message ?? e);
   return typeof code === 'string' && code !== msg ? `${msg} (${code})` : msg;
@@ -380,7 +390,7 @@ class OfficeApp {
         this.link.send({ t: 'saved', ok: true, through });
       } catch (e) {
         this.link.send({ t: 'saved', ok: false, through: 0 });
-        this.fx.toast(this.t.saveFailed(reason(e)), 'error');
+        this.fx.toast(this.t.saveFailed(reason(e, this.t)), 'error');
         throw e;
       }
     })();
@@ -404,7 +414,7 @@ class OfficeApp {
       // A no to filex's question is the person's answer, not a failure.
       if (!(e instanceof FilexError && e.code === 'cancelled')) {
         ok = false;
-        this.fx.toast(this.t.exportFailed(reason(e)), 'error');
+        this.fx.toast(this.t.exportFailed(reason(e, this.t)), 'error');
       }
     }
     this.link.send({ t: 'exported', id: m.id, ok });
@@ -514,12 +524,21 @@ async function main(): Promise<void> {
     docsApi = api;
   } catch (e) {
     phase('failed');
-    setStatus(t.openFailed(reason(e)), true);
+    setStatus(t.openFailed(reason(e, t)), true);
     return;
   }
 
   /** The editor (or the phone app) on screen now. */
   let editor: DocEditor | null = null;
+  /** End the editor: an opening that failed leaves nothing loading behind its message. */
+  const stopEditor = (): void => {
+    try {
+      editor?.destroyEditor?.();
+    } catch {
+      // Already gone.
+    }
+    editor = null;
+  };
 
   /** Start ONLYOFFICE's editor (`view` "editor") or its phone app ("reader"); returns the document key of this frame. */
   const start = (view: View): string => {
@@ -586,7 +605,8 @@ async function main(): Promise<void> {
     handOver(latest, key);
   } catch (e) {
     phase('failed');
-    setStatus(t.openFailed(reason(e)), true);
+    setStatus(t.openFailed(reason(e, t)), true);
+    stopEditor();
     return;
   }
 
@@ -614,7 +634,7 @@ async function main(): Promise<void> {
       // To the editor: the phone app changed nothing, the last one stands.
       doc = view === 'reader' ? await app.current() : latest;
     } catch (e) {
-      fx.toast(t.switchFailed(reason(e)), 'error');
+      fx.toast(t.switchFailed(reason(e, t)), 'error');
       switching = false;
       button.disabled = false;
       return;
@@ -634,7 +654,7 @@ async function main(): Promise<void> {
       showSwitch();
     } catch (e) {
       phase('failed');
-      setStatus(t.openFailed(reason(e)), true);
+      setStatus(t.openFailed(reason(e, t)), true);
     } finally {
       switching = false;
       button.disabled = false;

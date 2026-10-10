@@ -183,7 +183,7 @@ more, which later filex releases bring.
 | `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)) |
 | `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
 | `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
-| `src/worker/x2t-worker.ts` | The converter's worker |
+| `src/worker/x2t-worker.ts` | The converter's worker: loads x2t and converts one document at a time; when x2t stops it says so once, with why, and converts nothing more - the app page's client (`src/app/x2t-client.ts`) then starts a new one, and ends one that does not finish in time ([When x2t stops](#when-x2t-stops)) |
 | `app/` | The app page itself: `index.html` and `filex/app.css` |
 | `scripts/build-app.mjs` | Builds the app's bundle, `dist/ui/` and `dist/ui.zip`, from the editor files (checked against the lock), x2t (checked against the pin) and the app ([The app](#the-app)) |
 | `e2e/` | The browser measurement: a stand-in for filex 0.55 that serves the bundle the way filex serves an app (`e2e/harness/`), and the run in Chromium, Firefox and WebKit (`e2e/run.mjs`) ([Measured in the browsers](#measured-in-the-browsers)) |
@@ -336,7 +336,7 @@ the other formats of Download as. Here it is the same program, from
 ONLYOFFICE core, compiled to WebAssembly and run in a worker (`src/x2t.ts`
 drives it). It is **this project's own build, from ONLYOFFICE core at the
 editor files' tag** - `v9.4.0.129`, commit `a016fc28` - released here as
-**`v9.4.0.129+1`** and pinned under `x2t` in
+**`v9.4.0.129+2`** and pinned under `x2t` in
 [`upstream/onlyoffice.json`](upstream/onlyoffice.json): how it is built,
 every source by its commit, and the SHA-256 of `x2t.js` and `x2t.wasm`.
 Release 0.1.0 carried CryptPad's build
@@ -407,23 +407,39 @@ and why:
   ("Aborted(missing function: ...CStarMathConverter...)", measured on
   CryptPad's `v9.3.2+3`, the x2t of release 0.1.0). Now the formula comes in
   as OOXML math.
+- `05-frame-anchor.patch`: a frame's anchor (`text:anchor-type`) is read
+  from the frame whether or not it has a graphic style. The ODF reader read
+  it only from inside the style's block, so a frame without
+  `draw:style-name` - valid OpenDocument, written by producers other than
+  LibreOffice - lost its anchor and became a floating shape at the top left
+  of the page's margin: a formula "as-char" at the end of a sentence was
+  drawn in front of it (#220, measured on `v9.4.0.129+1`). LibreOffice gives
+  every frame a style (a formula's has the parent "Formula"), and its files
+  kept their place.
 
 What x2t still does without, as CryptPad's build does: the link lists 86
 functions it does not have, and a conversion that reached one would stop
 the module - OpenSSL's (signing a document, checking a signature), the
 JavaScript engine's (doctrenderer runs none here; html, md and the images,
 which need it, end with x2t's error 80, measured, not with a stop) and the
-OFD reader's. FB2 and HEIF are not built.
+OFD reader's (an OFD package, whatever its name: x2t knows a file by what it
+holds). FB2 and HEIF are not built. The app tells the person when x2t
+stops, and starts it again for the next conversion ([When x2t
+stops](#when-x2t-stops)).
 
 **Measured** (2026-10-10, an x86-64 Linux machine, `--cpus 6 --memory 7g`):
 two builds from empty trees, each from a fresh clone of this branch, the
 second with the toolchain image built again without Docker's cache (another
 image id), gave the same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`)
-and `x2t.wasm` (38,763,076 bytes, `8f643075...`), the sums pinned; so did
+and `x2t.wasm` (38,763,076 bytes, `8f643075...`) of `v9.4.0.129+1`; so did
 the build the recipe was written with, resumed from its stamps again and
 again. About 20 minutes each - fetching the sources 3 minutes, Boost and
 emscripten's ICU 3, the graphics library 4.5, the link 2 - and a 4.5 GB
-build tree.
+build tree. `v9.4.0.129+2` (patch 05; 2026-10-10, an x86-64 Linux
+machine, `--cpus 6 --memory 7g`): two builds from empty trees gave the
+same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`, the same as
+`v9.4.0.129+1`'s: only the module changed) and `x2t.wasm` (38,763,027
+bytes, `cabaa6e3...`), the sums pinned; 18.6 and 17.4 minutes.
 
 ### txt and csv
 
@@ -463,8 +479,10 @@ delimiter: red on CryptPad's build, green on this one.
 `npm run test:x2t` drives the build with `src/x2t.ts`, in Node, through
 three documents built in the test with Turkish text (ğ Ğ ı İ ş Ş ç ö ü): a
 Word document with bold and italic runs and a table, a workbook with a
-sheet named in Turkish, numbers and a formula, a presentation; and an odt
-with a LibreOffice formula. Measured on `v9.4.0.129+1`:
+sheet named in Turkish, numbers and a formula, a presentation; and two odts
+with a LibreOffice formula at the end of a sentence and between two words,
+one with the frame style LibreOffice gives a formula, one without
+(`tests/fixtures/office.ts` `odtWithFormula`). Measured on `v9.4.0.129+2`:
 
 | | In | Editor.bin | Back | Same Editor.bin twice | Second save changes |
 |---|---:|---:|---:|---|---|
@@ -473,9 +491,12 @@ with a LibreOffice formula. Measured on `v9.4.0.129+1`:
 | pptx | 4,598 B | 2,076 B (`PPTY;v10`) | 10,902 B | yes | nothing |
 
 Every text comes back exactly, with its bold and italic, the table's four
-cells, the sheet's name, its numbers and its `SUM` formula; the odt's
+cells, the sheet's name, its numbers and its `SUM` formula; each odt's
 formula (`a + b`, MathML with its StarMath annotation) comes back in a docx
-as OOXML math (`<m:oMath>`), its Editor.bin 1,634 B. Each conversion
+as OOXML math (`<m:oMath>`) in the line where its frame is - "Iğdır: a+b",
+"Önce a+b sonra metin." - and not as a floating shape (Editor.bin 1,515 B
+either way; without the style `v9.4.0.129+1` made both formulas shapes at
+the top left of the margin). Each conversion
 takes 12-40 ms; the module starts in about 180 ms. The first save adds what
 x2t always writes (styles, settings, a theme, document properties); from
 the second save on, opening and saving again changes nothing. As in
@@ -498,6 +519,40 @@ document) and the fonts it drew them with: x2t has no layout of its own,
 and without them it writes nothing. Left out, measured again on this
 build: html, md, mht, fb2 and the images (jpg, png), which need the
 Document Server's renderer; and epub, which stops the module.
+
+### When x2t stops
+
+x2t can stop - emscripten's `abort()`, for a document that needs one of the
+functions the build leaves out (an OFD package under a .docx name does,
+measured), or a trap, or the stack or the memory running out - and the
+module cannot be used again. The worker (`src/worker/x2t-worker.ts`) says
+so once, with why in a line (`x2tStopReason` in `src/x2t.ts`, the C++ name
+made readable: "missing function: COFDFile::COFDFile"), and converts
+nothing more. The page (`src/app/x2t-client.ts`) fails what waits, ends
+the worker and starts a new one for the next conversion, so a save after a
+Download as that stopped x2t still converts; a conversion that does not
+finish in time (a minute, and five seconds more per MiB) and a worker that
+dies (its `error` or `messageerror`) are handled the same way. The person
+reads it in their language: "The document could not be opened: the
+converter stopped on this document (missing function: COFDFile::COFDFile)",
+"Belge açılamadı: dönüştürücü bu belgede durdu (...)"; a save or a Download
+as says it in filex's toast.
+
+Measured (2026-10-10, #220): the abort reaches the worker the same way in
+Chromium, Firefox and WebKit - `Module.onAbort`, then a
+`WebAssembly.RuntimeError` out of `ccall`. What looked like Chromium
+hanging on a document 0.1.0's x2t stopped on ([Measured in filex
+0.55](#measured-in-filex-055)) was the page's phase (`data-fx-phase`): the
+error was on the screen, but the editor, loading beside the conversion,
+said it was ready after the conversion had failed and took the page out of
+"failed" - x2t is ready before the editor in Chromium nearly always, in
+Firefox often - so anything watching the phase waited for an opening that
+had ended, and the editor went on loading behind the message. "failed" now
+stays until the editor is started again, and an opening that failed ends
+the editor. `npm run e2e` opens such a document in each browser
+(`stops.docx`) and reads the page six seconds after it failed: still
+"failed", the Turkish message, no editor (red on the 0.1.1 bundle in all
+three browsers, green now).
 
 ## The app
 
@@ -687,7 +742,10 @@ For the Turkish documents it then opens File → Download as, checks what is
 offered, downloads the OpenDocument copy and the PDF, and prints. Once per
 browser, in one browser context, it closes the editor's "New" hint, reopens
 the document, and prints where filex has no print (`print=none`) and,
-reopened, where the app has no `ui:print` grant.
+reopened, where the app has no `ui:print` grant. Once per browser it also
+opens the two odts with a formula and reads, in the editor's own document,
+that each formula is in its line (`formulaRun`), and opens a document x2t
+stops on (`stopRun`, [When x2t stops](#when-x2t-stops)).
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -735,6 +793,18 @@ openings 1.6-2.3 s in Chromium, 3.3-4.7 s in Firefox, 3.4-4.1 s in WebKit;
 54 screenshots. In the same run: `npm test` 221 of 221 (the one test of a
 built `dist/editor` skipped there), `npm run typecheck` clean, `npm run
 test:x2t` 11 of 11.
+
+**x2t stopping and the formula's place** (#220; x2t `v9.4.0.129+2`,
+2026-10-10; Windows, headless, Playwright 1.59): `npm run e2e` 33 of 33 -
+the 24 and, in each browser, the two odts with a formula (each formula in
+its line in the editor's own document, nothing floating) and `stops.docx`
+(still "failed" six seconds on, the Turkish message, no editor left);
+openings 1.5-1.9 s in Chromium, 3.2-3.8 s in Firefox, 3.3-4.0 s in
+WebKit. On the 0.1.1 bundle `stops.docx` fails in all three (Chromium and Firefox: the phase back to the editor's;
+all three: emscripten's raw text, the editor still loading) and, with
+x2t `v9.4.0.129+1`, `formula-nostyle.odt` in all three (two floating
+shapes). In the same tree: `npm test` 237 of 237, `npm run typecheck`
+clean, `npm run test:x2t` 13 of 13.
 
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
@@ -831,6 +901,11 @@ against the manifest's; the viewer says "Office editor was updated to
 | The Turkish document as txt, through the editor's dialog (it offers UTF-8 alone) | filex opens Chromium's save dialog (`showSaveFilePicker`), which a headless run cannot answer: not measured | 339 B, UTF-8, every Turkish letter | the same |
 | The Turkish workbook as csv (the dialog offers UTF-8, UTF-16 and UTF-32) | not measured, as above | 59 B, UTF-8, `Şehir,Sıcaklık` | the same |
 | Requests outside filex / failed requests | 0 / 0 | 0 / 0 | 0 / 0 |
+
+Chromium's "never opens" was not a hang: its error was on the screen (the
+screenshot shows it), while the page's phase, which the measurement read,
+had gone back to the editor's - fixed since ([When x2t
+stops](#when-x2t-stops)).
 
 ## Keeping up with ONLYOFFICE
 

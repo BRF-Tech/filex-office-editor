@@ -137,6 +137,99 @@ export function pptx(): Uint8Array {
   });
 }
 
+/** The two sentences of odtWithFormula: one ends with the formula, the other has it between two words. */
+export const FORMULA = { end: `${TR.cells[3]}:`, before: 'Önce', after: 'sonra metin.' };
+
+const NS_ODF = {
+  office: 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+  style: 'urn:oasis:names:tc:opendocument:xmlns:style:1.0',
+  text: 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
+  draw: 'urn:oasis:names:tc:opendocument:xmlns:drawing:1.0',
+  svg: 'urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0',
+  fo: 'urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0',
+  xlink: 'http://www.w3.org/1999/xlink',
+};
+const odfNs = Object.entries(NS_ODF)
+  .map(([k, v]) => `xmlns:${k}="${v}"`)
+  .join(' ');
+
+/**
+ * An odt with a formula (a + b) in two sentences - at the end of the first,
+ * between two words in the second - the way LibreOffice writes one: an
+ * embedded object per formula ("Object 1", "Object 2") holding MathML with
+ * its StarMath annotation, in a frame anchored as a character.
+ *
+ * `styled`: the frames carry the style LibreOffice gives every formula (an
+ * automatic style "fr1" whose parent is the "Formula" graphic style of
+ * styles.xml), as in an odt LibreOffice 7.6 wrote, measured. Without it the
+ * frames have no style - valid ODF, as other producers write it - which x2t
+ * read as a floating shape at the top left of the margin until
+ * scripts/x2t/patches/05-frame-anchor.patch.
+ */
+export function odtWithFormula(o: { styled: boolean }): Uint8Array {
+  const X = '<?xml version="1.0" encoding="UTF-8"?>';
+  const style = o.styled ? ' draw:style-name="fr1"' : '';
+  const frame = (n: number) =>
+    `<draw:frame${style} draw:name="Object${n}" text:anchor-type="as-char" svg:width="0.8cm" svg:height="0.5cm">` +
+    `<draw:object xlink:href="./Object ${n}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`;
+  const automatic = o.styled
+    ? '<office:automatic-styles><style:style style:name="fr1" style:family="graphic" style:parent-style-name="Formula">' +
+      '<style:graphic-properties fo:margin-left="0cm" fo:margin-right="0cm" style:vertical-pos="middle" style:vertical-rel="text"/></style:style></office:automatic-styles>'
+    : '';
+  const content =
+    `${X}<office:document-content ${odfNs} office:version="1.3">${automatic}<office:body><office:text>` +
+    `<text:p>${esc(FORMULA.end)} ${frame(1)}</text:p>` +
+    `<text:p>${esc(FORMULA.before)} ${frame(2)} ${esc(FORMULA.after)}</text:p>` +
+    '</office:text></office:body></office:document-content>';
+  const styles =
+    `${X}<office:document-styles ${odfNs} office:version="1.3"><office:styles>` +
+    '<style:style style:name="Formula" style:family="graphic"><style:graphic-properties text:anchor-type="as-char" svg:y="0cm" ' +
+    'fo:margin-left="0cm" fo:margin-right="0cm" style:vertical-pos="middle" style:vertical-rel="text" draw:fill="none"/></style:style>' +
+    '</office:styles></office:document-styles>';
+  const math =
+    `${X}<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>a</mi><mo stretchy="false">+</mo><mi>b</mi></mrow>` +
+    '<annotation encoding="StarMath 5.0">a + b</annotation></semantics></math>';
+  const entry = (path: string, type: string) => `<manifest:file-entry manifest:full-path="${path}" manifest:media-type="${type}"/>`;
+  const manifest =
+    `${X}<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">` +
+    entry('/', 'application/vnd.oasis.opendocument.text') +
+    entry('content.xml', 'text/xml') +
+    (o.styled ? entry('styles.xml', 'text/xml') : '') +
+    [1, 2].map((n) => entry(`Object ${n}/content.xml`, 'text/xml') + entry(`Object ${n}/`, 'application/vnd.oasis.opendocument.formula')).join('') +
+    '</manifest:manifest>';
+  return zip({
+    mimetype: 'application/vnd.oasis.opendocument.text',
+    'content.xml': content,
+    ...(o.styled ? { 'styles.xml': styles } : {}),
+    'Object 1/content.xml': math,
+    'Object 2/content.xml': math,
+    'META-INF/manifest.xml': manifest,
+  });
+}
+
+/**
+ * An OFD package (the Chinese fixed-layout format, GB/T 33190): OFD.xml, a
+ * document and an empty page. x2t knows a file by what it holds, not by its
+ * name, and the build has no OFD reader (the link leaves COFDFile out,
+ * README.md "x2t, the converter"): converting it stops the module -
+ * "Aborted(missing function: _ZN8COFDFileC1EPN7NSFonts17IApplicationFontsE)",
+ * measured. Named .docx, it is the document the measurements open to see
+ * x2t stop (e2e/make-docs.mjs stops.docx).
+ */
+export function ofdPackage(): Uint8Array {
+  const X = '<?xml version="1.0" encoding="UTF-8"?>';
+  const NS = 'xmlns:ofd="http://www.ofdspec.org/2016"';
+  return zip({
+    'OFD.xml':
+      `${X}<ofd:OFD ${NS} Version="1.0" DocType="OFD"><ofd:DocBody><ofd:DocInfo><ofd:DocID>0</ofd:DocID></ofd:DocInfo>` +
+      '<ofd:DocRoot>Doc_0/Document.xml</ofd:DocRoot></ofd:DocBody></ofd:OFD>',
+    'Doc_0/Document.xml':
+      `${X}<ofd:Document ${NS}><ofd:CommonData><ofd:MaxUnitID>1</ofd:MaxUnitID><ofd:PageArea><ofd:PhysicalBox>0 0 210 297</ofd:PhysicalBox></ofd:PageArea></ofd:CommonData>` +
+      '<ofd:Pages><ofd:Page ID="1" BaseLoc="Pages/Page_0/Content.xml"/></ofd:Pages></ofd:Document>',
+    'Doc_0/Pages/Page_0/Content.xml': `${X}<ofd:Page ${NS}><ofd:Content/></ofd:Page>`,
+  });
+}
+
 // ---- reading what comes back -------------------------------------------
 
 const unesc = (s: string) =>
@@ -165,6 +258,27 @@ export function texts(xml: string, tag: string): string[] {
 /** The paragraphs of a Word document's body, their runs' text joined. */
 export function docxParagraphs(documentXml: string): string[] {
   return [...documentXml.matchAll(/<w:p[\s>][\s\S]*?<\/w:p>/g)].map((m) => texts(m[0], 'w:t').join('')).filter((t) => t !== '');
+}
+
+/**
+ * The lines of a Word document's body with its formulas in place: each
+ * OOXML math (m:oMath) as "[its text]" where it is in the XML, one line per
+ * paragraph, spaces collapsed ("Iğdır: [a+b]"). Where a formula is drawn -
+ * in the line, or as a floating shape (wp:anchor) - the XML order does not
+ * say; a test asks that separately.
+ */
+export function formulaLines(documentXml: string): string[] {
+  const re = /<m:oMath(?:\s[^>]*)?>([\s\S]*?)<\/m:oMath>|<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<\/w:p>/g;
+  let out = '';
+  for (const m of documentXml.matchAll(re)) {
+    if (m[1] !== undefined) out += `[${texts(m[1], 'm:t').join('')}]`;
+    else if (m[2] !== undefined) out += unesc(m[2]);
+    else out += '\n';
+  }
+  return out
+    .split('\n')
+    .map((l) => l.replace(/\s*\[/g, ' [').replace(/\]\s*/g, '] ').replace(/\s+/g, ' ').trim())
+    .filter((l) => l !== '');
 }
 
 /** The runs of a Word document: their text, and whether they are bold or italic. */

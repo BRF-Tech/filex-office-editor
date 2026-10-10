@@ -15,6 +15,10 @@ export interface Strings {
   saveFailed: (reason: string) => string;
   /** "Download as" or Print could not be written. */
   exportFailed: (reason: string) => string;
+  /** The reason in those three when the converter (x2t) stopped on the document: `detail` is x2t's own words. */
+  x2tStopped: (detail: string) => string;
+  /** The reason when a conversion did not finish in time. */
+  x2tTimeout: (seconds: number) => string;
   /** Print where filex cannot print yet: the PDF is handed over to print from the person's viewer. */
   printAsDownload: string;
   /** Something the editor offers that cannot be done here (a format x2t does not write, a server command). */
@@ -57,6 +61,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     openFailed: (reason) => `The document could not be opened: ${reason}`,
     saveFailed: (reason) => `The document could not be saved: ${reason}`,
     exportFailed: (reason) => `The file could not be made: ${reason}`,
+    x2tStopped: (detail) => `the converter stopped on this document (${detail})`,
+    x2tTimeout: (seconds) => `the converter did not finish in ${seconds} seconds`,
     printAsDownload: 'filex cannot print from here yet: the PDF was handed to you to print from your PDF viewer.',
     notAvailable: 'That is not available in this editor.',
     edit: 'Edit',
@@ -77,6 +83,8 @@ export const STRINGS: Record<UiLang, Strings> = {
     openFailed: (reason) => `Belge açılamadı: ${reason}`,
     saveFailed: (reason) => `Belge kaydedilemedi: ${reason}`,
     exportFailed: (reason) => `Dosya hazırlanamadı: ${reason}`,
+    x2tStopped: (detail) => `dönüştürücü bu belgede durdu (${detail})`,
+    x2tTimeout: (seconds) => `dönüştürücü ${seconds} saniyede bitiremedi`,
     printAsDownload: "filex buradan henüz yazdıramıyor: PDF size verildi, PDF görüntüleyicinizden yazdırabilirsiniz.",
     notAvailable: 'Bu işlem bu düzenleyicide kullanılamıyor.',
     edit: 'Düzenle',

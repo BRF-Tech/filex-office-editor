@@ -34,9 +34,17 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     expect(x2t.build.toolchain.image).toBe(`docker.io/emscripten/emsdk:${x2t.build.toolchain.emsdk}`);
   });
 
-  it("names the zip this version's release attaches, with its SHA-512", () => {
+  // A release pins the x2t.zip it attaches (its release commit adds "url"
+  // and "sha512", README.md "Building a release"); between releases a build
+  // that no release has published yet is pinned by its two files alone
+  // (fetch-x2t.mjs then takes it from a build: --dir, or build.sh).
+  it("names the zip this version's release attaches, with its SHA-512, or none until a release publishes one", () => {
     const x2t = readX2tPin();
     const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+    if (x2t.url === undefined) {
+      expect(x2t.sha512).toBeUndefined();
+      return;
+    }
     expect(x2t.url).toBe(`https://github.com/BRF-Tech/filex-office-editor/releases/download/v${version}/x2t.zip`);
     expect(x2t.sha512).toMatch(/^[0-9a-f]{128}$/);
   });
@@ -56,8 +64,12 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, core: { ...sources.core, commit: 'v9.4.0.129' } } } })).toThrow(/core\.commit/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, toolchain: { ...good.build.toolchain, digest: 'latest' } } })).toThrow(/digest/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, boost: { ...sources.boost, sha256: '' } } } })).toThrow(/boost\.sha256/);
-    expect(() => validateX2tPin({ ...good, sha512: undefined })).toThrow(/sha512/);
-    expect(() => validateX2tPin({ ...good, url: 'https://example.com/x2t.zip' })).toThrow(/url/);
+    // A published zip is pinned whole: its address and its SHA-512 together.
+    const zipped = { ...good, url: 'https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.1.1/x2t.zip', sha512: 'a'.repeat(128) };
+    expect(validateX2tPin(zipped).url).toBe(zipped.url);
+    expect(() => validateX2tPin({ ...zipped, sha512: undefined })).toThrow(/sha512/);
+    expect(() => validateX2tPin({ ...zipped, url: undefined })).toThrow(/url/);
+    expect(() => validateX2tPin({ ...zipped, url: 'https://example.com/x2t.zip' })).toThrow(/url/);
     expect(validateX2tPin({ ...good, url: undefined, sha512: undefined }).files).toEqual(good.files);
     expect(() => validateX2tPin({ ...good, build: undefined })).toThrow(/build/);
   });
@@ -112,5 +124,12 @@ describe('the build recipe (scripts/x2t)', () => {
     const fix = readFileSync(path.join(dir, 'patches', '03-unicode-utf32.patch'), 'latin1');
     expect(fix).toMatch(/u_strFromUTF32WithSub/);
     expect(fix).toMatch(/u_strToUTF32WithSub/);
+  });
+
+  it("keeps the frame anchor fix: a frame's text:anchor-type is read whether or not it has a style (#220)", () => {
+    const fix = readFileSync(path.join(dir, 'patches', '05-frame-anchor.patch'), 'latin1');
+    expect(fix).toContain('diff --git a/OdfFile/Reader/Format/draw_frame_docx.cpp b/OdfFile/Reader/Format/draw_frame_docx.cpp');
+    expect(fix).toMatch(/^\+\t_CP_OPT\(anchor_type\) anchor = attlists_\.shape_with_text_and_styles_\.common_text_anchor_attlist_\.type_;$/m);
+    expect(fix).toMatch(/^-\t\tanchor = attlists_\.shape_with_text_and_styles_\.common_text_anchor_attlist_\.type_;$/m);
   });
 });

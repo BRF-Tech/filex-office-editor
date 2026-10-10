@@ -34,13 +34,22 @@
 //     and Print reach filex, a format x2t does not write here is refused and
 //     said, "Edit" opens the editor folded and its save holds the typed
 //     text, "Reading view" goes back (phoneRun);
+//   - a formula, once per engine for each kind of odt (formula.odt with the
+//     frame style LibreOffice gives a formula, formula-nostyle.odt without):
+//     in the editor's own document the formula is in the line where the
+//     frame is - at the end of the first sentence, between the words of the
+//     second - and no floating shape (formulaRun, #220);
+//   - x2t stopping, once per engine: a document x2t stops on (stops.docx, an
+//     OFD package under a .docx name) ends the opening with the app's own
+//     error, in the person's language and with why, and the page stays
+//     "failed" after the editor would have been ready (stopRun, #220);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -86,6 +95,8 @@ function args(argv) {
     keep: false,
     settings: true,
     phone: true,
+    formula: true,
+    stop: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -96,6 +107,8 @@ function args(argv) {
     else if (a === '--keep') o.keep = true;
     else if (a === '--no-settings') o.settings = false;
     else if (a === '--no-phone') o.phone = false;
+    else if (a === '--no-formula') o.formula = false;
+    else if (a === '--no-stop') o.stop = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -690,6 +703,138 @@ async function phoneRun(browser, server, engine, o) {
   return r;
 }
 
+/** What the person reads when x2t stops on the document (src/app/strings.ts, tr: openFailed + x2tStopped). */
+const STOPPED_TR = 'Belge açılamadı: dönüştürücü bu belgede durdu (missing function: COFDFile::COFDFile)';
+/** Longer than the editor takes to say it is ready (0.7-2.2 s measured): the late phase that used to undo "failed". */
+const AFTER_FAILED_MS = 6000;
+
+/**
+ * x2t stops on stops.docx (an OFD package: x2t has no OFD reader, and knows a
+ * file by what it holds). The opening ends "failed" with the app's error in
+ * Turkish, saying why; the page is still "failed" well after the editor
+ * would have said it was ready (the phase a late "editor-app-ready" used to
+ * overwrite, Chromium and Firefox, #220); the editor is not left loading
+ * behind the message.
+ */
+async function stopRun(browser, server, engine) {
+  const r = { engine, doc: 'stops.docx (x2t stops)', ok: false, steps: [], problems: [], notes: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  try {
+    await page.goto(`${server.origin}/?doc=stops.docx&locale=tr&tag=${engine}-stops`);
+    const phaseOf = async () => (appFrame(page) ? await appFrame(page).evaluate(() => document.documentElement.dataset.fxPhase || '') : '');
+    const first = await until('the opening to end', async () => {
+      const ph = await phaseOf();
+      return ph === 'failed' || ph === 'ready' ? ph : false;
+    }, OPEN_MS);
+    step(first);
+    if (first !== 'failed') throw new Error(`the opening ended "${first}", not "failed"`);
+    await sleep(AFTER_FAILED_MS);
+    const st = await appFrame(page).evaluate(() => {
+      const box = document.getElementById('fx-status');
+      return {
+        phase: document.documentElement.dataset.fxPhase || '',
+        phases: (window.__fxPhases || []).map((x) => x[0]),
+        shown: !!box && !box.hidden,
+        error: !!box && box.classList.contains('fx-error'),
+        text: document.getElementById('fx-status-text')?.textContent || '',
+        editorFrames: document.querySelectorAll('#fx-editor-box iframe').length,
+      };
+    });
+    step('after the editor would be ready', { phase: st.phase });
+    r.status = st;
+    if (st.phase !== 'failed') r.problems.push(`${AFTER_FAILED_MS / 1000} s after it failed the page says "${st.phase}" (${st.phases.join(' > ')})`);
+    if (!st.shown || !st.error) r.problems.push('the error is not on the screen');
+    if (st.text !== STOPPED_TR) r.problems.push(`the person reads ${JSON.stringify(st.text)}, not ${JSON.stringify(STOPPED_TR)}`);
+    if (st.editorFrames !== 0) r.problems.push('the editor is still loading behind the error');
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+  }
+  try {
+    mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+    await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-stops${r.problems.length ? '-FAILED' : ''}.png`) });
+  } catch {
+    /* the page is gone */
+  }
+  r.ok = r.problems.length === 0;
+  await ctx.close();
+  return r;
+}
+
+/** The formula's two sentences (tests/fixtures/office.ts FORMULA), as formulaRun reads them out of the editor. */
+const FORMULA_LINES = ['Iğdır: [math]', 'Önce [math] sonra metin.'];
+
+/**
+ * An odt with a formula at the end of a sentence and one between two words
+ * (formula.odt: the frames styled as LibreOffice writes them;
+ * formula-nostyle.odt: no style, which x2t made a floating shape at the top
+ * left of the margin before scripts/x2t/patches/05-frame-anchor.patch). In
+ * the editor's own document (sdkjs: the paragraphs' runs and math) each
+ * formula is in the line where its frame is, and nothing floats.
+ */
+async function formulaRun(browser, server, engine, doc) {
+  const r = { engine, doc: `${doc} (where the formula is)`, ok: false, steps: [], problems: [], notes: [] };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  try {
+    await page.goto(`${server.origin}/?doc=${encodeURIComponent(doc)}&locale=tr&tag=${engine}-formula`);
+    const end = await until('the opening to end', async () => {
+      const a = appFrame(page);
+      const ph = a ? await a.evaluate(() => document.documentElement.dataset.fxPhase || '') : '';
+      if (ph === 'failed') return `failed: ${await a.evaluate(() => document.getElementById('fx-status-text')?.textContent || '')}`;
+      return ph === 'ready' ? ph : false;
+    }, OPEN_MS);
+    step(end);
+    if (end !== 'ready') throw new Error(end);
+    const seen = await editorFrame(page).evaluate(() => {
+      const W = window.AscCommonWord;
+      const doc = window.editor.WordControl.m_oLogicDocument;
+      let floating = 0;
+      const lines = doc.Content.map((para) =>
+        (para.Content || [])
+          .map((el) => {
+            if (el instanceof W.ParaMath) return '[math]';
+            if (!(el instanceof W.ParaRun)) return '';
+            let t = '';
+            for (const x of el.Content) {
+              if (x instanceof W.ParaDrawing) {
+                if (x.Is_Inline && x.Is_Inline()) t += '[drawing]';
+                else floating++;
+              } else if (typeof x.Value === 'number') t += String.fromCodePoint(x.Value);
+              else if (x.Type === 2 || x.Type === 3) t += ' ';
+            }
+            return t;
+          })
+          .join('')
+          .replace(/\s*\[/g, ' [')
+          .replace(/\]\s*/g, '] ')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      ).filter((l) => l !== '');
+      return { lines, floating };
+    });
+    step('read', seen);
+    r.formula = seen;
+    for (const l of FORMULA_LINES) if (!seen.lines.includes(l)) r.problems.push(`no line ${JSON.stringify(l)} in ${JSON.stringify(seen.lines)}`);
+    if (seen.floating) r.problems.push(`${seen.floating} floating shape(s): a formula is not in its line`);
+  } catch (e) {
+    r.problems.push(String(e?.message ?? e).slice(0, 400));
+  }
+  try {
+    mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+    await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-${doc.replace(/\W/g, '_')}${r.problems.length ? '-FAILED' : ''}.png`) });
+  } catch {
+    /* the page is gone */
+  }
+  r.ok = r.problems.length === 0;
+  await ctx.close();
+  return r;
+}
+
 async function shots(browser, server, engine) {
   const out = [];
   for (const [w, h] of [
@@ -757,6 +902,16 @@ async function main() {
       }
       if (o.phone) {
         const r = await phoneRun(browser, server, engine, o);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      for (const doc of o.formula ? ['formula.odt', 'formula-nostyle.odt'] : []) {
+        const r = await formulaRun(browser, server, engine, doc);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.stop) {
+        const r = await stopRun(browser, server, engine);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }

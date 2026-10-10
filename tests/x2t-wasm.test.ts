@@ -24,9 +24,9 @@ import vm from 'node:vm';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CSV, EXPORT_FORMATS, PDF, TEXT_ENCODINGS, TXT, type DocumentKind } from '../src/formats';
-import { X2tError, x2tConvert, x2tExport, type X2tFormat, type X2tModule } from '../src/x2t';
+import { X2tError, stopsX2t, x2tConvert, x2tExport, x2tStopReason, type X2tFormat, type X2tModule } from '../src/x2t';
 import { writeZip } from '../scripts/lib/zip.mjs';
-import { TR, docx, docxParagraphs, docxRuns, parts, pptx, texts, xlsx } from './fixtures/office';
+import { FORMULA, TR, docx, docxParagraphs, docxRuns, formulaLines, odtWithFormula, ofdPackage, parts, pptx, texts, xlsx } from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIR = process.env.X2T_DIR ? path.resolve(process.env.X2T_DIR) : path.join(here, '..', 'dist', 'x2t');
@@ -37,7 +37,7 @@ if (!present && required) {
   throw new Error(`x2t is not in ${DIR}: run bash scripts/x2t/build.sh (or node scripts/fetch-x2t.mjs --dir DIR)`);
 }
 
-type EmModule = X2tModule & { onRuntimeInitialized?: () => void };
+type EmModule = X2tModule & { onRuntimeInitialized?: () => void; onAbort?: (what: unknown) => void };
 
 // x2t.js is emscripten's CommonJS script; this package is "type": "module",
 // so it is run as CommonJS by hand, the way Node would.
@@ -65,37 +65,6 @@ async function loadX2t(): Promise<EmModule> {
 }
 
 const head = (b: Uint8Array, n = 12) => Buffer.from(b.subarray(0, n)).toString('latin1');
-
-/**
- * An odt with a formula the way LibreOffice writes one: an embedded object
- * ("Object 1") holding MathML with its StarMath annotation, in a Turkish
- * sentence.
- */
-function odtWithFormula(): Uint8Array {
-  const X = '<?xml version="1.0" encoding="UTF-8"?>';
-  const content =
-    `${X}<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ` +
-    'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">' +
-    `<office:body><office:text><text:p>${TR.cells[3]}: <draw:frame draw:name="Object1" text:anchor-type="as-char" svg:width="2cm" svg:height="0.5cm">` +
-    '<draw:object xlink:href="./Object 1" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame></text:p></office:text></office:body></office:document-content>';
-  const math =
-    `${X}<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>a</mi><mo>+</mo><mi>b</mi></mrow>` +
-    '<annotation encoding="StarMath 5.0">a + b</annotation></semantics></math>';
-  const manifest =
-    `${X}<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">` +
-    '<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>' +
-    '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>' +
-    '<manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/>' +
-    '<manifest:file-entry manifest:full-path="Object 1/" manifest:media-type="application/vnd.oasis.opendocument.formula"/></manifest:manifest>';
-  return new Uint8Array(
-    writeZip([
-      { name: 'mimetype', data: Buffer.from('application/vnd.oasis.opendocument.text') },
-      { name: 'content.xml', data: Buffer.from(content) },
-      { name: 'Object 1/content.xml', data: Buffer.from(math) },
-      { name: 'META-INF/manifest.xml', data: Buffer.from(manifest) },
-    ]),
-  );
-}
 
 /**
  * A txt or csv written in x2t's code page `codepage` (formats.ts
@@ -340,18 +309,54 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
   // _ZN8StarMath18CStarMathConverterC1Ev)"). This build links it
   // (scripts/x2t/patches/04-starmath.patch). Last before the report: on a
   // build without it the module is gone after this.
-  it('odt: a LibreOffice formula comes in as OOXML math', () => {
-    const bin = toBin(odtWithFormula(), 'odt');
-    const doc = parts(fromBin(bin, 'docx')).get('word/document.xml') ?? '';
-    expect(doc).toContain(TR.cells[3]);
-    expect(doc).toMatch(/<m:oMath>/);
-    // (twice: x2t writes the object as a drawing and as its fallback)
-    expect(texts(doc, 'm:t').join('')).toContain('a+b');
-    measured.push(`odt with a formula: Editor.bin ${bin.bytes.length} B, back as OOXML math`);
-  });
+  //
+  // Where the formula is: in the line, where the frame is - at the end of
+  // the first sentence, between the words of the second - and not a
+  // floating shape (wp:anchor) at the top left of the margin, which the
+  // editor draws in front of the sentence. A frame without a style was such
+  // a shape until scripts/x2t/patches/05-frame-anchor.patch (#220).
+  for (const styled of [true, false]) {
+    it(`odt: a LibreOffice formula comes in as OOXML math, in its place in the line (frames ${styled ? 'with the style LibreOffice gives them' : 'without a style'})`, () => {
+      const bin = toBin(odtWithFormula({ styled }), 'odt');
+      const doc = parts(fromBin(bin, 'docx')).get('word/document.xml') ?? '';
+      expect(doc).toMatch(/<m:oMath>/);
+      expect(texts(doc, 'm:t').join('')).toContain('a+b');
+      expect(/<wp:anchor[\s>]|<w:txbxContent[\s>]/.test(doc), 'the formula is a floating shape (wp:anchor), not in the line').toBe(false);
+      const lines = formulaLines(doc);
+      expect(lines).toContain(`${FORMULA.end} [a+b]`);
+      expect(lines).toContain(`${FORMULA.before} [a+b] ${FORMULA.after}`);
+      measured.push(`odt with two formulas (${styled ? 'styled' : 'no style'}): Editor.bin ${bin.bytes.length} B, back as OOXML math in the line: ${JSON.stringify(lines)}`);
+    });
+  }
 
   it('reports what it measured', () => {
     console.log(`x2t smoke (${DIR}):\n  ${measured.join('\n  ')}`);
     expect(measured.length).toBeGreaterThan(1);
   });
+});
+
+// x2t stops - emscripten's abort() - on a document that needs a function the
+// build does not have: here an OFD package (x2t knows it by what it holds,
+// whatever its name, and has no OFD reader). The worker must see it as the
+// module stopping, not as a failed conversion (src/worker/x2t-worker.ts,
+// #220): Module.onAbort first, then a WebAssembly.RuntimeError out of ccall.
+// A module of its own: after an abort it cannot be used again.
+describe.skipIf(!present)('x2t (WebAssembly) stopping on a document', () => {
+  it('an OFD package named .docx stops the module: onAbort, then a RuntimeError, both read as "missing function: COFDFile::COFDFile"', async () => {
+    const m = await loadX2t();
+    const aborts: unknown[] = [];
+    m.onAbort = (what) => aborts.push(what);
+    let thrown: unknown = null;
+    try {
+      x2tConvert(m, { bytes: ofdPackage(), format: 'docx' }, 'bin');
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown, 'the conversion threw').not.toBeNull();
+    expect(thrown).not.toBeInstanceOf(X2tError);
+    expect(stopsX2t(thrown)).toBe(true);
+    expect(String((thrown as Error).message)).toMatch(/^Aborted\(missing function: _ZN8COFDFile/);
+    expect(aborts.map(x2tStopReason)).toEqual(['missing function: COFDFile::COFDFile']);
+    expect(x2tStopReason(thrown)).toBe('missing function: COFDFile::COFDFile');
+  }, 180_000);
 });

@@ -9,7 +9,7 @@
 // both ways, and that it leaves nothing of one document behind for the next.
 import { describe, expect, it } from 'vitest';
 
-import { X2T_DIR, X2tError, x2tConvert, x2tParams, type X2tModule } from '../src/x2t';
+import { X2T_DIR, X2tError, readableSymbol, stopsX2t, x2tConvert, x2tParams, x2tStopReason, type X2tModule } from '../src/x2t';
 
 type Behaviour = (params: string, files: Map<string, Uint8Array | string>) => unknown;
 
@@ -139,5 +139,41 @@ describe('x2tConvert', () => {
     });
     x2tConvert(m, { bytes: new Uint8Array([1]), format: 'docx' }, 'bin');
     expect(() => x2tConvert(m, { bytes: new Uint8Array([1]), format: 'docx' }, 'bin')).not.toThrow();
+  });
+});
+
+// x2t stopping (#220): what emscripten's abort() says, made readable for the
+// person, and which errors mean the module cannot be used again.
+describe('x2t stopping', () => {
+  it('reads a C++ name: nested names, a constructor, a destructor; anything else as it is', () => {
+    expect(readableSymbol('_ZN8COFDFileC1EPN7NSFonts17IApplicationFontsE')).toBe('COFDFile::COFDFile');
+    expect(readableSymbol('_ZN8StarMath18CStarMathConverterC1Ev')).toBe('StarMath::CStarMathConverter::CStarMathConverter');
+    expect(readableSymbol('_ZN8NSJSBase10CJSContextD1Ev')).toBe('NSJSBase::CJSContext::~CJSContext');
+    expect(readableSymbol('_ZN8NSJSBase10CJSContext9runScriptERKNSt3__212basic_stringIcEE')).toBe('NSJSBase::CJSContext::runScript');
+    expect(readableSymbol('_ZN8NSJSBase14CreateDefaultsEv')).toBe('NSJSBase::CreateDefaults');
+    expect(readableSymbol('_Z4mainv')).toBe('main');
+    expect(readableSymbol('BIO_new')).toBe('BIO_new');
+    expect(readableSymbol('_ZNSt3__16vectorIiE')).toBe('_ZNSt3__16vectorIiE');
+    expect(readableSymbol('_ZN99short')).toBe('_ZN99short');
+  });
+
+  it('says why in one line, from what onAbort gets or from the error thrown', () => {
+    const fn = 'missing function: _ZN8COFDFileC1EPN7NSFonts17IApplicationFontsE';
+    expect(x2tStopReason(fn)).toBe('missing function: COFDFile::COFDFile');
+    expect(x2tStopReason(new Error(`Aborted(${fn}). Build with -sASSERTIONS for more info.`))).toBe('missing function: COFDFile::COFDFile');
+    expect(x2tStopReason(`RuntimeError: Aborted(${fn}). Build with -sASSERTIONS for more info.`)).toBe('missing function: COFDFile::COFDFile');
+    expect(x2tStopReason('Aborted(OOM)')).toBe('OOM');
+    expect(x2tStopReason(new Error('unreachable'))).toBe('unreachable');
+    expect(x2tStopReason(undefined)).toBe('aborted');
+    expect(x2tStopReason('x'.repeat(500))).toHaveLength(200);
+  });
+
+  it('an abort, a trap and the stack or memory running out stop the module; x2t own errors do not', () => {
+    const RuntimeError = (WebAssembly as unknown as { RuntimeError: new (m: string) => Error }).RuntimeError;
+    expect(stopsX2t(new RuntimeError('Aborted(missing function: x)'))).toBe(true);
+    expect(stopsX2t(new RangeError('Maximum call stack size exceeded'))).toBe(true);
+    expect(stopsX2t(new X2tError(89, 'x2t: conversion failed (89)'))).toBe(false);
+    expect(stopsX2t(new Error('ENOENT'))).toBe(false);
+    expect(stopsX2t('Aborted(x)')).toBe(false);
   });
 });
