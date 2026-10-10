@@ -9,6 +9,16 @@ update.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-10
+
+Documents in encrypted folders and vaults: filex 0.56 decrypts the document
+for the editor in the person's browser and encrypts the save, and no server
+reads it. For filex 0.56.0 or later, asking for one permission more than
+0.1.1 (`files:e2e-plaintext`, from the manifest's `encrypted_folders`
+block); installing it over 0.1.1 is an update. A document the converter
+stops on now ends its opening in every browser, and a formula stays where
+its sentence puts it.
+
 ### Added
 
 - **Documents in encrypted folders** (filex 0.56.0 or later). The manifest
@@ -40,8 +50,8 @@ update.
 
 - x2t is `v9.4.0.129+2`: the same build with the frame anchor fix, its two
   files' SHA-256 pinned in `upstream/onlyoffice.json` (two builds from empty
-  trees give the same bytes). No release has published its `x2t.zip` yet:
-  `bash scripts/x2t/build.sh` makes it.
+  trees give the same bytes). This release attaches it as `x2t.zip`, next
+  to `ui.zip`, and the pin names that zip and its SHA-512.
 - **filex 0.56.0 or later** (`"filex": ">=0.56.0"`): 0.55 refuses a manifest
   with `encrypted_folders`.
 - The description says encrypted folders again, and the `ui:connect-blob`
