@@ -9,14 +9,21 @@ update.
 
 ## [Unreleased]
 
-Editing together, for filex 0.56.0 or later. **No ONLYOFFICE Document Server
-is needed** - not to edit office documents, and not to edit them together:
-this app with filex 0.56 is all it takes. filex keeps its Document Server
-support, and it is optional (an instance that has one may stay connected).
-What still needs one is what filex itself does with an office file on the
-server through it (a conversion run there, an office thumbnail made there);
-this app does neither - its Download as, PDF and Print run x2t in the
-browser.
+## [0.3.0] - 2026-10-10
+
+Editing together, for filex 0.56.0 or later: several people in one
+document through filex's relay, with the Document Server's lock rules, and
+a person who may only read following it live. It asks for one permission
+more than 0.2.0 (`files:co-edit`, from the manifest's `co_edit` block);
+installing it over 0.2.0 is an update.
+
+**No ONLYOFFICE Document Server is needed** - not to edit office documents,
+and not to edit them together: this app with filex 0.56 is all it takes.
+filex keeps its Document Server support, and it is optional (an instance
+that has one may stay connected). What still needs one is what filex itself
+does with an office file on the server through it (a conversion run there,
+an office thumbnail made there); this app does neither - its Download as,
+PDF and Print run x2t in the browser.
 
 ### Added
 
@@ -79,7 +86,7 @@ browser.
   manifest with a block it does not know; servers on 0.55 keep 0.1.1).
   Where filex offers no editing together - an older filex, no grant, a
   vault, the phone's reading view, a person who may only read a document
-  nobody is editing - the editor runs alone, exactly as in 0.1.1.
+  nobody is editing - the editor runs alone, exactly as in 0.2.0.
 
 ## [0.2.0] - 2026-10-10
 

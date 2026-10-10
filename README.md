@@ -20,8 +20,7 @@ neither - its Download as, PDF and Print run x2t in the browser.
 It goes further with filex 0.56: documents **inside encrypted folders**,
 decrypted in the browser, edited there and encrypted again before they are
 saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-folder),
-since 0.2.0) - and edited together there too (0.3.0, not released
-yet).
+since 0.2.0) - and edited together there too (since 0.3.0).
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -36,8 +35,12 @@ yet).
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.2.0**, for filex 0.56 or later. One person edits a document
-> and saves it as a new version - in an encrypted folder or a vault too:
+> **Status: 0.3.0**, for filex 0.56 or later. Several people edit one
+> document together through filex's relay, with the Document Server's lock
+> rules, and a person who may only read follows it live
+> ([Editing together](#editing-together)); no Document Server is needed for
+> it. One person edits a document and saves it as a new version - in an
+> encrypted folder or a vault too:
 > filex decrypts the document for the editor in the person's browser and
 > encrypts the save, and no server reads it
 > ([In an encrypted folder](#in-an-encrypted-folder)). Download as and
@@ -48,33 +51,25 @@ yet).
 > as with every Turkish letter, and a document x2t stops on ends its
 > opening with the reason ([When x2t stops](#when-x2t-stops)). Measured in
 > Chromium, Firefox and WebKit against a stand-in for filex 0.56; 0.1.1, the
-> same app without encrypted folders, in a real filex 0.55.0
-> ([Measured in filex 0.55](#measured-in-filex-055)). On filex 0.55, install
-> 0.1.1: 0.55 refuses 0.2.0's manifest.
->
-> **Unreleased (0.3.0): editing together**, for filex 0.56 or later -
-> several people in one document, through filex's relay, with the Document
-> Server's lock rules, and a person who may only read following it live
-> ([Editing together](#editing-together)). Built and measured in Chromium,
-> Firefox and WebKit against a stand-in for filex 0.56; not yet measured in
-> a real filex 0.56; not released.
+> same app without encrypted folders or editing together, in a real filex
+> 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)). On filex 0.55,
+> install 0.1.1: 0.55 refuses the manifests of 0.2.0 and 0.3.0.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.2.0: **0.56.0** or later (`"filex": ">=0.56.0"`; encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`). The next release (editing together, its `co_edit` block, granted as `files:co-edit`): the same. filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.2.0** (tag `v0.2.0`): `ui.zip`, 98.3 MiB, SHA-256 `2768d10a6227710f4b9e616da683749fd11e1258eedd7420d78fb9e5e0c0d156`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| filex | 0.3.0 (and 0.2.0): **0.56.0** or later (`"filex": ">=0.56.0"`; editing together, the manifest's `co_edit` block, granted as `files:co-edit`; encrypted folders, its `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
+| Release | **0.3.0** (tag `v0.3.0`): `ui.zip`, 98.3 MiB, SHA-256 `028e24765531f6183bf7527ab2eaf5c7b1b52d78882a7371a69037bbab001c00`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
 
 Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
 or together. In filex 0.56.0 or later, as an administrator: **Admin →
-Plugins → Apps →
-Install an app → GitHub repository**, `BRF-Tech/filex-office-editor`, tag
-`v0.2.0` (in filex 0.55, `v0.1.1`). filex reads `filex-app.json` at that
-tag, downloads the release's `ui.zip` and refuses it unless its SHA-256
-is the one the manifest names.
+Plugins → Apps → Install an app → GitHub repository**,
+`BRF-Tech/filex-office-editor`, tag `v0.3.0` (in filex 0.55, `v0.1.1`).
+filex reads `filex-app.json` at that tag, downloads the release's `ui.zip`
+and refuses it unless its SHA-256 is the one the manifest names.
 The review lists what the app asks for: `files:read` and `files:write` (the
 file it was opened with, and its new versions), `files:e2e-plaintext` (the
 documents of encrypted folders the person opens with it, handed over in the
@@ -83,9 +78,9 @@ allowed - its own package, frames of its own package, `blob:` addresses it
 made, the script-policy exceptions ONLYOFFICE's editor and x2t need
 (`ui:eval`, `ui:wasm-eval`), handing the person a file (`ui:download`) and
 a PDF to print (`ui:print`), the six kinds it opens and the three rows it
-adds to New document - and, from the next release on, `files:co-edit`
-(several people editing a document together through filex's relay; filex
-seals what they share, the app holds no key). A store that lists the app installs the same release
+adds to New document - and `files:co-edit` (several people editing a
+document together through filex's relay; filex seals what they share, the
+app holds no key). A store that lists the app installs the same release
 through the same review. On a server that downloads nothing, **Upload
 files** with the release's `filex-app.json` and `ui.zip` does the same.
 
@@ -166,8 +161,8 @@ document and seals what it sends. filex never runs the editor's code. In
 0.1.0 the left column is the plain one - filex reads and saves a file that
 is not encrypted, and there is no relay. Editing together (filex 0.56) adds
 the relay for a file that is not encrypted: filex seals the entries with a
-session key of its own there; in an encrypted folder (a later release) the
-key is the folder's.
+session key of its own there; in an encrypted folder the key is the
+folder's.
 
 This is the model [CryptPad](https://github.com/cryptpad/cryptpad) uses for
 its office documents, measured against a Document Server 9.4 before it was
@@ -283,7 +278,7 @@ more, which later filex releases bring.
 | The editor page may be framed by the app page | a package page carries no `frame-ancestors` (⚠ measured in Chromium before 0.55: `*` never matches an opaque origin, and the editor page was refused) | 0.1.0 |
 | The editor loads the document from a `blob:` address | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` | 0.1.0 |
 | The plaintext of a document in an encrypted folder | not given in 0.55: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`). **filex 0.56:** the manifest's `encrypted_folders: {"open": true}` → the derived permission `files:e2e-plaintext` (a stern sentence in the review): the person's browser decrypts the document for the app (`FileInfo.plaintext`) and encrypts the save, written only over the file as it was opened | 0.2.0 ([In an encrypted folder](#in-an-encrypted-folder)) |
-| Editing together | filex 0.55: the SDK's `coedit.*` methods are defined, and answer `unavailable`. **filex 0.56:** they are answered through filex's relay (its routes and WebSocket, its tables, the sealed blob store), with the permission `files:co-edit` | the next release ([Editing together](#editing-together)); on filex 0.55 the app edits alone |
+| Editing together | filex 0.55: the SDK's `coedit.*` methods are defined, and answer `unavailable`. **filex 0.56:** they are answered through filex's relay (its routes and WebSocket, its tables, the sealed blob store), with the permission `files:co-edit` | 0.3.0 ([Editing together](#editing-together)); on filex 0.55 the app edits alone |
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
@@ -393,7 +388,7 @@ the per-theme thumbnails out, below):
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
 | The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
 | **The editor bundle** | **2,623** | **286.1** | **88.5** |
-| **The app's bundle** (`ui.zip` of 0.2.0: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.1.1's was 98.3 MiB, 0.1.0's 98.2 MiB) | **2,633** | **323.4** | **98.3** |
+| **The app's bundle** (`ui.zip` of 0.3.0: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,633** | **323.4** | **98.3** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
 64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
@@ -697,7 +692,7 @@ packages by `package-lock.json`, x2t by its hashes - so anyone can make the
 same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 
 ```bash
-git clone --branch v0.2.0 https://github.com/BRF-Tech/filex-office-editor
+git clone --branch v0.3.0 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
 docker run --rm -v "$PWD:/src" -w /src \
@@ -713,6 +708,12 @@ minutes, [x2t, the converter](#x2t-the-converter)): it puts the same two
 files in `dist/x2t/`, and `fetch-x2t.mjs` then finds them in place. The
 release's `x2t.zip` is `node scripts/fetch-x2t.mjs --pack dist/x2t.zip`,
 run in the same Node image.
+
+Measured for 0.3.0 (2026-10-10, an x86-64 Linux machine), the same way as
+0.2.0: the same `ui.zip` from both builds - 103,097,729 bytes,
+2,633 files, SHA-256
+`028e24765531f6183bf7527ab2eaf5c7b1b52d78882a7371a69037bbab001c00` - and
+0.2.0's `x2t.zip`; three to four minutes each from the image to the zip.
 
 Measured for 0.2.0 (2026-10-10, an x86-64 Linux machine): two complete
 builds in two fresh checkouts, from the image to the zip, each taking x2t
@@ -1028,7 +1029,7 @@ outside the package and no failed request; openings 2.0-2.6 s in Chromium,
 tree on Windows: `npm test` 245 of 245 (the `dist/editor` and `dist/ui`
 tests included), `npm run typecheck` clean, `npm run test:x2t` 13 of 13.
 
-**Editing together, with encrypted folders** (0.3.0 on 0.2.0; run on
+**Editing together, with encrypted folders** (release 0.3.0; run on
 2026-10-10, the same image, machine and x2t): `npm run e2e -- --shots` 39
 of 39 - the 33 above, the encrypted folder and two people in each browser -
 with no request outside the package and no failed request; openings
@@ -1198,8 +1199,9 @@ put the new release in `upstream/onlyoffice.json`, run
 ## Roadmap
 
 **0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
-for filex 0.55.0 or later, and **0.2.0** (2026-10-10, encrypted folders),
-for filex 0.56.0 or later, are what works today:
+for filex 0.55.0 or later, and **0.2.0** (2026-10-10, encrypted folders)
+and **0.3.0** (2026-10-10, editing together), for filex 0.56.0 or later,
+are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
@@ -1223,17 +1225,16 @@ for filex 0.56.0 or later, are what works today:
    for the app in the person's browser and encrypts what it saves
    ([In an encrypted folder](#in-an-encrypted-folder)); a save filex
    refuses is said in the person's words.
+6. Editing together, with filex 0.56's relay and `files:co-edit`: several
+   people in one document, in an encrypted folder or a plain one, with the
+   Document Server's lock rules in every bridge; a person who may only read
+   follows it live; no Document Server
+   ([Editing together](#editing-together)).
 
 Next - the numbers are a plan, and each waits for what filex has to give it
 ([What filex provides](#what-filex-provides)):
 
-- **0.3.0, editing together**: several people in one document, in an
-  encrypted folder or a plain one, through filex's relay and its
-  `files:co-edit` (filex 0.56) - built on `main`
-  ([Editing together](#editing-together)) and measured in the three
-  browsers against a stand-in for filex 0.56; released once filex 0.56 is,
-  after its measurement in filex 0.56 itself.
-- **In any release before those**: a corpus of real documents compared
+- **In a next release**: a corpus of real documents compared
   with what a Document Server makes of them; and, when filex serves an
   app's package compressed, a lighter download for the browser.
 
