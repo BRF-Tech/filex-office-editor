@@ -58,7 +58,8 @@
 //     only read follows in ONLYOFFICE's live viewer and sees the typed text
 //     before anybody saves (read from her editor's document), neither is told
 //     "unsaved changes" while the other may save, and when one leaves the
-//     other counts one again (togetherRun);
+//     other counts one again; a document x2t stops on, opened together,
+//     stays "failed" and its member leaves the session (togetherRun);
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
@@ -980,7 +981,10 @@ async function encryptedRun(browser, server, engine, o) {
  *     is written into the log with how far it reaches (`through`), past the
  *     last change;
  *   - neither is told "unsaved changes" while the other may save;
- *   - Mehmet leaves: the log says so, and Ayşe's editor counts one again.
+ *   - Mehmet leaves: the log says so, and Ayşe's editor counts one again;
+ *   - a document x2t stops on, opened together: the opening stays "failed"
+ *     with the app's error and no editor, and the member leaves the session
+ *     it started (#220 with editing together).
  */
 async function togetherRun(browser, server, engine, o) {
   const doc = 'tr.docx';
@@ -1104,6 +1108,45 @@ async function togetherRun(browser, server, engine, o) {
     const alone = await open('v', 'Can Aydın', '&ro=1', `${room}-nobody`);
     if ((await bridge(alone, 'together')) !== false) r.problems.push('a watcher started a session nobody edits');
     step('a reader alone');
+
+    // A document x2t stops on, opened together (#220 with editing together):
+    // the person starts its session and puts the base, the conversion
+    // stops; the opening ends "failed" and stays so, says why, the editor is
+    // ended - and the member leaves the session it joined (the app's leave,
+    // not a drop: the page stays open).
+    const sRoom = `${room}-stops`;
+    const sctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+    try {
+      const sp = await sctx.newPage();
+      await sp.goto(`${server.origin}/?doc=stops.docx&locale=tr&tag=${engine}-co-s&co=${sRoom}&who=s&uname=${encodeURIComponent('Deniz Kara')}`);
+      const phaseOf = async () => (appFrame(sp) ? await appFrame(sp).evaluate(() => document.documentElement.dataset.fxPhase || '') : '');
+      const ended = await until('the opening together to end', async () => {
+        const ph = await phaseOf();
+        return ph === 'failed' || ph === 'ready' ? ph : false;
+      }, OPEN_MS);
+      if (ended !== 'failed') r.problems.push(`stops.docx together ended "${ended}", not "failed"`);
+      const left = await until('the log to say the member whose opening failed left', () => {
+        const snap = server.relay.snapshot(sRoom);
+        return snap && snap.log.some((e) => e.kind === 'leave') ? snap : false;
+      }, 20_000);
+      const how = left.departures.at(-1)?.how;
+      if (!left.log.some((e) => e.kind === 'join')) r.problems.push('stops.docx together did not join the session');
+      if (how !== 'left') r.problems.push(`the member whose opening failed went "${how}", not by leaving`);
+      if (left.members.length !== 0) r.problems.push(`${left.members.length} member(s) still in the failed session`);
+      await sleep(AFTER_FAILED_MS);
+      const st = await appFrame(sp).evaluate(() => ({
+        phase: document.documentElement.dataset.fxPhase || '',
+        text: document.getElementById('fx-status-text')?.textContent || '',
+        editorFrames: document.querySelectorAll('#fx-editor-box iframe').length,
+      }));
+      step('failed together, left', { how, phase: st.phase });
+      r.failedTogether = { how, ...st };
+      if (st.phase !== 'failed') r.problems.push(`${AFTER_FAILED_MS / 1000} s after it failed together the page says "${st.phase}"`);
+      if (st.text !== STOPPED_TR) r.problems.push(`together, the person reads ${JSON.stringify(st.text)}, not ${JSON.stringify(STOPPED_TR)}`);
+      if (st.editorFrames !== 0) r.problems.push('together, the editor is still loading behind the error');
+    } finally {
+      await sctx.close().catch(() => {});
+    }
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));
     for (const x of people2) {
