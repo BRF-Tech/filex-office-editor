@@ -35,11 +35,18 @@ with a later release, as filex gains what it needs ([Roadmap](#roadmap)).
 > a real filex 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)).
 > filex 0.55 opens no app on an encrypted file, so in an encrypted folder
 > filex keeps its own read-only preview.
+>
+> **Unreleased (0.2.0): documents in encrypted folders**, for filex 0.56 or
+> later - filex decrypts the document for the editor in the person's
+> browser and encrypts the save, and no server reads it
+> ([In an encrypted folder](#in-an-encrypted-folder)). Built and measured
+> in Chromium, Firefox and WebKit against a stand-in for filex 0.56; not
+> yet measured in a real filex 0.56; not released.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | **0.55.0** or later (`"filex": ">=0.55.0"`) |
+| filex | 0.1.1: **0.55.0** or later. The next release (encrypted folders, the manifest's `encrypted_folders` block, granted as `files:e2e-plaintext`): **0.56.0** or later (`"filex": ">=0.56.0"`) - filex 0.55 refuses a manifest with a block it does not know, and keeps 0.1.1 |
 | Release | **0.1.1** (tag `v0.1.1`): `ui.zip`, 98.3 MiB, SHA-256 `7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
@@ -770,7 +777,21 @@ the harness holds the document as filex's explorer encrypts it (the
 ciphertext, that no request carries a document in the clear, and that what
 the server holds decrypts to a document with the typed text - and that on
 filex 0.55 (`enc=055`) the app says the document is encrypted
-(`encryptedRun`). Written for 0.2.0; not run yet.
+(`encryptedRun`).
+
+Measured on 2026-10-10 in Chromium 147, Firefox 148 and WebKit 26.4 (Linux,
+Playwright 1.59's image, Node 24.14.1, headless; on a Windows PC's docker),
+in each browser: the document of the encrypted folder opened (2.4 s,
+6.8 s, 10.5 s on a busy machine), the typed text saved, the server received
+only `filexe2e` ciphertext (25,831 / 25,868 / 25,830 bytes) and no request
+the pages sent carried a document in the clear; what the server holds,
+decrypted with the folder key, holds the typed text and the Turkish
+document's own; on filex 0.55 the app said, in the run's Turkish, that the
+document is encrypted and that filex does not hand it to this app there,
+asked for nothing, and nothing was saved. In the same run the 24 of 0.1.1
+passed again: 27 of 27, no request outside the package, no failed request,
+54 screenshots ([Measured in the browsers](#measured-in-the-browsers)). Not
+yet measured in a real filex 0.56.
 
 ## Measured in the browsers
 
@@ -854,6 +875,17 @@ all three: emscripten's raw text, the editor still loading) and, with
 x2t `v9.4.0.129+1`, `formula-nostyle.odt` in all three (two floating
 shapes). In the same tree: `npm test` 237 of 237, `npm run typecheck`
 clean, `npm run test:x2t` 13 of 13.
+
+**Encrypted folders** (the next release, 0.2.0; run on 2026-10-10 on Linux
+in Playwright 1.59's image, Node 24.14.1, on a Windows PC's docker):
+`npm run e2e -- --shots` 27 of 27 - the 24 above and, in each browser, a
+document of an encrypted folder through a stand-in for filex 0.56
+([In an encrypted folder](#in-an-encrypted-folder)) - with no request
+outside the package and no failed request; openings 2.5-5.1 s in Chromium,
+5.3-8.4 s in Firefox, 8.8-10.8 s in WebKit (the machine was busy with other
+work); 54 screenshots. In the same tree on Windows: `npm test` 230 of 230
+(the `dist/editor` and `dist/ui` tests included), `npm run typecheck`
+clean, `npm run test:x2t` 11 of 11.
 
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
@@ -1016,8 +1048,9 @@ Next - the numbers are a plan, and each waits for what filex has to give it
   encrypted folder, with filex 0.56's `encrypted_folders` /
   `files:e2e-plaintext` (filex decrypts the document for the app and
   encrypts what it saves) - built on `main`
-  ([In an encrypted folder](#in-an-encrypted-folder)), released once filex
-  0.56 is, after its measurement in the three browsers and in filex 0.56.
+  ([In an encrypted folder](#in-an-encrypted-folder)) and measured in the
+  three browsers against a stand-in for filex 0.56; released once filex
+  0.56 is, after its measurement in filex 0.56 itself.
 - **0.3.0, editing together**: several people in one document, in an
   encrypted folder or a plain one, through filex's relay and its
   `files:co-edit` (planned for filex 0.57 or later).
