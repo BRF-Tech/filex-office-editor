@@ -112,7 +112,7 @@
   "ui": {
     "bundle": {
       "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.3.1/ui.zip",
-      "sha256": "028e24765531f6183bf7527ab2eaf5c7b1b52d78882a7371a69037bbab001c00"
+      "sha256": "cd3bc0741f97e471ec26d639da65835fccff2605fc255974ecb5f21d2b179baf"
     },
     "csp": [
       "unsafe-eval",

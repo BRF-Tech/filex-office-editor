@@ -10,7 +10,7 @@
   "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
   "pinned": "2026-10-08",
   "x2t": {
-    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; releases 0.3.0 and 0.2.0 attach v9.4.0.129+2, release 0.1.1 attached v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
+    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; releases 0.2.0 to 0.3.1 attach v9.4.0.129+2, release 0.1.1 attached v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
     "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/; built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
     "release": "v9.4.0.129+2",
     "build": {
@@ -58,7 +58,7 @@
       "x2t.js": "9f2f65ac557470b2895beaa0f9678ee1a998545d49c8b93d67306ff3e7d7fe4b",
       "x2t.wasm": "cabaa6e33574f61703c53463d714e33529949d17d388b4e198994199e29c368b"
     },
-    "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.3.0/x2t.zip",
+    "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.3.1/x2t.zip",
     "sha512": "9bc03d7508b231d691e3cef7878c4572c737d2e0d84b320f458e587e387f20ae8c2a15e29199103b3a80a04b574ff9b7be12b59b57748178a13db2d746a7fb5c",
     "pinned": "2026-10-10"
   }
