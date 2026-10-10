@@ -112,6 +112,16 @@ export class Together {
   private toFrame: (m: ToFrame, transfer?: Transferable[]) => void = () => {};
   private readonly offs: (() => void)[] = [];
   private pipeline: Promise<void> = Promise.resolve();
+  /**
+   * The lease calls, one after another. The bridge gives the lease back as
+   * its batch comes back and asks for it again for the next one at once; two
+   * calls in flight together can reach filex in either order, and a release
+   * that lands after the next acquire takes the lease just granted (the
+   * relay's release clears its holder) - the next changes are then refused
+   * (`no_lease`) and the editor waits for them for good. Measured in a real
+   * filex 0.56: in an encrypted folder about one opening in two.
+   */
+  private leasing: Promise<unknown> = Promise.resolve();
   /** Images the editor page has (the base's, this member's own, the ones handed over). */
   private readonly media = new Set<string>();
   private save: SaveState = emptySaveState();
@@ -251,14 +261,14 @@ export class Together {
         return true;
       case 'co-lease':
         if (m.op === 'release') {
-          if (!this.stopped) this.o.api.lease('release', m.seen).catch(() => {});
+          if (!this.stopped) this.lease('release', m.seen).catch(() => {});
           return true;
         }
         if (this.stopped) {
           this.toFrame({ t: 'co-lease-answer', id: m.id, granted: false });
           return true;
         }
-        this.o.api.lease('acquire', m.seen).then(
+        this.lease('acquire', m.seen).then(
           (granted) => this.toFrame({ t: 'co-lease-answer', id: m.id, granted }),
           () => this.toFrame({ t: 'co-lease-answer', id: m.id, granted: false }),
         );
@@ -284,6 +294,13 @@ export class Together {
       }
     }
     return false;
+  }
+
+  /** A lease call to filex once the one before it is answered (`leasing`). */
+  private lease(op: 'acquire' | 'release', seen: number): Promise<boolean> {
+    const run = this.leasing.then(() => this.o.api.lease(op, seen));
+    this.leasing = run.catch(() => undefined);
+    return run;
   }
 
   /** The latest cursor, at most every CURSOR_EVERY_MS. */

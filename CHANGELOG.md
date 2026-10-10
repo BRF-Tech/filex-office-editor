@@ -9,6 +9,20 @@ update.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A save no longer hangs on "saving" after typing, above all in an
+  encrypted folder.** The editor gives the changes lease back as each of
+  its batches comes back from filex's relay and asks for it again for the
+  next batch at once; the two calls went to filex side by side, and when
+  the release reached the relay after the new acquire it took away the
+  lease just granted. The next batch was then refused (`no_lease`), the
+  editor waited for it for good and its status stayed "saving", and filex
+  never received the save. Measured in a filex built from main (0.56): in
+  an encrypted folder about every other opening, in an ordinary one now
+  and then. The lease calls now go to filex one after another, each once
+  the one before it is answered.
+
 ## [0.3.0] - 2026-10-10
 
 Editing together, for filex 0.56.0 or later: several people in one

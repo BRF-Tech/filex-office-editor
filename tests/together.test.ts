@@ -326,6 +326,42 @@ describe("the editor page's messages", () => {
     expect(frame.map((f) => f.m)).toEqual([{ t: 'co-lease-answer', id: 7, granted: false }]);
   });
 
+  it('a lease call waits for the one before it: a release reaches filex before the next acquire, a failed one does not hold it', async () => {
+    const { fx, t, frame, attach } = setup();
+    await attach();
+    // filex answers the lease calls only when told to, as a slow connection would.
+    const answers: { op: string; done: (granted: boolean) => void; fail: (e: Error) => void }[] = [];
+    fx.lease = (op: string, seen: number) =>
+      new Promise<boolean>((done, fail) => {
+        fx.calls.push(`lease ${op} ${seen}`);
+        answers.push({ op, done, fail });
+      });
+    t.fromFrame({ t: 'co-lease', id: 8, op: 'release', seen: 4 });
+    t.fromFrame({ t: 'co-lease', id: 9, op: 'acquire', seen: 4 });
+    await settle();
+    // Only the release is on its way: the acquire waits for its answer.
+    expect(fx.calls.filter((c) => c.startsWith('lease'))).toEqual(['lease release 4']);
+    answers[0].done(true);
+    await settle();
+    expect(fx.calls.filter((c) => c.startsWith('lease'))).toEqual(['lease release 4', 'lease acquire 4']);
+    answers[1].done(true);
+    await settle();
+    expect(frame.map((f) => f.m)).toEqual([{ t: 'co-lease-answer', id: 9, granted: true }]);
+    // A release filex did not answer does not stop the next acquire.
+    t.fromFrame({ t: 'co-lease', id: 10, op: 'release', seen: 6 });
+    t.fromFrame({ t: 'co-lease', id: 11, op: 'acquire', seen: 6 });
+    await settle();
+    answers[2].fail(new Refusal('unavailable', 'gone'));
+    await settle();
+    answers[3].done(false);
+    await settle();
+    expect(fx.calls.filter((c) => c.startsWith('lease'))).toEqual(['lease release 4', 'lease acquire 4', 'lease release 6', 'lease acquire 6']);
+    expect(frame.map((f) => f.m)).toEqual([
+      { t: 'co-lease-answer', id: 9, granted: true },
+      { t: 'co-lease-answer', id: 11, granted: false },
+    ]);
+  });
+
   it('an image this member inserted is kept with the session, and the editor page is told', async () => {
     const { fx, t, frame, attach } = setup();
     await attach();
