@@ -162,8 +162,8 @@ sponsored by Ascensio System SIA.
    1.1.1f (no OpenSSL code is linked), hyphen (MPL 1.1, GPL 2.0 or LGPL
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
-   LLVM exception, the Unicode license). Release 0.2.0 carries this build
-   (x2t v9.4.0.129+2); release 0.1.1 carried it without
+   LLVM exception, the Unicode license). Releases 0.3.0 and 0.2.0 carry
+   this build (x2t v9.4.0.129+2); release 0.1.1 carried it without
    05-frame-anchor.patch (x2t v9.4.0.129+1); release 0.1.0 carried
    CryptPad's own build of x2t (release v9.3.2+3) unchanged.
 
