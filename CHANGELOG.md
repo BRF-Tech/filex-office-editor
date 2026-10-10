@@ -90,6 +90,10 @@ browser.
   types before anybody saves (read from the editor's own document). The
   stand-in drops a member whose page went away, as filex does after 45 s
   (a closing tab does not always let its leave out).
+- An opening that fails while editing together (the converter stops on the
+  document, or does not finish in time, or the editor's script does not
+  load) stays failed and ends the editor, as alone, and leaves the session
+  it joined - nobody waits on a member whose editor never started.
 
 ### Changed
 

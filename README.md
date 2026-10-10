@@ -246,6 +246,10 @@ on the editor page, `src/coedit.ts` for what both derive from the log):
   does not check out** (`broken`), editing together stops for this person:
   the session is left and the document opens again alone, as it was last
   saved, and they are told.
+- **An opening that fails** (x2t stops on the document, it does not finish
+  in time, the editor's script does not load) stays failed, says why and
+  ends the editor, as alone - and leaves the session it joined, so nobody
+  waits on a member whose editor never started.
 - **Alone, as before**, wherever filex offers no editing together: an older
   filex (`unknown_method`), no `files:co-edit` grant, a vault, a document
   nobody is editing opened by a person who may only read it - and on a
@@ -936,7 +940,9 @@ editor is ONLYOFFICE's live viewer, and the run reads from her editor's own
 document that it shows the typed text before anybody saves. A page that
 closes leaves the session; the relay stand-in also drops a member whose
 page went away (its event stream closed and not opened again within 5 s),
-as filex drops one it has not heard from for 45 s.
+as filex drops one it has not heard from for 45 s. Last, a document x2t
+stops on is opened together: the opening stays "failed" with the app's
+message and no editor, and its member leaves the session it started.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -997,10 +1003,10 @@ x2t `v9.4.0.129+1`, `formula-nostyle.odt` in all three (two floating
 shapes). In the same tree: `npm test` 237 of 237, `npm run typecheck`
 clean, `npm run test:x2t` 13 of 13.
 
-**Encrypted folders** (the next release, 0.2.0 alone, on the tree above with x2t
-`v9.4.0.129+2`; run on 2026-10-10 on Linux in Playwright 1.59's image,
-Node 24.14.1, on a Windows PC's docker): `npm run e2e -- --shots` 36 of
-36 - the 33 above and, in each browser, a document of an encrypted folder
+**Encrypted folders** (the next release, 0.2.0 alone, on the tree above
+with x2t `v9.4.0.129+2`; run on 2026-10-10 on Linux in Playwright 1.59's
+image, Node 24.14.1, on a Windows PC's docker): `npm run e2e -- --shots`
+36 of 36 - the 33 above and, in each browser, a document of an encrypted folder
 through a stand-in for filex 0.56
 ([In an encrypted folder](#in-an-encrypted-folder)) - with no request
 outside the package and no failed request; openings 2.0-2.6 s in Chromium,
@@ -1009,25 +1015,26 @@ tree on Windows: `npm test` 245 of 245 (the `dist/editor` and `dist/ui`
 tests included), `npm run typecheck` clean, `npm run test:x2t` 13 of 13.
 
 **Editing together, with encrypted folders** (0.3.0 on 0.2.0; run on
-2026-10-10, the same image and machine): `npm run e2e -- --shots` 30 of 30 -
-the 24 above, the encrypted folder and two people in each browser - with no
-request outside the package and no failed request; openings 2.3-3.2 s in
-Chromium, 3.6-4.4 s in Firefox, 5.3-12.8 s in WebKit; 57 screenshots (the
-watcher's editor in each browser among them). In the same tree on Windows:
-`npm test` 281 of 281, `npm run typecheck` clean, `npm run test:x2t` 11 of
-11.
+2026-10-10, the same image, machine and x2t): `npm run e2e -- --shots` 39
+of 39 - the 33 above, the encrypted folder and two people in each browser -
+with no request outside the package and no failed request; openings
+1.9-3.3 s in Chromium, 3.1-4.6 s in Firefox, 4.9-5.5 s in WebKit; 66
+screenshots (the watcher's editor in each browser among them). In the same
+tree on Windows: `npm test` 296 of 296, `npm run typecheck` clean, `npm
+run test:x2t` 13 of 13.
 
 | Two people and a watcher, one document (`togetherRun`) | Chromium | Firefox | WebKit |
 |---|---|---|---|
 | Ayşe starts the session and puts the base, Mehmet joins; each editor counts two people, no two share an editor user id | yes | yes | yes |
 | Zeynep, who may only read, follows: a member that may not write, her editor in view mode and ONLYOFFICE's live viewer | yes | yes | yes |
-| What Ayşe types reaches every bridge: the same change batches in all three | yes (78) | yes (116) | yes (73) |
-| ... and shows in Zeynep's editor, read from its own document, before anybody saves (the check polls every 0.25 s) | 0.27 s after the typing | 0.28 s | 0.30 s |
+| What Ayşe types reaches every bridge: the same change batches in all three | yes (73) | yes (116) | yes (73) |
+| ... and shows in Zeynep's editor, read from its own document, before anybody saves (the check polls every 0.25 s) | 0.26 s after the typing | 0.27 s | 0.26 s |
 | Zeynep writes nothing into the log; her page closes and the log says she left | yes | yes | yes |
 | Ayşe's and Mehmet's bridges hold the same locks | yes | yes | yes |
-| Mehmet's Save holds Ayşe's text and is written into the log past the last change (`through`) | yes (45) | yes (39) | yes (35) |
+| Mehmet's Save holds Ayşe's text and is written into the log past the last change (`through`) | yes (39) | yes (39) | yes (35) |
 | Neither is told "unsaved changes"; Mehmet leaves and Ayşe counts one again | yes | yes | yes |
 | A reader alone: no session to follow, the document opens as it is | yes | yes | yes |
+| A document x2t stops on, opened together: still "failed" 6 s on, the app's message, no editor; its member left the session it started (its own leave, not a drop) | yes | yes | yes |
 
 The first run of it was red in Firefox and WebKit ("timed out (20 s)
 waiting for the log to say Zeynep left"), and it was the measurement's,
@@ -1038,9 +1045,10 @@ and Playwright 1.59's WebKit leaves a page open after `close({
 runBeforeUnload: true })`, even a page with no handler. filex covers the
 first with its 45-second drop, which the relay stand-in now does too (in
 5 s); the run closes a WebKit page that stays open without its
-beforeunload. In the run above every page's leave got out; on Windows,
-Firefox's and WebKit's members were dropped instead, 5 s after their pages
-closed.
+beforeunload. In the run above Firefox's watcher was dropped that way
+(her page's leave did not get out) and every other page's leave got out;
+on Windows, Firefox's and WebKit's members were dropped, 5 s after their
+pages closed.
 
 The PDFs were also read with MuPDF: the Turkish text is whole, the docx's
 title bold, its body regular, its italic line italic (Liberation Serif in
