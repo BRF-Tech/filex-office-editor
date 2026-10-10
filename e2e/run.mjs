@@ -199,6 +199,23 @@ async function viewerFacts(page) {
   });
 }
 
+/**
+ * Close a page as a person closes the tab: its beforeunload and pagehide
+ * handlers run. Playwright 1.59's WebKit leaves the page open after
+ * close({ runBeforeUnload: true }) - measured even for a page with no
+ * handler at all - so there, after a moment, the page is closed without
+ * them (the relay then drops the member whose stream closed, as filex does
+ * a member whose page went away). Returns how the page was closed.
+ */
+async function closeTab(page) {
+  await page.close({ runBeforeUnload: true });
+  const end = Date.now() + 2000;
+  while (!page.isClosed() && Date.now() < end) await sleep(100);
+  if (page.isClosed()) return 'closed';
+  await page.close();
+  return 'closed without beforeunload';
+}
+
 /** Wait for the next file the app hands filex (ui.download, or the ui.print stand-in). */
 async function nextFile(server, tag, before, what) {
   return until(what, () => server.files.filter((f) => f.tag === tag)[before], 60_000);
@@ -1050,9 +1067,9 @@ async function togetherRun(browser, server, engine, o) {
     const watcher = server.relay.snapshot(room).members.find((m) => m.name === 'Zeynep Kaya');
     if (!watcher || watcher.canEdit) r.problems.push('the watcher is not a member that may not write');
     else if (server.relay.snapshot(room).log.some((e) => e.client === watcher.client && e.kind !== 'join')) r.problems.push('the watcher wrote into the log');
-    await w.page.close({ runBeforeUnload: true });
+    const closedW = await closeTab(w.page);
     await until('the log to say Zeynep left', () => server.relay.snapshot(room).log.some((e) => e.kind === 'leave' && e.client === watcher?.client), 20_000);
-    step('Zeynep left');
+    step('Zeynep left', { page: closedW, how: server.relay.snapshot(room).departures.find((d) => d.client === watcher?.client)?.how });
     await sleep(1500);
     const la = JSON.stringify(await bridge(a, 'locks'));
     const lb = JSON.stringify(await bridge(b, 'locks'));
@@ -1076,10 +1093,10 @@ async function togetherRun(browser, server, engine, o) {
     step('nothing unsaved');
 
     // Mehmet leaves: the log says so, Ayşe counts one again.
-    await b.page.close({ runBeforeUnload: true });
+    const closedB = await closeTab(b.page);
     await until('the log to say Mehmet left', () => server.relay.snapshot(room).log.filter((e) => e.kind === 'leave').length >= 2, 20_000);
     await until("Ayşe's editor to count one person again", async () => (await people(a.page, 'docx')).visible === 1, 30_000);
-    step('Mehmet left');
+    step('Mehmet left', { page: closedB, how: server.relay.snapshot(room).departures.at(-1)?.how });
     r.relayAtEnd = server.relay.snapshot(room).log.map((e) => `${e.seq}:${e.kind}:${e.client}`);
 
     // A person who may only read a document nobody is editing: nothing to

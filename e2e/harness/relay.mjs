@@ -18,13 +18,21 @@
 //     writer that has seen every change (60 s, renewed by each changes entry);
 //   - the relay's own entries: join (with an indexUser never given twice),
 //     leave, saved (written when a save carries `through`);
-//   - cursors passed to the others, not kept; the session's blobs, once a name.
+//   - cursors passed to the others, not kept; the session's blobs, once a name;
+//   - the drop of a member whose page went away: filex's page leaves on
+//     `pagehide` with a keepalive request, which a closing tab does not
+//     always let out (measured: Firefox lets it out now and then, WebKit
+//     never, when Playwright closes the page), so filex also drops a member
+//     it has not heard from for 45 s (MemberTTL, with a leave entry). Here
+//     that is a member whose event stream closed and was not opened again
+//     within GONE_MS.
 //
 // What it does not do: sealing (filex's page seals and opens; the app never
-// sees it), the database, the 45-second drop of a member whose page is gone,
-// limits. None of it is the app's to see.
+// sees it), the database, limits. None of it is the app's to see.
 
 const LEASE_MS = 60_000;
+/** filex's MemberTTL (45 s), shortened: a closed event stream not opened again by then. */
+const GONE_MS = 5_000;
 const BLOB_NAME = /^[A-Za-z0-9._-]{1,128}$/;
 
 function json(res, status, v) {
@@ -60,6 +68,17 @@ export function createRelay({ log = () => {} } = {}) {
     return { client: m.client, user: m.user, name: m.name, indexUser: m.indexUser, canEdit: m.canEdit };
   }
 
+  /** A member leaves (coedit.leave), or is dropped: a leave entry, and the lease goes. */
+  function leave(s, room, client, why) {
+    if (!s.members.has(client)) return false;
+    s.members.delete(client);
+    if (s.lease.holder === client) s.lease.holder = '';
+    add(s, { kind: 'leave', client });
+    s.departures.push({ client, how: why ? 'dropped' : 'left' });
+    log(`co ${room}: ${client} left${why ? ` (${why})` : ''}`);
+    return true;
+  }
+
   /** A save of the room's document reached `through` (host.js's file.save with through). */
   function saved(room, client, through) {
     const s = session(room);
@@ -81,6 +100,7 @@ export function createRelay({ log = () => {} } = {}) {
       changesHead: s.changesHead,
       savedThrough: s.savedThrough,
       blobs: [...s.blobs.keys()],
+      departures: s.departures.slice(),
     };
   }
 
@@ -113,7 +133,7 @@ export function createRelay({ log = () => {} } = {}) {
         return true;
       }
       if (!s) {
-        s = { log: [], blobs: new Map(), members: new Map(), nextClient: 0, nextIndex: 0, lease: { holder: '', until: 0 }, changesHead: 0, savedThrough: 0, subs: new Set(), id: `s-${room}` };
+        s = { log: [], blobs: new Map(), members: new Map(), nextClient: 0, nextIndex: 0, lease: { holder: '', until: 0 }, changesHead: 0, savedThrough: 0, subs: new Set(), departures: [], id: `s-${room}` };
         rooms.set(room, s);
         created = true;
       } else if (!s.blobs.has('base')) {
@@ -144,7 +164,15 @@ export function createRelay({ log = () => {} } = {}) {
       };
       for (const e of s.log.slice(from)) sub.send({ type: 'entry', entry: e });
       s.subs.add(sub);
-      req.on('close', () => s.subs.delete(sub));
+      req.on('close', () => {
+        s.subs.delete(sub);
+        // A new stream (coedit.subscribe again, EventSource's own retry)
+        // keeps the member; none by then means its page went away.
+        const t = setTimeout(() => {
+          if (![...s.subs].some((x) => x.client === client)) leave(s, room, client, 'its page went away');
+        }, GONE_MS);
+        t.unref?.();
+      });
       return true;
     }
 
@@ -239,10 +267,7 @@ export function createRelay({ log = () => {} } = {}) {
     }
 
     if (what === 'leave') {
-      s.members.delete(client);
-      if (s.lease.holder === client) s.lease.holder = '';
-      add(s, { kind: 'leave', client });
-      log(`co ${room}: ${client} left`);
+      leave(s, room, client, '');
       json(res, 200, {});
       return true;
     }
