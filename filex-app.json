@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "name": "office-editor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "filex": ">=0.56.0",
   "label": {
     "en": "Office editor",
@@ -104,7 +104,7 @@
   ],
   "ui": {
     "bundle": {
-      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.1.1/ui.zip",
+      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.2.0/ui.zip",
       "sha256": "7cd9c42c00e839f6970a7bc55f0fd76c180cb0b9c714d130fbaa911633aea06b"
     },
     "csp": [
