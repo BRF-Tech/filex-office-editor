@@ -91,7 +91,12 @@ files** with the release's `filex-app.json` and `ui.zip` does the same.
 
 Once installed, a `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods` or `.odp`
 opens in the editor, and **New → New document** offers a document, a
-spreadsheet and a presentation under Apps.
+spreadsheet and a presentation under Apps. The next release (0.4.0, filex
+0.57) opens every kind a Document Server edits for filex - doc, xls, ppt,
+rtf, the templates and macro-enabled kinds, csv... (`src/kinds.ts`) - saves
+a format x2t cannot write beside the file as OOXML, checks spelling with
+the dictionaries of filex's languages, opens password-protected documents
+and runs macros after the editor's question ([docs/PARITY.md](docs/PARITY.md)).
 
 ## What it is for
 
@@ -361,10 +366,13 @@ in three containers, none of them with network access after the pull:
    phone app (`mobile`, see [On a phone](#on-a-phone)) - sdkjs, the
    fonts, ONLYOFFICE's license files. It leaves out the help pages (533 MiB),
    the PDF and Visio editors and engines, the embedded and forms
-   apps, the macro editor, the server's script snapshots, the theme
+   apps, the macro editor's Internet Explorer build (the macro editor
+   itself stays on this branch: macros run), the server's script snapshots, the theme
    sources, the asm.js builds for browsers without WebAssembly, the large
-   CJK fonts (a fallback CJK font stays) and pre-compressed copies;
-   dictionaries are never copied. Every HTML page loses its inline code
+   CJK fonts (a fallback CJK font stays) and pre-compressed copies; of the
+   dictionaries, those of filex's interface languages are copied (on this
+   branch: en_US, tr_TR, de_DE, es_ES, fr_FR, ar - 18.4 MB zipped, their
+   `.aff` and `.dic` as `.txt`), the rest an administrator adds. Every HTML page loses its inline code
    (`scripts/editor/html.mjs`, below).
 3. **The checks**: every file is one filex serves (its extension, a clean
    path, no two names that differ only in case), no HTML page holds inline
@@ -779,8 +787,9 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    narrower than 600 px starts the editor folded and, on a touch screen,
    opens ONLYOFFICE's phone app instead ([On a phone](#on-a-phone)).
    Everything that
-   would reach a Document Server is off: plugins, macros, chat, the spell
-   checker, help, "suggest a feature". Download as and Print are on when
+   would reach a Document Server is off: plugins, chat, help, "suggest a
+   feature" (on this branch macros run after the editor's question, and the
+   spell checker has its dictionaries). Download as and Print are on when
    filex can hand a file over (the app's `ui:download` grant).
 4. It hands the editor page the converted document over a `MessagePort`,
    as bytes (transferred, not copied).
@@ -823,7 +832,7 @@ measured in the browser before it was written:
 |---|---|---|
 | The two pages hear each other | `api.js` and the editor's Gateway take a message only from the origin of the other's address; a sandboxed page's messages carry the origin `"null"`, so the editor never got its configuration | `src/origin.ts`: a message that comes from the one window it should come from is handed on with the origin they expect (the window is a stronger check than the origin was); everything else is left as it is |
 | The interface templates | served as `.template.txt` (above) | `src/frame/text.ts`: the text plugin's `createXhr` setting |
-| The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening; spell checking has no dictionaries here anyway | `src/frame/workers.ts`: the spell engine gets a worker that does nothing; any other worker from the package starts from a `blob:` address |
+| The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening | `src/frame/workers.ts`: every worker from the package starts from a `blob:` address; the spell engine's (on this branch) with spell.wasm's place and its dictionaries' addresses - the bundle's `editor/dictionaries/`, or `extra/dictionaries/` for a language an administrator added - and the editor page's hyphenation requests go the same way |
 | The presentation themes | the editor loads `sdkjs/slide/themes//themes.js`; nginx merges the two slashes, filex refuses an empty path segment | `src/frame/themes-path.ts`: the editor is given its themes folder without the trailing slash |
 | Save while the editor hands over its changes | the editor's Save does nothing while a hand-over runs, and keeps nothing for later (sdkjs `asc_Save`); a Ctrl+S right after typing was lost | `src/frame/save-retry.ts`: the Save is kept until the editor has started it, and asked again when the editor is free |
 | Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture |

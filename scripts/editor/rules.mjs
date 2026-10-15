@@ -61,7 +61,10 @@ const RULES = [
   { re: /^web-apps\/apps\/[^/]+\/(embed|forms)\//, drop: 'the embedded-viewer and forms apps' },
   { re: /\/resources\/help\//, drop: 'the help pages' },
   { re: /^web-apps\/apps\/api\/wopi\//, drop: "the WOPI host's server templates" },
-  { re: /^web-apps\/vendor\/monaco\//, drop: 'the macro editor (macros are off)' },
+  // The macro editor stays (0.4.0: macros run, and the editor's Macros
+  // dialog edits them in it); its build for Internet Explorer and its
+  // example page do not.
+  { re: /^web-apps\/vendor\/monaco\/(monaco-for-ie\/|example\.html$)/, drop: "the macro editor's Internet Explorer build and its example page" },
   { re: /^sdkjs\/(pdf|visio)\//, drop: 'the PDF and Visio engines' },
   { re: /^sdkjs\/[^/]+\/sdk-all\.bin$/, drop: "the server's script snapshot (doctrenderer)" },
   { re: /^sdkjs\/slide\/themes\/src\//, drop: 'the theme sources (the generated themes stay)' },
