@@ -11,9 +11,11 @@
 // ppt or csv - 88, measured on the server build, docs/SERVER.md), and how a
 // save is written:
 //   - in place, in its own format, when x2t writes it (src/formats.ts, the
-//     formats measured with Turkish text);
+//     formats measured with Turkish text, and dotm, xltm, xlsb, potm, ppsm:
+//     written and read back with the text whole, docs/SERVER.md);
 //   - beside it, as OOXML, when x2t cannot write it (doc, xls, ppt and the
-//     other legacy formats; a Document Server cannot either): the file stays
+//     other legacy formats, the flat ODF ones: x2t answers 88; a Document
+//     Server cannot write the binary ones either): the file stays
 //     as it was and filex writes the save next to it, choosing the name
 //     ("rapor.docx", "rapor (2).docx") as it does for a Document Server's
 //     save (filex's callback_format.go). The app asks for that with
@@ -58,7 +60,7 @@ const TABLE: readonly [string, DocumentType, string, number | null][] = [
   ['docx', 'word', `${OOXML}.wordprocessingml.document`, 0x0041],
   ['docm', 'word', `${MS}word.document.macroEnabled.12`, 0x004b],
   ['dotx', 'word', `${OOXML}.wordprocessingml.template`, 0x004c],
-  ['dotm', 'word', `${MS}word.template.macroEnabled.12`, null],
+  ['dotm', 'word', `${MS}word.template.macroEnabled.12`, 0x004d],
   ['doc', 'word', 'application/msword', null],
   ['dot', 'word', 'application/msword', null],
   ['odt', 'word', `${ODF}.text`, 0x0043],
@@ -75,10 +77,10 @@ const TABLE: readonly [string, DocumentType, string, number | null][] = [
   ['xlsx', 'cell', `${OOXML}.spreadsheetml.sheet`, 0x0101],
   ['xlsm', 'cell', `${MS}excel.sheet.macroEnabled.12`, 0x0105],
   ['xltx', 'cell', `${OOXML}.spreadsheetml.template`, 0x0106],
-  ['xltm', 'cell', `${MS}excel.template.macroEnabled.12`, null],
+  ['xltm', 'cell', `${MS}excel.template.macroEnabled.12`, 0x0107],
   ['xls', 'cell', `${MS}excel`, null],
   ['xlt', 'cell', `${MS}excel`, null],
-  ['xlsb', 'cell', `${MS}excel.sheet.binary.macroEnabled.12`, null],
+  ['xlsb', 'cell', `${MS}excel.sheet.binary.macroEnabled.12`, 0x0108],
   ['ods', 'cell', `${ODF}.spreadsheet`, 0x0103],
   ['ots', 'cell', `${ODF}.spreadsheet-template`, 0x010a],
   ['fods', 'cell', `${ODF}.spreadsheet-flat-xml`, null],
@@ -90,9 +92,9 @@ const TABLE: readonly [string, DocumentType, string, number | null][] = [
   ['pptx', 'slide', `${OOXML}.presentationml.presentation`, 0x0081],
   ['pptm', 'slide', `${MS}powerpoint.presentation.macroEnabled.12`, 0x0085],
   ['potx', 'slide', `${OOXML}.presentationml.template`, 0x0087],
-  ['potm', 'slide', `${MS}powerpoint.template.macroEnabled.12`, null],
+  ['potm', 'slide', `${MS}powerpoint.template.macroEnabled.12`, 0x0088],
   ['ppsx', 'slide', `${OOXML}.presentationml.slideshow`, 0x0084],
-  ['ppsm', 'slide', `${MS}powerpoint.slideshow.macroEnabled.12`, null],
+  ['ppsm', 'slide', `${MS}powerpoint.slideshow.macroEnabled.12`, 0x0086],
   ['ppt', 'slide', `${MS}powerpoint`, null],
   ['pot', 'slide', `${MS}powerpoint`, null],
   ['pps', 'slide', `${MS}powerpoint`, null],

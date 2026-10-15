@@ -343,6 +343,8 @@ class OfficeApp {
   doc: OpenedDocument;
   /** filex said where the first save beside the file went (its name), once. */
   private besideName = '';
+  /** filex said a save became a conflict copy (its name), once. */
+  private conflictName = '';
 
   constructor(
     private readonly fx: FilexApp,
@@ -517,14 +519,20 @@ class OfficeApp {
         // Together, the save says how far into the log it reaches; filex
         // writes that into the log, and every member's "unsaved" follows it.
         const t = this.together;
-        let answer: unknown;
-        if (t?.active) answer = await t.saveFile(out.bytes, target.mime, through, extra);
-        else if (Object.keys(extra).length > 0) answer = await saveWith(this.fx, out.bytes, target.mime, extra);
-        else await this.fx.save(out.bytes, { mime: target.mime });
-        const name = (answer as { name?: unknown } | null | undefined)?.name;
-        if (target.beside && typeof name === 'string' && name !== this.besideName) {
-          this.besideName = name;
-          this.fx.toast(this.t.savedBeside(name), 'info');
+        const answer = (t?.active ? await t.saveFile(out.bytes, target.mime, through, extra) : await saveWith(this.fx, out.bytes, target.mime, extra)) as
+          | { name?: unknown; conflict?: unknown }
+          | null
+          | undefined;
+        // Where filex put it, said once: beside the file (a format x2t
+        // cannot write), or - the file was changed by someone else since it
+        // was opened - as a conflict copy beside it, as a Document Server's
+        // save is (filex 0.57; docs/PARITY.md A9).
+        if (typeof answer?.conflict === 'string' && answer.conflict !== this.conflictName) {
+          this.conflictName = answer.conflict;
+          this.fx.toast(this.t.savedConflict(answer.conflict), 'warning');
+        } else if (target.beside && typeof answer?.name === 'string' && answer.name !== this.besideName) {
+          this.besideName = answer.name;
+          this.fx.toast(this.t.savedBeside(answer.name), 'info');
         }
         this.lastSave = Date.now();
         this.link.send({ t: 'saved', ok: true, through });
@@ -609,7 +617,11 @@ class OfficeApp {
   }
 }
 
-/** file.save with what the SDK's save does not carry (document.ts saveExtra, filex 0.57); filex's answer. */
+/**
+ * file.save with what the SDK's save does not carry (document.ts saveExtra,
+ * filex 0.57), and filex's whole answer (the SDK's keeps only saved and
+ * size): `name` of a save beside the file, `conflict` of a conflict copy.
+ */
 function saveWith(fx: FilexApp, bytes: ArrayBuffer, mime: string, extra: Record<string, unknown>): Promise<unknown> {
   const request = fx.request.bind(fx) as unknown as (method: string, params: unknown, transfer?: Transferable[]) => Promise<unknown>;
   return request('file.save', { index: 0, data: bytes, mime, ...extra }, [bytes]);

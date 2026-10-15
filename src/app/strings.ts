@@ -51,6 +51,8 @@ export interface Strings {
   legalLabel: string;
   /** A save of a format x2t cannot write (doc, xls, ppt...) went beside the file, under the name filex chose. */
   savedBeside: (name: string) => string;
+  /** Someone changed the file since it was opened: the save went beside it as a conflict copy, as a Document Server's does. */
+  savedConflict: (name: string) => string;
   /** A protected document: its password, asked before it opens; asked again when it was wrong. */
   passwordPrompt: string;
   passwordWrong: string;
@@ -116,6 +118,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       'ONLYOFFICE® is a registered trademark of Ascensio System SIA; this app is not affiliated with or endorsed by it.',
     legalLabel: 'About this editor',
     savedBeside: (name) => `This format cannot be written back, so your changes were saved beside it as ${name}; the original file is unchanged.`,
+    savedConflict: (name) => `Someone changed this file after you opened it, so your version was saved beside it as ${name}; theirs is unchanged.`,
     passwordPrompt: 'This document is protected with a password. Enter it to open the document.',
     passwordWrong: 'That password is not right. Enter the password of this document.',
     passwordOpen: 'Open',
@@ -160,6 +163,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       "ONLYOFFICE®, Ascensio System SIA'nın tescilli markasıdır; bu uygulama onunla bağlantılı değildir ve onun tarafından onaylanmamıştır.",
     legalLabel: 'Bu düzenleyici hakkında',
     savedBeside: (name) => `Bu biçim geri yazılamıyor, bu yüzden değişiklikleriniz yanına ${name} olarak kaydedildi; özgün dosya değişmedi.`,
+    savedConflict: (name) => `Bu dosya siz açtıktan sonra başka biri tarafından değiştirildi, bu yüzden sizin sürümünüz yanına ${name} olarak kaydedildi; onunki değişmedi.`,
     passwordPrompt: 'Bu belge parolayla korunuyor. Açmak için parolasını girin.',
     passwordWrong: 'Bu parola doğru değil. Belgenin parolasını girin.',
     passwordOpen: 'Aç',
