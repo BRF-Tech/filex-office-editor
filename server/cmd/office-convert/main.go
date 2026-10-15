@@ -76,8 +76,8 @@ func main() {
 	if kind == "" {
 		fail(fmt.Errorf("%s: no editor opens it", *in))
 	}
-	if *to != "pdf" && *to != "png" {
-		fail(fmt.Errorf("-to %q: pdf or png", *to))
+	if *to != "pdf" && *to != "png" && *to != "html" {
+		fail(fmt.Errorf("-to %q: pdf, png or html", *to))
 	}
 	var jsonParams any
 	if *params != "" {
@@ -121,10 +121,7 @@ func main() {
 			report(line, err)
 			continue
 		}
-		mode := "pdf"
-		if *to == "png" {
-			mode = "image"
-		}
+		mode := map[string]string{"pdf": "pdf", "png": "image", "html": "html"}[*to]
 		s = time.Now()
 		lr, err := w.Layout(ctx, bin.Output, bin.Media, mode, jsonParams)
 		line["layout_ms"] = time.Since(s).Milliseconds()
@@ -135,6 +132,16 @@ func main() {
 		line["layout"] = lr.Ms
 		line["font_engine_ms"] = lr.FontEngineMs
 		line["pages"] = lr.Pages
+		if *to == "html" {
+			// The layout's HTML is the result, as doctrenderer's is.
+			line["out_bytes"] = len(lr.PDFBin)
+			line["total_ms"] = time.Since(begin).Milliseconds()
+			if *out != "" && i == 0 {
+				fail(os.WriteFile(*out, lr.PDFBin, 0o644))
+			}
+			report(line, nil)
+			continue
+		}
 		j := x2t.Job{From: "bin", To: *to, Input: bin.Output, Media: bin.Media, PDF: lr.PDFBin, Fonts: lr.Fonts, FormatTo: formatPDF}
 		if *to == "png" {
 			j.FormatTo = formatPNG

@@ -94,8 +94,8 @@ func TestLayout_RefusesWhatIsNotAJob(t *testing.T) {
 		t.Fatal("KindOf")
 	}
 	w := &Worker{}
-	if _, err := w.Layout(context.Background(), nil, nil, "html", nil); err == nil {
-		t.Fatal("mode html accepted")
+	if _, err := w.Layout(context.Background(), nil, nil, "svg", nil); err == nil {
+		t.Fatal("mode svg accepted")
 	}
 	if _, err := (&Engine{}).Start(context.Background(), "visio"); err == nil {
 		t.Fatal("kind visio accepted")

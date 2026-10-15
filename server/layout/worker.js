@@ -25,7 +25,7 @@
 //   qjs --std worker.js <engine dir> <kind> <Editor.bin> <out pdf.bin> [pdf|image] [json]
 //       one job
 //
-// A job: {"in": Editor.bin, "out": pdf.bin, "mode": "pdf"|"image",
+// A job: {"in": Editor.bin, "out": pdf.bin (or the HTML), "mode": "pdf"|"image"|"html",
 // "json": the Document Server's m_sJsonParams or null, "fonts": a directory
 // to put the fonts the pages were drawn with, plain, as "<id>.ttf"}.
 //
@@ -237,6 +237,20 @@ function layout(j) {
     var pages = api.asc_nativePrintPagesCount(params);
     lap('calculate');
     stage = 'save';
+    if (j.mode === 'html') {
+      // doctrenderer's DoctRendererFormat::HTML: the document as HTML, from
+      // the same layout (what x2t makes html, and through it epub, from).
+      var html = api.asc_nativeGetHtml(params);
+      if (typeof html !== 'string' || !html) throw new Error('no html');
+      // QuickJS has no TextEncoder; its FILE.puts writes UTF-8.
+      var hf = std.open(j.out, 'w');
+      if (!hf) throw new Error('cannot write ' + j.out);
+      hf.puts(html);
+      var size = hf.tell();
+      hf.close();
+      lap('save');
+      return { ok: true, pages: pages, bytes: size, fonts: [], ms: ms, font_engine: { ms: fontEngine.ms, calls: fontEngine.calls } };
+    }
     var getParams = j.mode === 'image' ? Object.assign({}, params || {}, { saveFormat: 'image' }) : params;
     var out = api.asc_nativeGetPDF(getParams);
     if (!out) throw new Error('no drawing');

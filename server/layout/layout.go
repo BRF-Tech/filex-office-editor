@@ -209,7 +209,7 @@ func (w *Worker) read(v any) error {
 
 // Result is a laid-out document.
 type Result struct {
-	PDFBin []byte            // the pages as drawing commands (x2t's pdf.bin)
+	PDFBin []byte            // the pages as drawing commands (x2t's pdf.bin); for "html", the HTML
 	Fonts  map[string][]byte // the fonts they were drawn with, "<id>.ttf"
 	Pages  int
 	Ms     map[string]int64 // open, calculate, save
@@ -221,11 +221,12 @@ type Result struct {
 var mediaName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
 // Layout lays out one Editor.bin, with its images (by name, without
-// "media/"), for a PDF ("pdf") or a picture of its pages ("image"). json is
+// "media/"), for a PDF ("pdf"), a picture of its pages ("image") or HTML
+// ("html": the result is the HTML itself, in PDFBin). json is
 // the Document Server's m_sJsonParams (a spreadsheet's page layout,
 // printPages...) or nil.
 func (w *Worker) Layout(ctx context.Context, editorBin []byte, media map[string][]byte, mode string, params any) (*Result, error) {
-	if mode != "pdf" && mode != "image" {
+	if mode != "pdf" && mode != "image" && mode != "html" {
 		return nil, fmt.Errorf("layout: mode %q", mode)
 	}
 	w.mu.Lock()
