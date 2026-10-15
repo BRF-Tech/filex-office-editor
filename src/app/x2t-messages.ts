@@ -5,6 +5,7 @@
 // The app page and the converter's worker (worker/x2t-worker.ts).
 
 import type { TextOptions } from '../formats';
+import type { ConvertOptions } from '../x2t';
 
 export interface WorkerFile {
   name: string;
@@ -28,7 +29,7 @@ export type WorkerRequest =
   /** Load x2t from `base` (the package's x2t/ folder, ending in "/"). */
   | { t: 'start'; base: string }
   /** Convert one document; an Editor.bin from the editor comes as its text. */
-  | { t: 'convert'; id: number; from: string; to: string; bytes: ArrayBuffer | string; media?: WorkerFile[] }
+  | { t: 'convert'; id: number; from: string; to: string; bytes: ArrayBuffer | string; media?: WorkerFile[]; opts?: ConvertOptions }
   /** Write the editor's document in another format ("Download as", Print). */
   | ({ t: 'export'; id: number } & WorkerExport);
 

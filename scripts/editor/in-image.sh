@@ -14,6 +14,11 @@
 #   web-apps/  sdkjs/  fonts/            as the image has them, plus the
 #                                        generated files
 #   LICENSE.txt 3rd-Party.txt license/   ONLYOFFICE's license and notices
+#   dictionaries/<lang>/                 the spell checker's and the
+#                                        hyphenation's dictionaries of
+#                                        filex's interface languages
+#                                        (DICTIONARIES; the others an
+#                                        administrator adds, docs/PARITY.md A7)
 #   document-templates/new/default/      the Document Server's blank docx,
 #                                        xlsx and pptx (what its "Create
 #                                        new" starts from; filex's New menu
@@ -90,6 +95,21 @@ rm -f "$DS"/fonts/*.gz "$DS/sdkjs/common/AllFonts.js.gz" "$DS"/sdkjs/common/Imag
 
 echo "in-image: copying out"
 cp -a "$DS/web-apps" "$DS/sdkjs" "$DS/fonts" "$DS/license" "$DS/LICENSE.txt" "$DS/3rd-Party.txt" "$OUT/"
+# The dictionaries of filex's interface languages (src/frame/workers.ts
+# BUNDLED_DICTIONARIES names the same): about 19 MB zipped, 14.5 of them
+# Turkish's (measured on 9.4.0.129). The rest of the image's 50 (227 MB)
+# are an administrator's to add.
+mkdir -p "$OUT/dictionaries"
+for lang in ${DICTIONARIES:-en_US tr_TR de_DE es_ES fr_FR ar}; do
+  case "$lang" in
+    */*|*..*|"") echo "in-image.sh: bad DICTIONARIES entry: $lang" >&2; exit 1 ;;
+  esac
+  if [ ! -d "$DS/dictionaries/$lang" ]; then
+    echo "in-image.sh: DICTIONARIES names $lang, which the image does not have" >&2
+    exit 1
+  fi
+  cp -a "$DS/dictionaries/$lang" "$OUT/dictionaries/"
+done
 mkdir -p "$OUT/document-templates/new/default"
 cp -a "$DS/document-templates/new/default/new.docx" "$DS/document-templates/new/default/new.xlsx" \
   "$DS/document-templates/new/default/new.pptx" "$OUT/document-templates/new/default/"

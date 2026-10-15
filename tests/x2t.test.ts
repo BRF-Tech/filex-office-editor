@@ -60,6 +60,25 @@ describe('x2tParams', () => {
     expect(tag(xml, 'm_sThemeDir')).toBe('/working/themes');
     expect(tag(xml, 'm_bIsNoBase64')).toBe('true');
     expect(tag(x2tParams('a', 'b', false), 'm_bIsNoBase64')).toBe('false');
+    expect(x2tParams('a', 'b', false)).not.toContain('m_nFormatTo');
+  });
+
+  // 0.4.0 (docs/PARITY.md A3, A5, A10): the target's type (the editor's
+  // format by editor: by the extension alone x2t refuses doc, xls, ppt and
+  // csv), a csv's options and a password, by a Document Server's names.
+  it("names the target's type, a csv's options and the passwords, escaped", () => {
+    const xml = x2tParams('/working/input.csv', '/working/output.bin', true, {
+      formatTo: 0x2002,
+      text: { codepage: 46, delimiterChar: '<' },
+      password: 'a&b',
+      savePassword: '"q"',
+    });
+    expect(tag(xml, 'm_nFormatTo')).toBe('8194');
+    expect(tag(xml, 'm_nCsvTxtEncoding')).toBe('46');
+    expect(tag(xml, 'm_nCsvDelimiterChar')).toBe('&lt;');
+    expect(tag(xml, 'm_sPassword')).toBe('a&amp;b');
+    expect(tag(xml, 'm_sSavePassword')).toBe('&quot;q&quot;');
+    expect(tag(x2tParams('a', 'b', false, { text: { codepage: 46, delimiter: 2 } }), 'm_nCsvDelimiter')).toBe('2');
   });
 });
 

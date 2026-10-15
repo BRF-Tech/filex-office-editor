@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "name": "office-editor",
   "version": "0.3.1",
-  "filex": ">=0.56.0",
+  "filex": ">=0.57.0",
   "label": {
     "en": "Office editor",
     "tr": "Ofis düzenleyici"
@@ -72,25 +72,181 @@
       "en": "So a .docx document opens in the editor.",
       "tr": "Bir .docx belgesi düzenleyicide açılsın diye."
     },
-    "ui-viewer:.xlsx": {
-      "en": "So a .xlsx spreadsheet opens in the editor.",
-      "tr": "Bir .xlsx tablosu düzenleyicide açılsın diye."
+    "ui-viewer:.docm": {
+      "en": "So a .docm document opens in the editor.",
+      "tr": "Bir .docm belgesi düzenleyicide açılsın diye."
     },
-    "ui-viewer:.pptx": {
-      "en": "So a .pptx presentation opens in the editor.",
-      "tr": "Bir .pptx sunusu düzenleyicide açılsın diye."
+    "ui-viewer:.dotx": {
+      "en": "So a .dotx document opens in the editor.",
+      "tr": "Bir .dotx belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.dotm": {
+      "en": "So a .dotm document opens in the editor.",
+      "tr": "Bir .dotm belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.doc": {
+      "en": "So a .doc document opens in the editor.",
+      "tr": "Bir .doc belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.dot": {
+      "en": "So a .dot document opens in the editor.",
+      "tr": "Bir .dot belgesi düzenleyicide açılsın diye."
     },
     "ui-viewer:.odt": {
       "en": "So an .odt document opens in the editor.",
       "tr": "Bir .odt belgesi düzenleyicide açılsın diye."
     },
+    "ui-viewer:.ott": {
+      "en": "So an .ott document opens in the editor.",
+      "tr": "Bir .ott belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.fodt": {
+      "en": "So a .fodt document opens in the editor.",
+      "tr": "Bir .fodt belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.rtf": {
+      "en": "So a .rtf document opens in the editor.",
+      "tr": "Bir .rtf belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.wps": {
+      "en": "So a .wps document opens in the editor.",
+      "tr": "Bir .wps belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.wpt": {
+      "en": "So a .wpt document opens in the editor.",
+      "tr": "Bir .wpt belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.stw": {
+      "en": "So a .stw document opens in the editor.",
+      "tr": "Bir .stw belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.sxw": {
+      "en": "So a .sxw document opens in the editor.",
+      "tr": "Bir .sxw belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.mht": {
+      "en": "So a .mht document opens in the editor.",
+      "tr": "Bir .mht belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.mhtml": {
+      "en": "So a .mhtml document opens in the editor.",
+      "tr": "Bir .mhtml belgesi düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xlsx": {
+      "en": "So a .xlsx spreadsheet opens in the editor.",
+      "tr": "Bir .xlsx tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xlsm": {
+      "en": "So a .xlsm spreadsheet opens in the editor.",
+      "tr": "Bir .xlsm tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xltx": {
+      "en": "So a .xltx spreadsheet opens in the editor.",
+      "tr": "Bir .xltx tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xltm": {
+      "en": "So a .xltm spreadsheet opens in the editor.",
+      "tr": "Bir .xltm tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xls": {
+      "en": "So a .xls spreadsheet opens in the editor.",
+      "tr": "Bir .xls tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xlt": {
+      "en": "So a .xlt spreadsheet opens in the editor.",
+      "tr": "Bir .xlt tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.xlsb": {
+      "en": "So a .xlsb spreadsheet opens in the editor.",
+      "tr": "Bir .xlsb tablosu düzenleyicide açılsın diye."
+    },
     "ui-viewer:.ods": {
       "en": "So an .ods spreadsheet opens in the editor.",
       "tr": "Bir .ods tablosu düzenleyicide açılsın diye."
     },
+    "ui-viewer:.ots": {
+      "en": "So an .ots spreadsheet opens in the editor.",
+      "tr": "Bir .ots tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.fods": {
+      "en": "So a .fods spreadsheet opens in the editor.",
+      "tr": "Bir .fods tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.csv": {
+      "en": "So a .csv file opens in the spreadsheet editor, in its own delimiter and encoding.",
+      "tr": "Bir .csv dosyası kendi ayırıcısı ve kodlamasıyla tablo düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.et": {
+      "en": "So an .et spreadsheet opens in the editor.",
+      "tr": "Bir .et tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.ett": {
+      "en": "So an .ett spreadsheet opens in the editor.",
+      "tr": "Bir .ett tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.sxc": {
+      "en": "So a .sxc spreadsheet opens in the editor.",
+      "tr": "Bir .sxc tablosu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.pptx": {
+      "en": "So a .pptx presentation opens in the editor.",
+      "tr": "Bir .pptx sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.pptm": {
+      "en": "So a .pptm presentation opens in the editor.",
+      "tr": "Bir .pptm sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.potx": {
+      "en": "So a .potx presentation opens in the editor.",
+      "tr": "Bir .potx sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.potm": {
+      "en": "So a .potm presentation opens in the editor.",
+      "tr": "Bir .potm sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.ppsx": {
+      "en": "So a .ppsx presentation opens in the editor.",
+      "tr": "Bir .ppsx sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.ppsm": {
+      "en": "So a .ppsm presentation opens in the editor.",
+      "tr": "Bir .ppsm sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.ppt": {
+      "en": "So a .ppt presentation opens in the editor.",
+      "tr": "Bir .ppt sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.pot": {
+      "en": "So a .pot presentation opens in the editor.",
+      "tr": "Bir .pot sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.pps": {
+      "en": "So a .pps presentation opens in the editor.",
+      "tr": "Bir .pps sunusu düzenleyicide açılsın diye."
+    },
     "ui-viewer:.odp": {
       "en": "So an .odp presentation opens in the editor.",
       "tr": "Bir .odp sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.otp": {
+      "en": "So an .otp presentation opens in the editor.",
+      "tr": "Bir .otp sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.fodp": {
+      "en": "So a .fodp presentation opens in the editor.",
+      "tr": "Bir .fodp sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.dps": {
+      "en": "So a .dps presentation opens in the editor.",
+      "tr": "Bir .dps sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.dpt": {
+      "en": "So a .dpt presentation opens in the editor.",
+      "tr": "Bir .dpt sunusu düzenleyicide açılsın diye."
+    },
+    "ui-viewer:.sxi": {
+      "en": "So a .sxi presentation opens in the editor.",
+      "tr": "Bir .sxi sunusu düzenleyicide açılsın diye."
     },
     "ui-new:.docx": {
       "en": "So you can start a new document from New document.",
@@ -103,6 +259,18 @@
     "ui-new:.pptx": {
       "en": "So you can start a new presentation from New document.",
       "tr": "Yeni belge'den yeni bir sunu başlatabilesiniz diye."
+    },
+    "ui-new:.odt": {
+      "en": "So you can start a new OpenDocument text from New document.",
+      "tr": "Yeni belge'den yeni bir OpenDocument metin belgesi başlatabilesiniz diye."
+    },
+    "ui-new:.ods": {
+      "en": "So you can start a new OpenDocument spreadsheet from New document.",
+      "tr": "Yeni belge'den yeni bir OpenDocument tablosu başlatabilesiniz diye."
+    },
+    "ui-new:.odp": {
+      "en": "So you can start a new OpenDocument presentation from New document.",
+      "tr": "Yeni belge'den yeni bir OpenDocument sunusu başlatabilesiniz diye."
     }
   },
   "languages": [
@@ -140,11 +308,50 @@
         "kind": "file",
         "ext": [
           "docx",
-          "xlsx",
-          "pptx",
+          "docm",
+          "dotx",
+          "dotm",
+          "doc",
+          "dot",
           "odt",
+          "ott",
+          "fodt",
+          "rtf",
+          "wps",
+          "wpt",
+          "stw",
+          "sxw",
+          "mht",
+          "mhtml",
+          "xlsx",
+          "xlsm",
+          "xltx",
+          "xltm",
+          "xls",
+          "xlt",
+          "xlsb",
           "ods",
-          "odp"
+          "ots",
+          "fods",
+          "csv",
+          "et",
+          "ett",
+          "sxc",
+          "pptx",
+          "pptm",
+          "potx",
+          "potm",
+          "ppsx",
+          "ppsm",
+          "ppt",
+          "pot",
+          "pps",
+          "odp",
+          "otp",
+          "fodp",
+          "dps",
+          "dpt",
+          "sxi"
         ]
       }
     }
@@ -176,6 +383,30 @@
       },
       "view": "editor",
       "template": "editor/document-templates/new/default/new.pptx.bin"
+    },
+    {
+      "ext": "odt",
+      "label": {
+        "en": "Document (.odt)",
+        "tr": "Metin belgesi (.odt)"
+      },
+      "view": "editor"
+    },
+    {
+      "ext": "ods",
+      "label": {
+        "en": "Spreadsheet (.ods)",
+        "tr": "Tablo (.ods)"
+      },
+      "view": "editor"
+    },
+    {
+      "ext": "odp",
+      "label": {
+        "en": "Presentation (.odp)",
+        "tr": "Sunu (.odp)"
+      },
+      "view": "editor"
     }
   ]
 }

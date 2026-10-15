@@ -8,72 +8,11 @@
 
 import { personName } from '../bridge';
 import { EDITOR_USER_ID } from '../frame-protocol';
+import type { Kind } from '../kinds';
 
-export type DocumentType = 'word' | 'cell' | 'slide';
-
-export interface Kind {
-  /** The file's format, as x2t names it. */
-  ext: 'docx' | 'xlsx' | 'pptx' | 'odt' | 'ods' | 'odp';
-  documentType: DocumentType;
-  /** The bridge's EditorType: 0 text, 1 spreadsheet, 2 presentation. */
-  editorType: 0 | 1 | 2;
-  mime: string;
-  /** The blank document of this kind in the package (an empty file opens as one). */
-  blank: string;
-}
-
-const KINDS: Record<string, Kind> = {
-  docx: {
-    ext: 'docx',
-    documentType: 'word',
-    editorType: 0,
-    mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    blank: 'editor/document-templates/new/default/new.docx.bin',
-  },
-  xlsx: {
-    ext: 'xlsx',
-    documentType: 'cell',
-    editorType: 1,
-    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    blank: 'editor/document-templates/new/default/new.xlsx.bin',
-  },
-  pptx: {
-    ext: 'pptx',
-    documentType: 'slide',
-    editorType: 2,
-    mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    blank: 'editor/document-templates/new/default/new.pptx.bin',
-  },
-  odt: {
-    ext: 'odt',
-    documentType: 'word',
-    editorType: 0,
-    mime: 'application/vnd.oasis.opendocument.text',
-    blank: '',
-  },
-  ods: {
-    ext: 'ods',
-    documentType: 'cell',
-    editorType: 1,
-    mime: 'application/vnd.oasis.opendocument.spreadsheet',
-    blank: '',
-  },
-  odp: {
-    ext: 'odp',
-    documentType: 'slide',
-    editorType: 2,
-    mime: 'application/vnd.oasis.opendocument.presentation',
-    blank: '',
-  },
-};
-
-/** The kind of document a file is, by its extension (with or without the dot); null: not one the app opens. */
-export function kindOf(ext: string | undefined | null): Kind | null {
-  const e = String(ext ?? '')
-    .replace(/^\./, '')
-    .toLowerCase();
-  return Object.prototype.hasOwnProperty.call(KINDS, e) ? KINDS[e] : null;
-}
+// The kinds of document the app opens (and how each is saved) are in
+// ../kinds.ts; re-exported here, where the app page and the tests read them.
+export { kindOf, type DocumentType, type Kind } from '../kinds';
 
 /**
  * What filex says of the file's encryption (FileInfo, filex 0.55 and 0.56):
@@ -256,8 +195,8 @@ export function phoneLayout(): Record<string, unknown> {
  * DocsAPI.DocEditor's configuration. The editor runs as against a Document
  * Server, in "fast" co-editing (changes go to the bridge as they are made),
  * with Save asking the bridge (forcesave). Everything that would reach a
- * server the bridge does not answer is off: plugins, macros, chat, the
- * spell checker's server, the help pages (not in the bundle), the feedback,
+ * server the bridge does not answer is off: plugins, chat, the help pages
+ * (not in the bundle), the feedback,
  * "suggest a feature" and "go back" links. Download as and Print are x2t's
  * in the browser (frame/export.ts) and on when filex can hand the result
  * over. The editor lists only people without a group, which hides the
@@ -314,9 +253,14 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
         suggestFeature: false,
         goback: false,
         plugins: false,
-        macros: false,
+        // Macros run as a Document Server runs them: in the editor, after
+        // the person says yes to its "run the macros?" question.
+        macros: true,
+        macrosMode: 'warn',
         mentionShare: false,
-        features: { spellcheck: { mode: false, change: false } },
+        // The dictionaries are the bundle's and the ones an administrator
+        // added (frame/workers.ts); a language with neither is not checked.
+        features: { spellcheck: { mode: true, change: true } },
         ...(phone ? phoneLayout() : o.narrow ? narrowLayout() : {}),
       },
     },

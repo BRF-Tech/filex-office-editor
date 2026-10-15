@@ -42,6 +42,43 @@ attaches the engine, and filex runs it.
   by row, against this app in the browser and without one; the rows that
   need a decision first. `docs/SERVER.md`: the server build, the layout,
   the measurements and how filex would run them.
+- **Every kind a Document Server edits for filex opens here** - the 44 of
+  filex's list (doc, xls, ppt, rtf, the templates, the macro-enabled and
+  flat ODF kinds, xlsb, wps, et, dps...) and csv (`src/kinds.ts`, the
+  manifest's viewer rows). x2t is told the editor's type
+  (`m_nFormatTo`): by the extension alone it refuses a doc, xls, ppt or csv.
+- **A format x2t cannot write is saved beside the file**, as the OOXML of
+  its editor (`rapor.doc` stays, the save is `rapor.docx`; filex chooses the
+  name, as for a Document Server's save, and the app says where it went):
+  file.save's `beside` (filex 0.57).
+- **csv**: opened in its own delimiter and encoding - filex's
+  `text_dialect`, or the same sniff here (`src/csv.ts`) - as UTF-8 for x2t
+  (whose ICU cannot read windows-1254), and saved in its delimiter with the
+  dialect declared to filex (file.save's `csv`), which puts the file's own
+  back and keeps the cells nobody changed (#255).
+- **A password-protected document** opens with its password, asked in the
+  app's page before the editor starts (again while it is wrong), and stays
+  protected when it is saved (`m_sPassword`, `m_sSavePassword`).
+- **Spell checking and hyphenation**: the dictionaries of filex's interface
+  languages (en_US, tr_TR, de_DE, es_ES, fr_FR, ar; about 19 MB zipped)
+  travel in the bundle, the spell checker runs in a worker of its own
+  again, and a language an administrator adds is read from the package's
+  `extra/dictionaries/` (filex 0.57).
+- **New document** offers an OpenDocument text, spreadsheet and
+  presentation too; an empty file opens as the blank document of its
+  editor and is written in its own format at the first save.
+- `server/layout`: an `html` job - the document as doctrenderer's HTML
+  (`asc_nativeGetHtml`); tr.docx came out the same bytes as the Document
+  Server's.
+
+### Changed
+
+- **Macros run**, as a Document Server runs them: in the editor, after the
+  person answers its "run the macros?" question (`macrosMode: "warn"`).
+- The manifest asks for filex 0.57.0 or later (file.save's `beside` and
+  `csv`, FileInfo's `text_dialect`). The editor bundle's lock has to be
+  written again (`bash scripts/extract-editor.sh --update`) for the
+  dictionaries.
 
 ## [0.3.1] - 2026-10-10
 

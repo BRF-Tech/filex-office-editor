@@ -117,6 +117,46 @@ html[data-theme="dark"] #fx-status {
 #fx-status.fx-error p {
   color: var(--fe-danger, #cf222e);
 }
+/* A protected document's password (main.ts askPassword). */
+#fx-password {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  inline-size: min(22em, 100%);
+}
+#fx-password[hidden] {
+  display: none;
+}
+#fx-password input {
+  padding: 6px 10px;
+  min-height: 36px;
+  border: 1px solid var(--fe-border, rgba(127, 127, 127, 0.4));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.fx-password-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.fx-password-buttons button {
+  padding: 6px 14px;
+  min-height: 36px;
+  border: 1px solid var(--fe-accent, #2f6feb);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fe-accent, #2f6feb);
+  font: inherit;
+  cursor: pointer;
+}
+.fx-password-buttons button[type="submit"] {
+  background: var(--fe-accent, #2f6feb);
+  color: var(--fe-accent-text, #fff);
+  font-weight: 600;
+}
 .fx-spin {
   width: 28px;
   height: 28px;

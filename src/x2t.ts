@@ -37,14 +37,18 @@ export interface X2tModule {
   ccall(name: string, returnType: string, argTypes: string[], args: unknown[]): unknown;
 }
 
-/** What x2t converts between here: the office formats (OOXML and their OpenDocument kin) and the editor's own. */
-export type X2tFormat = 'docx' | 'xlsx' | 'pptx' | 'odt' | 'ods' | 'odp' | 'bin';
+/**
+ * What x2t converts between here: a format by its extension (the kinds of
+ * ../kinds.ts, and the editor's own, "bin"). x2t knows a file by what it
+ * holds; the extension names the file it reads and writes.
+ */
+export type X2tFormat = string;
 
 export const X2T_DIR = '/working';
 const MEDIA_DIR = `${X2T_DIR}/media`;
 const PARAMS = `${X2T_DIR}/params.xml`;
 const MEDIA_NAME = /^[A-Za-z0-9._-]{1,128}$/;
-const FORMATS: readonly string[] = ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'bin'];
+const FORMAT = /^[a-z0-9]{2,5}$/;
 
 export class X2tError extends Error {
   constructor(
@@ -119,7 +123,7 @@ export function stopsX2t(e: unknown): boolean {
  * The conversion order. Every path in it is one this file chose (fixed names
  * under /working), never a document's name, so nothing in it needs escaping.
  */
-export function x2tParams(from: string, to: string, noBase64: boolean): string {
+export function x2tParams(from: string, to: string, noBase64: boolean, o: ConvertOptions = {}): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?>' +
     '<TaskQueueDataConvert xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">' +
@@ -127,7 +131,34 @@ export function x2tParams(from: string, to: string, noBase64: boolean): string {
     `<m_sThemeDir>${X2T_DIR}/themes</m_sThemeDir>` +
     `<m_sFileTo>${to}</m_sFileTo>` +
     `<m_bIsNoBase64>${noBase64 ? 'true' : 'false'}</m_bIsNoBase64>` +
+    convertExtra(o) +
     '</TaskQueueDataConvert>'
+  );
+}
+
+/**
+ * What a conversion may say beyond its two files, by the names a Document
+ * Server gives them: the target's type (x2t's m_nFormatTo - the editor's
+ * format by its editor, ../kinds.ts CANVAS, or a template or macro-enabled
+ * type), a csv's or txt's encoding and delimiter, the password a protected
+ * document opens with, and the one its save is protected with.
+ */
+export interface ConvertOptions {
+  formatTo?: number;
+  text?: TextOptions;
+  password?: string;
+  savePassword?: string;
+}
+
+function convertExtra(o: ConvertOptions): string {
+  const t = o.text;
+  return (
+    (o.formatTo && Number.isInteger(o.formatTo) && o.formatTo > 0 ? `<m_nFormatTo>${o.formatTo}</m_nFormatTo>` : '') +
+    (t ? `<m_nCsvTxtEncoding>${Math.trunc(t.codepage)}</m_nCsvTxtEncoding>` : '') +
+    (t?.delimiter !== undefined ? `<m_nCsvDelimiter>${Math.trunc(t.delimiter)}</m_nCsvDelimiter>` : '') +
+    (t?.delimiterChar !== undefined ? `<m_nCsvDelimiterChar>${xmlText(t.delimiterChar)}</m_nCsvDelimiterChar>` : '') +
+    (o.password ? `<m_sPassword>${xmlText(o.password)}</m_sPassword>` : '') +
+    (o.savePassword ? `<m_sSavePassword>${xmlText(o.savePassword)}</m_sSavePassword>` : '')
   );
 }
 
@@ -201,15 +232,8 @@ function xmlText(s: string): string {
  * delimiter (the names a Document Server gives them).
  */
 export function x2tExportParams(from: string, to: string, formatTo: number, o: { fonts: boolean; json?: string; text?: TextOptions }): string {
-  const t = o.text;
-  const extra =
-    `<m_nFormatTo>${Math.trunc(formatTo)}</m_nFormatTo>` +
-    (o.fonts ? `<m_sFontDir>${X2T_DIR}/fonts/</m_sFontDir>` : '') +
-    (o.json ? `<m_sJsonParams>${xmlText(o.json)}</m_sJsonParams>` : '') +
-    (t ? `<m_nCsvTxtEncoding>${Math.trunc(t.codepage)}</m_nCsvTxtEncoding>` : '') +
-    (t?.delimiter !== undefined ? `<m_nCsvDelimiter>${Math.trunc(t.delimiter)}</m_nCsvDelimiter>` : '') +
-    (t?.delimiterChar !== undefined ? `<m_nCsvDelimiterChar>${xmlText(t.delimiterChar)}</m_nCsvDelimiterChar>` : '');
-  return x2tParams(from, to, false).replace('</TaskQueueDataConvert>', `${extra}</TaskQueueDataConvert>`);
+  const extra = (o.fonts ? `<m_sFontDir>${X2T_DIR}/fonts/</m_sFontDir>` : '') + (o.json ? `<m_sJsonParams>${xmlText(o.json)}</m_sJsonParams>` : '');
+  return x2tParams(from, to, false, { formatTo: Math.trunc(formatTo), text: o.text }).replace('</TaskQueueDataConvert>', `${extra}</TaskQueueDataConvert>`);
 }
 
 /**
@@ -262,8 +286,8 @@ export function x2tExport(m: X2tModule, e: X2tExport): Uint8Array {
  * Convert one document. Leaves /working as it found it: every file it wrote
  * or x2t wrote is removed, so the next conversion sees nothing of this one.
  */
-export function x2tConvert(m: X2tModule, input: X2tInput, to: X2tFormat): X2tOutput {
-  if (!FORMATS.includes(input.format) || !FORMATS.includes(to) || input.format === to) {
+export function x2tConvert(m: X2tModule, input: X2tInput, to: X2tFormat, o: ConvertOptions = {}): X2tOutput {
+  if (!FORMAT.test(input.format) || !FORMAT.test(to) || input.format === to) {
     throw new X2tError(null, `x2t: cannot convert ${input.format} to ${to}`);
   }
   mkdirs(m);
@@ -276,7 +300,7 @@ export function x2tConvert(m: X2tModule, input: X2tInput, to: X2tFormat): X2tOut
       if (!MEDIA_NAME.test(name)) throw new X2tError(null, `x2t: bad media name ${JSON.stringify(name)}`);
       m.FS.writeFile(`${MEDIA_DIR}/${name}`, bytes);
     }
-    m.FS.writeFile(PARAMS, x2tParams(from, out, to === 'bin'));
+    m.FS.writeFile(PARAMS, x2tParams(from, out, to === 'bin', o));
     const rc = m.ccall('main1', 'number', ['string'], [PARAMS]);
     if (typeof rc === 'number' && rc !== 0) throw new X2tError(rc, `x2t: conversion failed (${rc})`);
     let bytes: Uint8Array;

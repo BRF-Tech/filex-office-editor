@@ -30,21 +30,34 @@ import { HELD_SCRIPTS, holdScripts } from '../src/frame/hold';
 import { SaveRetry } from '../src/frame/save-retry';
 import { templateUrl } from '../src/frame/text';
 import { trimThemesPath } from '../src/frame/themes-path';
-import { InertWorker, SPELL_ENGINE } from '../src/frame/workers';
+import { BUNDLED_DICTIONARIES, InertWorker, SPELL_ENGINE, dictionaryUrl, guardDictionaries, packageRoot, spellBoot } from '../src/frame/workers';
 
 describe('the kind of document', () => {
   it('by extension, with or without the dot, in any case', () => {
     expect(kindOf('docx')).toMatchObject({ documentType: 'word', editorType: 0 });
     expect(kindOf('.XLSX')).toMatchObject({ documentType: 'cell', editorType: 1 });
     expect(kindOf('pptx')).toMatchObject({ documentType: 'slide', editorType: 2 });
-    expect(kindOf('odt')).toMatchObject({ documentType: 'word', blank: '' });
-    for (const no of ['pdf', 'doc', '', null, undefined, 'docx.exe', 'constructor', '__proto__']) expect(kindOf(no as string)).toBeNull();
+    expect(kindOf('odt')).toMatchObject({ documentType: 'word', writes: 0x0043, beside: null });
+    for (const no of ['pdf', 'xps', 'epub', '', null, undefined, 'docx.exe', 'constructor', '__proto__']) expect(kindOf(no as string)).toBeNull();
   });
 
-  it('a blank document for each OOXML kind, in the bundle as the manifest names it', () => {
+  // 0.4.0 (docs/PARITY.md A3, A4): the legacy formats open, and their saves
+  // go beside them as OOXML. Red on 0.3.1: kindOf('doc') was null.
+  it('a legacy format opens in its editor and is saved beside it as OOXML', () => {
+    expect(kindOf('doc')).toMatchObject({ documentType: 'word', writes: null, beside: 'docx' });
+    expect(kindOf('xls')).toMatchObject({ documentType: 'cell', writes: null, beside: 'xlsx' });
+    expect(kindOf('ppt')).toMatchObject({ documentType: 'slide', writes: null, beside: 'pptx' });
+    expect(kindOf('csv')).toMatchObject({ documentType: 'cell', writes: 0x0104, beside: null });
+    expect(kindOf('dotx')).toMatchObject({ writes: 0x004c, beside: null });
+  });
+
+  it('a blank document for each OOXML kind, in the bundle as the manifest names it; every kind opens an empty file as its editor's', () => {
     expect(kindOf('docx')!.blank).toBe('editor/document-templates/new/default/new.docx.bin');
     expect(kindOf('xlsx')!.blank).toBe('editor/document-templates/new/default/new.xlsx.bin');
     expect(kindOf('pptx')!.blank).toBe('editor/document-templates/new/default/new.pptx.bin');
+    expect(kindOf('odt')).toMatchObject({ blank: 'editor/document-templates/new/default/new.docx.bin', blankExt: 'docx' });
+    expect(kindOf('ods')).toMatchObject({ blankExt: 'xlsx' });
+    expect(kindOf('odp')).toMatchObject({ blankExt: 'pptx' });
   });
 });
 
@@ -123,8 +136,10 @@ describe('the editor configuration', () => {
     expect(c.document.url).toBe('filex:document');
     expect(c.editorConfig).toMatchObject({ mode: 'edit', lang: 'tr', region: 'tr-TR', coEditing: { mode: 'fast', change: false } });
     expect(c.editorConfig.user).toEqual({ id: EDITOR_USER_ID, name: 'Ayşe' });
-    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: false, help: false, feedback: false, goback: false, uiTheme: THEME_LIGHT });
-    expect(c.editorConfig.customization.features.spellcheck).toEqual({ mode: false, change: false });
+    // 0.4.0 (docs/PARITY.md): macros as a Document Server runs them, after
+    // its question; spell checking with the bundle's dictionaries.
+    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: true, macrosMode: 'warn', help: false, feedback: false, goback: false, uiTheme: THEME_LIGHT });
+    expect(c.editorConfig.customization.features.spellcheck).toEqual({ mode: true, change: true });
     expect(c.document.permissions).toMatchObject({ edit: true, download: false, print: false, chat: false });
     expect(c.editorConfig.customization.chat).toBeUndefined();
     // "Suggest a feature" opens ONLYOFFICE's site, which the sandbox cannot.
@@ -201,7 +216,7 @@ describe('on a phone', () => {
     // Not folded: that is the editor's, and the phone app has its own layout.
     for (const k of Object.keys(narrowLayout())) expect(c.editorConfig.customization[k]).toBeUndefined();
     // Nothing that would reach a server, as for the editor.
-    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: false, help: false, feedback: false, goback: false });
+    expect(c.editorConfig.customization).toMatchObject({ forcesave: true, plugins: false, macros: true, help: false, feedback: false, goback: false });
     const night = editorConfig({ ...base, phone: true, dark: true }) as any;
     expect(night.editorConfig.customization.uiTheme).toBe(PHONE_THEME_DARK);
   });
@@ -360,12 +375,54 @@ describe('the editor page', () => {
     expect(HELD_SCRIPTS.test('https://f.example/editor/web-apps/vendor/socketio/socket.io.min.js')).toBe(false);
   });
 
-  it("gives the spell checker's engine a worker that does nothing", () => {
+  it("knows the spell checker's engine, and has a worker that does nothing where the package's root cannot be found", () => {
     expect(SPELL_ENGINE.test('https://f.example/_appui/office-editor/abc/editor/sdkjs/common/spell/spell/spell.js')).toBe(true);
     expect(SPELL_ENGINE.test('https://f.example/_appui/office-editor/abc/x2t/x2t.js')).toBe(false);
     const w = new InertWorker();
     expect(() => w.postMessage()).not.toThrow();
     expect(() => w.terminate()).not.toThrow();
+  });
+
+  // 0.4.0 (docs/PARITY.md A7): spell checking, with the bundle's dictionaries
+  // and the ones an administrator added. Red on 0.3.1: the spell checker got
+  // an inert worker and no dictionaries.
+  it('finds a dictionary in the bundle or among the added ones, as a .txt filex serves', () => {
+    const root = 'https://f.example/_appui/office-editor/abc/';
+    expect(packageRoot(`${root}editor/sdkjs/common/spell/spell/spell.js`)).toBe(root);
+    expect(packageRoot('https://f.example/elsewhere/spell.js')).toBeNull();
+    expect(dictionaryUrl('../../../../dictionaries/tr_TR/tr_TR.dic', root, BUNDLED_DICTIONARIES)).toBe(`${root}editor/dictionaries/tr_TR/tr_TR.dic.txt`);
+    expect(dictionaryUrl('blob:x/dictionaries/en_US/en_US.aff', root, BUNDLED_DICTIONARIES)).toBe(`${root}editor/dictionaries/en_US/en_US.aff.txt`);
+    expect(dictionaryUrl('../dictionaries/pl_PL/pl_PL.dic', root, BUNDLED_DICTIONARIES)).toBe(`${root}extra/dictionaries/pl_PL/pl_PL.dic` + '.txt');
+    expect(dictionaryUrl('spell.wasm', root, BUNDLED_DICTIONARIES)).toBe('spell.wasm');
+    expect(dictionaryUrl('../dictionaries/../../x/y.dic', root, BUNDLED_DICTIONARIES)).toBe('../dictionaries/../../x/y.dic');
+    expect(BUNDLED_DICTIONARIES).toEqual(['en_US', 'tr_TR', 'de_DE', 'es_ES', 'fr_FR', 'ar']);
+  });
+
+  it("sends the editor page's own hyphenation requests to the same dictionaries", () => {
+    const opened: unknown[] = [];
+    class X {
+      open(...a: unknown[]): void {
+        opened.push(a[1]);
+      }
+    }
+    const win: Record<string, unknown> = { XMLHttpRequest: X };
+    const base = 'https://f.example/_appui/office-editor/abc/editor/web-apps/apps/documenteditor/main/index.html';
+    guardDictionaries(win, base);
+    guardDictionaries(win, base);
+    new X().open('GET', '../../../../dictionaries/de_DE/hyph_de_DE.dic', true);
+    new X().open('GET', '../../../../sdkjs/word/sdk-all.js', true);
+    expect(opened).toEqual(['https://f.example/_appui/office-editor/abc/editor/dictionaries/de_DE/hyph_de_DE.dic.txt', '../../../../sdkjs/word/sdk-all.js']);
+  });
+
+  it("boots the spell checker with spell.wasm's place and the dictionaries' addresses", () => {
+    const engine = 'https://f.example/_appui/office-editor/abc/editor/sdkjs/common/spell/spell/spell.js';
+    const boot = spellBoot(engine, 'https://f.example/_appui/office-editor/abc/', BUNDLED_DICTIONARIES);
+    expect(boot).toContain('"https://f.example/_appui/office-editor/abc/editor/sdkjs/common/spell/spell/" + p');
+    expect(boot.trim().endsWith(`importScripts(${JSON.stringify(engine)});`)).toBe(true);
+    // The worker's copy of dictionaryUrl works as the page's does.
+    const run = new Function('XMLHttpRequest', 'importScripts', `${boot}; return fxDictionaryUrl;`);
+    const fn = run(function XMLHttpRequest() {}, () => {}) as typeof dictionaryUrl;
+    expect(fn('x/dictionaries/de_DE/de_DE.aff', 'R/', ['de_DE'])).toBe('R/editor/dictionaries/de_DE/de_DE.aff.txt');
   });
 });
 

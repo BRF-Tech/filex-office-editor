@@ -46,7 +46,7 @@ import { SaveRetry } from './save-retry';
 import { KeptStorage } from './storage';
 import { serveTemplatesAsTxt } from './text';
 import { trimThemesPath } from './themes-path';
-import { guardWorkers } from './workers';
+import { guardDictionaries, guardWorkers } from './workers';
 
 /** The editor's own build (upstream/onlyoffice.json), put in by the build. */
 declare const __OO_BUILD__: { version: string; number: number };
@@ -154,6 +154,7 @@ if (phoneApp) holdScripts(document.body, settingsReady);
 serveTemplatesAsTxt(win);
 trimThemesPath(win);
 guardWorkers(win, document.baseURI);
+guardDictionaries(win, document.baseURI);
 // The editor's Gateway hears the app page (origin.ts): with the origin the
 // app page's address has, which api.js gave the editor as parentOrigin.
 adaptOpaqueOrigin(

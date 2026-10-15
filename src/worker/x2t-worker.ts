@@ -123,7 +123,7 @@ function convert(m: Extract<WorkerRequest, { t: 'convert' }>): void {
     const media: Record<string, Uint8Array> = {};
     for (const f of m.media ?? []) media[f.name] = new Uint8Array(f.bytes);
     const input = typeof m.bytes === 'string' ? m.bytes : new Uint8Array(m.bytes);
-    const out = x2tConvert(x2t, { bytes: input, format: m.from as X2tFormat, media }, m.to as X2tFormat);
+    const out = x2tConvert(x2t, { bytes: input, format: m.from as X2tFormat, media }, m.to as X2tFormat, m.opts ?? {});
     const bytes = exactBuffer(out.bytes);
     const outMedia = Object.entries(out.media).map(([name, b]) => ({ name, bytes: exactBuffer(b) }));
     reply({ t: 'result', id: m.id, bytes, media: outMedia, ms: Date.now() - t0 }, [bytes, ...outMedia.map((f) => f.bytes)]);

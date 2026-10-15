@@ -353,9 +353,13 @@ export class Together {
     return !this.stopped;
   }
 
-  /** Write a new version holding the log up to `through`; filex records it in the log. */
-  saveFile(bytes: ArrayBuffer, mime: string, through: number): Promise<void> {
-    return this.o.api.save(bytes, mime, through);
+  /**
+   * Write a new version holding the log up to `through`; filex records it
+   * in the log. `extra`: what else file.save is told (document.ts
+   * saveExtra: beside, csv). filex's answer.
+   */
+  saveFile(bytes: ArrayBuffer, mime: string, through: number, extra: Record<string, unknown> = {}): Promise<unknown> {
+    return this.o.api.save(bytes, mime, through, extra);
   }
 
   /** Leave the session (the editor is going away). */

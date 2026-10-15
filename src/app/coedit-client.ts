@@ -22,8 +22,8 @@ export interface CoEditApi {
   putBlob(name: string, bytes: ArrayBuffer): Promise<void>;
   getBlob(name: string): Promise<ArrayBuffer>;
   leave(): Promise<void>;
-  /** A new version of the opened file, holding the log up to `through`. */
-  save(bytes: ArrayBuffer, mime: string, through: number): Promise<void>;
+  /** A new version of the opened file, holding the log up to `through` (`extra`: beside, csv - document.ts); filex's answer. */
+  save(bytes: ArrayBuffer, mime: string, through: number, extra?: Record<string, unknown>): Promise<unknown>;
   onEntry(h: (e: unknown) => void): () => void;
   onCursor(h: (c: CoEditCursor) => void): () => void;
   onDropped(h: (d: CoEditDropped) => void): () => void;
@@ -61,9 +61,7 @@ export function coeditApi(fx: FilexApp): CoEditApi {
     leave: async () => {
       await call('coedit.leave');
     },
-    save: async (bytes, mime, through) => {
-      await call('file.save', { index: 0, data: bytes, mime, through }, [bytes]);
-    },
+    save: (bytes, mime, through, extra = {}) => call('file.save', { index: 0, data: bytes, mime, through, ...extra }, [bytes]),
     onEntry: (h) => on('coedit.entry' as never, h),
     onCursor: (h) => on('coedit.cursor' as never, (d) => h(d as CoEditCursor)),
     onDropped: (h) => on('coedit.dropped' as never, (d) => h((d ?? {}) as CoEditDropped)),

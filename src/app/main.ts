@@ -66,9 +66,12 @@ import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
 import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type EncryptionInfo, type Kind, type View } from './config';
 import { coeditApi } from './coedit-client';
+import { openOptions, saveExtra, saveOptions, saveTarget, wantsPassword, type OpenedDocument } from './document';
 import { STRINGS, type Strings } from './strings';
 import { Together, joinSession } from './together';
-import { X2tClient, X2tFailure, type Converted } from './x2t-client';
+import { X2tClient, X2tFailure, X2tRefusal, type Converted } from './x2t-client';
+import { CANVAS } from '../kinds';
+import { csvToUtf8, dialectOf, sniffCsv } from '../csv';
 
 declare const __OO_BUILD__: { version: string; number: number };
 declare const __OO_SOURCE_TAG__: string;
@@ -132,6 +135,64 @@ function setStatus(text: string | null, error = false): void {
   box.hidden = false;
   box.classList.toggle('fx-error', error);
   el('fx-status-text').textContent = text;
+}
+
+/**
+ * The opened bytes into the editor's format (document.ts openOptions): a csv
+ * as UTF-8 in its dialect (filex's text_dialect, or sniffed here: csv.ts),
+ * and a protected document with the password the person gives - asked again
+ * while it is wrong, until they give up.
+ */
+async function convertOpened(x2t: X2tClient, app: OfficeApp, read: { bytes: ArrayBuffer; ext: string }, info: object, t: Strings): Promise<Converted> {
+  let bytes = read.bytes;
+  if (app.doc.kind.ext === 'csv') {
+    const raw = new Uint8Array(bytes);
+    const csv = dialectOf(info) ?? sniffCsv(raw);
+    app.doc = { ...app.doc, csv };
+    if (read.ext === 'csv') bytes = csvToUtf8(raw, csv).slice().buffer;
+  }
+  for (;;) {
+    try {
+      // A copy each time: the conversion transfers the buffer it is given.
+      return await x2t.convert(read.ext, 'bin', bytes.slice(0), [], openOptions(read.ext === 'csv' ? app.doc : { ...app.doc, csv: null }));
+    } catch (e) {
+      if (!(e instanceof X2tRefusal) || !wantsPassword(e.code)) throw e;
+      const password = await askPassword(t, app.doc.password !== undefined);
+      if (password === null) throw new Error(t.passwordNeeded);
+      app.doc = { ...app.doc, password };
+    }
+  }
+}
+
+/**
+ * The password of a protected document, asked in the app's own status box
+ * (the editor is not up yet: x2t needs it to open the file, as a Document
+ * Server's does); null when the person gives up.
+ */
+function askPassword(t: Strings, wrong: boolean): Promise<string | null> {
+  const box = el('fx-password');
+  const input = el('fx-password-input') as HTMLInputElement;
+  el('fx-password-label').textContent = wrong ? t.passwordWrong : t.passwordPrompt;
+  el('fx-password-open').textContent = t.passwordOpen;
+  el('fx-password-cancel').textContent = t.passwordCancel;
+  input.value = '';
+  box.hidden = false;
+  input.focus();
+  return new Promise((resolve) => {
+    const done = (v: string | null) => {
+      box.hidden = true;
+      form.onsubmit = null;
+      cancel.onclick = null;
+      resolve(v);
+    };
+    const form = box as HTMLFormElement;
+    const cancel = el('fx-password-cancel');
+    form.onsubmit = (ev) => {
+      ev.preventDefault();
+      if (input.value) done(input.value);
+    };
+    cancel.onclick = () => done(null);
+  });
 }
 
 function setLegal(t: Strings): void {
@@ -278,6 +339,10 @@ class OfficeApp {
   grants = { download: false, print: false };
   /** The session the editor edits together in (filex 0.56), or null: alone. */
   together: Together | null = null;
+  /** The document as it was opened: its kind, a csv's dialect, a password (document.ts). */
+  doc: OpenedDocument;
+  /** filex said where the first save beside the file went (its name), once. */
+  private besideName = '';
 
   constructor(
     private readonly fx: FilexApp,
@@ -288,6 +353,7 @@ class OfficeApp {
     private readonly title: string,
   ) {
     this.link.onMessage = (m) => this.onFrame(m);
+    this.doc = { kind, csv: null };
   }
 
   /** The settings filex kept, for the editor page (its first word on the port). */
@@ -326,8 +392,11 @@ class OfficeApp {
     await this.settle();
     const snap = await this.link.snapshot();
     if (snap.error || typeof snap.bin !== 'string') throw new Error(snap.error ?? 'no document');
-    const file = await this.x2t.convert('bin', this.kind.ext, snap.bin, snap.media ?? []);
-    return this.x2t.convert(this.kind.ext, 'bin', file.bytes);
+    // Through the OOXML of its kind: the round trip needs no csv dialect,
+    // no password, and works for a format x2t cannot write.
+    const via = this.kind.blankExt;
+    const file = await this.x2t.convert('bin', via, snap.bin, snap.media ?? []);
+    return this.x2t.convert(via, 'bin', file.bytes, [], { formatTo: CANVAS[this.kind.documentType] });
   }
 
   private settingsChanged(values: Settings): void {
@@ -439,12 +508,24 @@ class OfficeApp {
         const snap = await this.link.snapshot();
         if (snap.error || typeof snap.bin !== 'string') throw new Error(snap.error ?? 'no document');
         through = snap.through ?? 0;
-        const out = await this.x2t.convert('bin', this.kind.ext, snap.bin, snap.media ?? []);
+        // The file's own format, or OOXML beside it (a doc, xls, ppt...: x2t
+        // cannot write those, nor can a Document Server); a csv in its
+        // delimiter; a protected document protected again (document.ts).
+        const target = saveTarget(this.doc.kind);
+        const out = await this.x2t.convert('bin', target.ext, snap.bin, snap.media ?? [], saveOptions(this.doc));
+        const extra = saveExtra(this.doc, new Uint8Array(out.bytes));
         // Together, the save says how far into the log it reaches; filex
         // writes that into the log, and every member's "unsaved" follows it.
         const t = this.together;
-        if (t?.active) await t.saveFile(out.bytes, this.kind.mime, through);
-        else await this.fx.save(out.bytes, { mime: this.kind.mime });
+        let answer: unknown;
+        if (t?.active) answer = await t.saveFile(out.bytes, target.mime, through, extra);
+        else if (Object.keys(extra).length > 0) answer = await saveWith(this.fx, out.bytes, target.mime, extra);
+        else await this.fx.save(out.bytes, { mime: target.mime });
+        const name = (answer as { name?: unknown } | null | undefined)?.name;
+        if (target.beside && typeof name === 'string' && name !== this.besideName) {
+          this.besideName = name;
+          this.fx.toast(this.t.savedBeside(name), 'info');
+        }
         this.lastSave = Date.now();
         this.link.send({ t: 'saved', ok: true, through });
       } catch (e) {
@@ -528,15 +609,25 @@ class OfficeApp {
   }
 }
 
-async function readDocument(fx: FilexApp, kind: Kind): Promise<ArrayBuffer> {
+/** file.save with what the SDK's save does not carry (document.ts saveExtra, filex 0.57); filex's answer. */
+function saveWith(fx: FilexApp, bytes: ArrayBuffer, mime: string, extra: Record<string, unknown>): Promise<unknown> {
+  const request = fx.request.bind(fx) as unknown as (method: string, params: unknown, transfer?: Transferable[]) => Promise<unknown>;
+  return request('file.save', { index: 0, data: bytes, mime, ...extra }, [bytes]);
+}
+
+/**
+ * The opened file's bytes and the format they are in. An empty file opens
+ * as the blank document of its editor - OOXML, saved later in the file's own
+ * format (an empty .odt is the blank docx until its first save writes an
+ * odt; filex's New menu makes such files for odt, ods and odp).
+ */
+async function readDocument(fx: FilexApp, kind: Kind): Promise<{ bytes: ArrayBuffer; ext: string }> {
   const file = await fx.open(0);
   const bytes = await file.bytes();
-  if (bytes.byteLength > 0 || !kind.blank) return bytes;
-  // An empty file opens as a blank document of its kind (filex's New menu
-  // copies the same blank, so this is only a file made empty elsewhere).
+  if (bytes.byteLength > 0) return { bytes, ext: kind.ext };
   const res = await fetch(new URL(kind.blank, BASE).href);
-  if (!res.ok) throw new Error(`the blank ${kind.ext} is missing from the package`);
-  return res.arrayBuffer();
+  if (!res.ok) throw new Error(`the blank ${kind.blankExt} is missing from the package`);
+  return { bytes: await res.arrayBuffer(), ext: kind.blankExt };
 }
 
 async function main(): Promise<void> {
@@ -641,10 +732,12 @@ async function main(): Promise<void> {
    */
   const openDocument = async (joined: Together | null): Promise<{ doc: Converted; tg: Together | null }> => {
     let tg = joined;
-    let bytes: ArrayBuffer | null = null;
+    let read: { bytes: ArrayBuffer; ext: string } | null = null;
     if (tg) {
       try {
-        bytes = await tg.base(() => readDocument(fx, kind));
+        let got: { bytes: ArrayBuffer; ext: string } | null = null;
+        const base = await tg.base(async () => (got = await readDocument(fx, kind)).bytes);
+        read = got ?? { bytes: base, ext: kind.ext };
       } catch (e) {
         console.warn('[office-editor] the session base:', reason(e));
         await tg.leave();
@@ -652,9 +745,9 @@ async function main(): Promise<void> {
         fx.toast(t.aloneNow(reason(e, t)), 'info');
       }
     }
-    if (!bytes) bytes = await readDocument(fx, kind);
+    if (!read) read = await readDocument(fx, kind);
     phase('read');
-    const doc = await x2t.convert(kind.ext, 'bin', bytes);
+    const doc = await convertOpened(x2t, app, read, info, t);
     tg?.haveMedia(doc.media.map((m) => m.name));
     return { doc, tg };
   };

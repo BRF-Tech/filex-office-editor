@@ -49,6 +49,15 @@ export interface Strings {
   /** The notice ONLYOFFICE's terms ask for: whose work it is, that it is modified, where the source is. */
   legal: (o: LegalFacts) => string;
   legalLabel: string;
+  /** A save of a format x2t cannot write (doc, xls, ppt...) went beside the file, under the name filex chose. */
+  savedBeside: (name: string) => string;
+  /** A protected document: its password, asked before it opens; asked again when it was wrong. */
+  passwordPrompt: string;
+  passwordWrong: string;
+  passwordOpen: string;
+  passwordCancel: string;
+  /** The person gave no password: the document does not open. */
+  passwordNeeded: string;
 }
 
 const SOURCE = 'github.com/BRF-Tech/filex-office-editor';
@@ -106,6 +115,12 @@ export const STRINGS: Record<UiLang, Strings> = {
       `Free software under the GNU AGPL version 3; source code: ${sourceOf(o.app)}. ` +
       'ONLYOFFICE® is a registered trademark of Ascensio System SIA; this app is not affiliated with or endorsed by it.',
     legalLabel: 'About this editor',
+    savedBeside: (name) => `This format cannot be written back, so your changes were saved beside it as ${name}; the original file is unchanged.`,
+    passwordPrompt: 'This document is protected with a password. Enter it to open the document.',
+    passwordWrong: 'That password is not right. Enter the password of this document.',
+    passwordOpen: 'Open',
+    passwordCancel: 'Cancel',
+    passwordNeeded: 'the document is protected with a password',
   },
   tr: {
     opening: (name) => `${name} açılıyor…`,
@@ -144,5 +159,11 @@ export const STRINGS: Record<UiLang, Strings> = {
       `GNU AGPL sürüm 3 ile lisanslı özgür yazılımdır; kaynak kodu: ${sourceOf(o.app)}. ` +
       "ONLYOFFICE®, Ascensio System SIA'nın tescilli markasıdır; bu uygulama onunla bağlantılı değildir ve onun tarafından onaylanmamıştır.",
     legalLabel: 'Bu düzenleyici hakkında',
+    savedBeside: (name) => `Bu biçim geri yazılamıyor, bu yüzden değişiklikleriniz yanına ${name} olarak kaydedildi; özgün dosya değişmedi.`,
+    passwordPrompt: 'Bu belge parolayla korunuyor. Açmak için parolasını girin.',
+    passwordWrong: 'Bu parola doğru değil. Belgenin parolasını girin.',
+    passwordOpen: 'Aç',
+    passwordCancel: 'Vazgeç',
+    passwordNeeded: 'belge parolayla korunuyor',
   },
 };

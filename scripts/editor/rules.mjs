@@ -98,6 +98,23 @@ const RULES = [
     why: "a blank document filex's New menu copies (filex-app.json new_documents), renamed with .bin so filex serves it (content unchanged)",
   },
   {
+    // The spell checker reads a dictionary's .aff and .dic (and the
+    // hyphenation its hyph_*.dic); the thesaurus and LibreOffice's extension
+    // files are not read by the editor.
+    re: /^dictionaries\/[^/]+\/(th_[^/]*|META-INF\/.*|description\.xml|dictionaries\.xcu)$/,
+    drop: "a dictionary's thesaurus or LibreOffice extension files (the editor reads only .aff and .dic)",
+  },
+  {
+    re: /^dictionaries\/[^/]+\/[^/]+\.(aff|dic)$/,
+    rename: (p) => `${p}.txt`,
+    why: "a dictionary the spell checker or the hyphenation reads, renamed with .txt so filex serves it (content unchanged; the editor page's script asks for this name, src/frame/workers.ts)",
+  },
+  {
+    re: /^dictionaries\/.+$/,
+    rename: (p) => (servedType(p) ? null : `${p}.txt`),
+    why: "a dictionary's license or notice, renamed with .txt so filex serves it (content unchanged)",
+  },
+  {
     re: /^(license|core-fonts-licenses)\/.+$/,
     rename: (p) => (servedType(p) ? null : `${p}.txt`),
     why: 'a license file, renamed with .txt so filex serves it (content unchanged)',

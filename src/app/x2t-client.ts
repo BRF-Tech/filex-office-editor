@@ -15,6 +15,7 @@
 // converts.
 
 import type { WorkerExport, WorkerFile, WorkerReply, WorkerRequest } from './x2t-messages';
+import type { ConvertOptions } from '../x2t';
 
 export interface Converted {
   bytes: ArrayBuffer;
@@ -35,6 +36,21 @@ export class X2tFailure extends Error {
   ) {
     super(kind === 'timeout' ? `x2t did not finish in ${seconds} s` : `x2t stopped: ${detail}`);
     this.name = 'X2tFailure';
+  }
+}
+
+/**
+ * x2t answered the conversion with an error code (AVS_FILEUTILS_ERROR_*: 90 a
+ * password is needed, 91 the password is wrong, 80 it could not convert...),
+ * or gave nothing; the module goes on converting.
+ */
+export class X2tRefusal extends Error {
+  constructor(
+    message: string,
+    readonly code: number | null,
+  ) {
+    super(message);
+    this.name = 'X2tRefusal';
   }
 }
 
@@ -95,7 +111,7 @@ class Converter {
         if (!p) return;
         this.pending.delete(m.id);
         clearTimeout(p.timer);
-        if (m.error || !m.bytes) p.reject(new Error(m.error ?? 'x2t gave nothing'));
+        if (m.error || !m.bytes) p.reject(new X2tRefusal(m.error ?? 'x2t gave nothing', m.code ?? null));
         else p.resolve({ bytes: m.bytes, media: m.media ?? [], ms: m.ms ?? 0 });
       }
     };
@@ -182,13 +198,18 @@ export class X2tClient {
     return next;
   }
 
-  /** Convert `bytes` (an office file, or an Editor.bin's text) from one format to another. Transfers the buffers. */
-  convert(from: string, to: string, bytes: ArrayBuffer | string, media: WorkerFile[] = []): Promise<Converted> {
+  /**
+   * Convert `bytes` (an office file, or an Editor.bin's text) from one
+   * format to another, with what x2t needs beyond the two files (the
+   * target's type, a csv's encoding and delimiter, a password: x2t.ts
+   * ConvertOptions). Transfers the buffers.
+   */
+  convert(from: string, to: string, bytes: ArrayBuffer | string, media: WorkerFile[] = [], opts?: ConvertOptions): Promise<Converted> {
     return this.queue((id) => {
       const transfer: Transferable[] = media.map((f) => f.bytes);
       if (typeof bytes !== 'string') transfer.push(bytes);
       const size = (typeof bytes === 'string' ? bytes.length : bytes.byteLength) + media.reduce((n, f) => n + f.bytes.byteLength, 0);
-      return { m: { t: 'convert', id, from, to, bytes, media }, transfer, bytes: size };
+      return { m: { t: 'convert', id, from, to, bytes, media, opts }, transfer, bytes: size };
     });
   }
 

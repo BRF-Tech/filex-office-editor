@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import { EDITOR_PREFIX, SOCKET_IO, readEditor } from '../scripts/build-app.mjs';
 import { inlineCodeIn } from '../scripts/editor/html.mjs';
+import { OPENS } from '../src/kinds';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..');
@@ -22,12 +23,28 @@ const manifest = JSON.parse(readFileSync(path.join(ROOT, 'filex-app.json'), 'utf
 const UI = path.join(ROOT, 'dist', 'ui');
 
 describe('the manifest and the locked editor files', () => {
-  it('every new document copies a blank the editor files hold', () => {
-    expect(manifest.new_documents.length).toBe(3);
+  it('every new document copies a blank the editor files hold, or starts empty (odt, ods, odp: the blank of its editor until its first save)', () => {
+    expect(manifest.new_documents.map((n: { ext: string }) => n.ext)).toEqual(['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp']);
     for (const n of manifest.new_documents) {
+      if (['odt', 'ods', 'odp'].includes(n.ext)) {
+        expect(n.template, n.ext).toBeUndefined();
+        continue;
+      }
       expect(n.template.startsWith(EDITOR_PREFIX)).toBe(true);
       expect(lock.files[n.template.slice(EDITOR_PREFIX.length)], n.template).toBeTruthy();
       expect(n.template.endsWith(`new.${n.ext}.bin`)).toBe(true);
+    }
+  });
+
+  // 0.4.0 (filex task #268, docs/PARITY.md A3): every kind a Document Server
+  // edits for filex opens here, and csv. Red on 0.3.1: six kinds.
+  it('opens every kind of src/kinds.ts, each with its reason in both languages', () => {
+    const exts: string[] = manifest.views[0].applies.ext;
+    expect(exts).toEqual([...OPENS]);
+    expect(exts.length).toBe(45);
+    for (const e of exts) {
+      expect(manifest.permission_reasons[`ui-viewer:.${e}`]?.en, e).toBeTruthy();
+      expect(manifest.permission_reasons[`ui-viewer:.${e}`]?.tr, e).toBeTruthy();
     }
   });
 
@@ -54,7 +71,8 @@ describe('the manifest and the locked editor files', () => {
     // filex refuses either written into `permissions`.
     expect(manifest.permissions).toEqual(['files:read', 'files:write']);
     expect(manifest.co_edit).toEqual({ open: true });
-    expect(manifest.filex).toBe('>=0.56.0');
+    // 0.4.0: filex 0.57's file.save (beside, csv) and FileInfo text_dialect.
+    expect(manifest.filex).toBe('>=0.57.0');
     for (const lang of ['en', 'tr']) expect(manifest.permission_reasons['files:co-edit']?.[lang], lang).toBeTruthy();
     const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     expect(manifest.version).toBe(version);
