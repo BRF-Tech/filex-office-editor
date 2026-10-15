@@ -51,9 +51,14 @@ func csvText(ext string) *x2t.TextOptions {
 
 // x2t's type numbers (AVS_OFFICESTUDIO_FILE_*), as src/formats.ts names them.
 const (
-	formatPDF = 0x0201
-	formatPNG = 0x0405
+	formatPDF  = 0x0201
+	formatPNG  = 0x0405
+	formatEPUB = 0x0048
+	formatMD   = 0x005c
 )
+
+// The layout's job for each target.
+var layoutMode = map[string]string{"pdf": "pdf", "png": "image", "html": "html", "md": "html", "epub": "html"}
 
 func main() {
 	x2tWasm := flag.String("x2t", "dist/x2t/x2t-server.wasm", "the server build of x2t")
@@ -76,8 +81,8 @@ func main() {
 	if kind == "" {
 		fail(fmt.Errorf("%s: no editor opens it", *in))
 	}
-	if *to != "pdf" && *to != "png" && *to != "html" {
-		fail(fmt.Errorf("-to %q: pdf, png or html", *to))
+	if _, ok := layoutMode[*to]; !ok {
+		fail(fmt.Errorf("-to %q: pdf, png, html, md or epub", *to))
 	}
 	var jsonParams any
 	if *params != "" {
@@ -121,7 +126,7 @@ func main() {
 			report(line, err)
 			continue
 		}
-		mode := map[string]string{"pdf": "pdf", "png": "image", "html": "html"}[*to]
+		mode := layoutMode[*to]
 		s = time.Now()
 		lr, err := w.Layout(ctx, bin.Output, bin.Media, mode, jsonParams)
 		line["layout_ms"] = time.Since(s).Milliseconds()
@@ -140,6 +145,27 @@ func main() {
 				fail(os.WriteFile(*out, lr.PDFBin, 0o644))
 			}
 			report(line, nil)
+			continue
+		}
+		if *to == "md" || *to == "epub" {
+			// md: x2t's own html2md, from the layout's HTML; epub: x2t's
+			// doct_bin2epub, which reads the HTML where doctrenderer would
+			// have written it.
+			j := x2t.Job{From: "html", To: "md", Input: lr.PDFBin, FormatTo: formatMD}
+			if *to == "epub" {
+				j = x2t.Job{From: "bin", To: "epub", Input: bin.Output, Media: bin.Media, HTML: lr.PDFBin, FormatTo: formatEPUB}
+			}
+			s = time.Now()
+			res, err := conv.Convert(ctx, j)
+			line["from_bin_ms"] = time.Since(s).Milliseconds()
+			line["total_ms"] = time.Since(begin).Milliseconds()
+			if err == nil {
+				line["out_bytes"] = len(res.Output)
+				if *out != "" && i == 0 {
+					fail(os.WriteFile(*out, res.Output, 0o644))
+				}
+			}
+			report(line, err)
 			continue
 		}
 		j := x2t.Job{From: "bin", To: *to, Input: bin.Output, Media: bin.Media, PDF: lr.PDFBin, Fonts: lr.Fonts, FormatTo: formatPDF}

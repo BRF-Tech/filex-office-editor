@@ -134,7 +134,13 @@ func (e *Engine) Convert(ctx context.Context, j Job) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(dir)
+	if os.Getenv("X2T_KEEP") == "" {
+		defer os.RemoveAll(dir)
+	} else {
+		// A conversion's directory kept for a look (X2T_KEEP=1): what x2t
+		// wrote where.
+		defer fmt.Fprintln(os.Stderr, "x2t: kept", dir)
+	}
 	for _, d := range []string{"media", "fonts", "themes", "tmp"} {
 		if err := os.Mkdir(filepath.Join(dir, d), 0o700); err != nil {
 			return nil, err
@@ -146,6 +152,9 @@ func (e *Engine) Convert(ctx context.Context, j Job) (*Result, error) {
 		// temporary directory for an image (doct_bin2image, as upstream).
 		files["pdf.bin"] = j.PDF
 		files[filepath.Join("tmp", "pdf.bin")] = j.PDF
+	}
+	if j.HTML != nil {
+		files[filepath.Join("tmp", "index.html")] = j.HTML
 	}
 	for n, b := range j.Media {
 		files[filepath.Join("media", n)] = b

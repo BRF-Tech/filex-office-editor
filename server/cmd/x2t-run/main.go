@@ -42,6 +42,7 @@ func main() {
 	delim := flag.Int("delim", 0, "csv delimiter: 1 tab, 2 ;, 3 :, 4 ,, 5 space")
 	delimChar := flag.String("delim-char", "", "csv delimiter of one's own")
 	password := flag.String("password", "", "a password-protected document's password")
+	savePassword := flag.String("save-password", "", "protect the output with this password")
 	pdf := flag.String("pdf", "", "the editor's drawing of the pages (pdf.bin), for a PDF")
 	fontsDir := flag.String("fonts", "", "a directory of font files, for a PDF or an image")
 	thumb := flag.Int("thumb", 0, "an image target as a thumbnail of the first page, fitted into N x N")
@@ -70,7 +71,7 @@ func main() {
 	}
 	input, err := os.ReadFile(*in)
 	check(err)
-	j := x2t.Job{From: *from, To: *to, Input: input, FormatTo: *formatTo, Password: *password}
+	j := x2t.Job{From: *from, To: *to, Input: input, FormatTo: *formatTo, Password: *password, SavePassword: *savePassword}
 	if j.From == "" {
 		j.From = strings.TrimPrefix(strings.ToLower(filepath.Ext(*in)), ".")
 	}

@@ -314,10 +314,14 @@ x2t() {
 #     EMULATE_FUNCTION_POINTER_CASTS keeps working - and the module exports
 #     the three functions the host needs around it;
 #   - no closure compiler, import names kept, the functions' names kept
-#     (--profiling-funcs) so a trap says where it stopped.
+#     (--profiling-funcs) so a trap says where it stopped;
+#   - an 8 MiB stack, a native x2t's (the page's 128 KiB ran out on three
+#     .doc files of 0.9-6 MB: "out of bounds memory access" in a
+#     recursion, measured), and memory up to 4 GiB (a 200,000-row csv went
+#     past the 2 GiB a module may grow to by default; the host caps it).
 # The libraries, the patches and the flags they were compiled with are the
 # page's.
-SERVER_LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=128kb -sASSERTIONS=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 -sSTANDALONE_WASM=1 --profiling-funcs"
+SERVER_LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=8mb -sASSERTIONS=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 -sSTANDALONE_WASM=1 --profiling-funcs"
 x2t_server() {
   local shim=$W/b/server-shim bin=$CORE/build/bin/linux_64
   local em

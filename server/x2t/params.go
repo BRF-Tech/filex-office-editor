@@ -47,6 +47,10 @@ type Job struct {
 	Media map[string][]byte
 	// PDF is the editor's drawing of the pages (pdf.bin), for a PDF.
 	PDF []byte
+	// HTML is the layout's HTML of the document (server/layout, mode
+	// "html"), for the targets x2t makes from it (epub): where x2t's
+	// doctrenderer would write it (m_sTempDir/index.html).
+	HTML []byte
 	// Fonts are font files by name, for a PDF or an image.
 	Fonts map[string][]byte
 	// JSON is the editor's json parameters, as a Document Server passes them.
@@ -55,6 +59,8 @@ type Job struct {
 	Text *TextOptions
 	// Password opens a password-protected document (m_sPassword).
 	Password string
+	// SavePassword protects what is written with a password (m_sSavePassword).
+	SavePassword string
 	// Thumbnail makes the image target a thumbnail (m_oThumbnail): the
 	// first page only, fitted into Width x Height, as a Document Server's
 	// ConvertService thumbnail is.
@@ -111,6 +117,9 @@ func (j Job) Params() string {
 	}
 	if j.Password != "" {
 		el("m_sPassword", j.Password)
+	}
+	if j.SavePassword != "" {
+		el("m_sSavePassword", j.SavePassword)
 	}
 	if t := j.Thumbnail; t != nil {
 		b.WriteString("<m_oThumbnail>")

@@ -10,8 +10,9 @@
 // emscripten JavaScript (MEMFS) does for x2t, over the directories the host
 // preopens (a Document Server's x2t works in a directory of its own; filex
 // mounts one per conversion): the 18 calls the page's build imports
-// (open, stat and friends, directories, getcwd/chdir, truncate, utimensat)
-// and mmap of a file. read, write, seek and close are WASI's already.
+// (open, stat and friends, directories, getcwd/chdir, truncate, utimensat),
+// mmap of a file and /dev/urandom. write, seek and close are WASI's
+// already.
 //
 // Paths: an absolute path is looked up among the preopened directories
 // (the longest that holds it); a relative one is taken from the working
@@ -178,7 +179,35 @@ static int path_stat(int dirfd, const char* path, struct stat* st, bool follow) 
   return 0;
 }
 
+// /dev/urandom and /dev/random: CryptoPP's NonblockingRng reads them to
+// encrypt a document a password protects (m_sSavePassword), and a missing
+// one is a C++ exception - which stops the module (measured: "unreachable").
+// open() answers a descriptor of its own and read() fills it from WASI's
+// random_get.
+#define FX_RANDOM_FD 0x3ffffff0
+
+ssize_t read(int fd, void* buf, size_t count) {
+  if (fd == FX_RANDOM_FD) {
+    __wasi_errno_t e = __wasi_random_get((uint8_t*)buf, (__wasi_size_t)count);
+    if (e) {
+      errno = e;
+      return -1;
+    }
+    return (ssize_t)count;
+  }
+  __wasi_iovec_t iov = {(uint8_t*)buf, count};
+  __wasi_size_t n = 0;
+  __wasi_errno_t e = __wasi_fd_read((__wasi_fd_t)fd, &iov, 1, &n);
+  if (e) {
+    errno = e;
+    return -1;
+  }
+  return (ssize_t)n;
+}
+
 int __syscall_openat(int dirfd, intptr_t path, int flags, ...) {
+  const char* p = (const char*)path;
+  if (p && (strcmp(p, "/dev/urandom") == 0 || strcmp(p, "/dev/random") == 0)) return FX_RANDOM_FD;
   char buf[MAX_PATH];
   __wasi_fd_t base;
   const char* rel;
