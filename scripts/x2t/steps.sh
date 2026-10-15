@@ -318,10 +318,12 @@ x2t() {
 #   - an 8 MiB stack, a native x2t's (the page's 128 KiB ran out on three
 #     .doc files of 0.9-6 MB: "out of bounds memory access" in a
 #     recursion, measured), and memory up to 4 GiB (a 200,000-row csv went
-#     past the 2 GiB a module may grow to by default; the host caps it).
+#     past the 2 GiB a module may grow to by default; the host caps it),
+#     starting at 320 MiB (the data and the bigger stack no longer fit the
+#     size emscripten works out, 284 MiB: wasm-ld "initial memory too small").
 # The libraries, the patches and the flags they were compiled with are the
 # page's.
-SERVER_LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=8mb -sASSERTIONS=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 -sSTANDALONE_WASM=1 --profiling-funcs"
+SERVER_LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=320mb -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=8mb -sASSERTIONS=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 -sSTANDALONE_WASM=1 --profiling-funcs"
 x2t_server() {
   local shim=$W/b/server-shim bin=$CORE/build/bin/linux_64
   local em
