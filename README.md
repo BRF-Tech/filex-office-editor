@@ -15,7 +15,11 @@ filex keeps its Document Server support, and it is optional: an instance
 that has one can stay connected to it. What still needs a Document Server
 is what filex itself does with an office file **on the server** through one
 (a conversion run there, an office thumbnail made there); this app does
-neither - its Download as, PDF and Print run x2t in the browser.
+neither yet - its Download as, PDF and Print run x2t in the browser. The
+next release brings both to the server, without a browser and without a
+Document Server: x2t built for WASI and the editor's own layout (sdkjs) in
+QuickJS, all of it WebAssembly - measured on this branch, page for page as
+the Document Server makes them ([The app on a server](#the-app-on-a-server)).
 
 It goes further with filex 0.56: documents **inside encrypted folders**,
 decrypted in the browser, edited there and encrypted again before they are
@@ -316,13 +320,17 @@ more, which later filex releases bring.
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
+| `server/` | The app on a server, in Go with wazero ([The app on a server](#the-app-on-a-server)): `x2t/` runs the server build of x2t, `layout/` lays a document out into pages with sdkjs in QuickJS (`worker.js` plays the Document Server's doctrenderer), `cmd/` the measurement commands (`x2t-run`, `office-convert`, `wasi-run`); Go tests of its own (`cd server && go test ./...`) |
+| `scripts/x2t/server/` | What the server build of x2t adds to the page's: file calls over WASI (`wasi-fs.c`) and the module's own indirect calls for setjmp/longjmp (`dyncalls.py`) |
+| `docs/` | [PARITY.md](docs/PARITY.md): what a Document Server gives filex, row by row, against this app; [SERVER.md](docs/SERVER.md): the server build, the layout without a browser, the measurements |
 | `filex-app.json` | The app's manifest: what filex installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.56's fields and permissions |
 
 ```bash
 npm install
 npm test              # vitest run (the x2t round trips are skipped without the build)
 npm run typecheck     # tsc
-npm run x2t:build     # bash scripts/x2t/build.sh: x2t from ONLYOFFICE core (needs docker, about 20 minutes)
+npm run x2t:build     # bash scripts/x2t/build.sh: x2t from ONLYOFFICE core (needs docker, about 20 minutes);
+                      #   --server adds x2t-server.wasm, the build a server runs (docs/SERVER.md)
 npm run test:x2t      # the x2t in dist/x2t (checked against the pin), then its round trips
 npm run editor        # bash scripts/extract-editor.sh: the editor bundle (needs docker)
 npm run build         # node scripts/build-app.mjs: the app's bundle, dist/ui.zip
@@ -928,6 +936,28 @@ again: 36 of 36, no request outside the package, no failed request, 63
 screenshots ([Measured in the browsers](#measured-in-the-browsers)). Not
 yet measured in a real filex 0.56.
 
+## The app on a server
+
+What filex does with an office file on the server - a conversion for an
+app (`engines:office`), an office thumbnail - goes to a Document Server
+today. The next release does it with this app, without a browser and
+without a Document Server, all of it WebAssembly under wazero, the runtime
+filex runs its apps with ([docs/SERVER.md](docs/SERVER.md); what a Document
+Server gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
+
+- **x2t for a server** (`bash scripts/x2t/build.sh --server`): the same
+  libraries as the page's x2t, linked as a WASI command - files through
+  WASI (`scripts/x2t/server/wasi-fs.c`), x2t's own `main` with a
+  `params.xml`, as a Document Server runs it. `server/x2t` runs it from Go,
+  a new instance per conversion.
+- **The pages without a browser**: sdkjs, the editor's own layout, in
+  QuickJS compiled to WebAssembly (`server/layout`), where a Document Server
+  runs it in V8; `worker.js` answers what doctrenderer's native objects
+  answer, and x2t turns the drawing into a PDF or a thumbnail. Measured: the
+  same pages as the Document Server's, letter.docx's PDF pixel for pixel.
+- Measured, not shipped: the release that brings it attaches the engine,
+  and filex 0.57 runs it (docs/SERVER.md, "How filex runs it").
+
 ## Measured in the browsers
 
 `npm run e2e` (`node e2e/run.mjs`, `--shots` for screenshots) serves the
@@ -1286,6 +1316,11 @@ and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
 Next - the numbers are a plan, and each waits for what filex has to give it
 ([What filex provides](#what-filex-provides)):
 
+- **0.4.0, with filex 0.57**: the app on a server - conversions and
+  office thumbnails without a browser and without a Document Server
+  ([The app on a server](#the-app-on-a-server)), and the rows of
+  [docs/PARITY.md](docs/PARITY.md) that 0.57 closes: the legacy formats,
+  csv, spell checking.
 - **In a next release**: a corpus of real documents compared
   with what a Document Server makes of them; and, when filex serves an
   app's package compressed, a lighter download for the browser.

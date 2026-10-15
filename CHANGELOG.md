@@ -9,6 +9,40 @@ update.
 
 ## [Unreleased]
 
+The groundwork for filex 0.57, where an administrator can delete the
+Document Server container: the app does on the server what a Document
+Server did for filex - conversions and office thumbnails - without a
+browser, all of it WebAssembly. Measured here; the release that ships it
+attaches the engine, and filex runs it.
+
+### Added
+
+- **x2t for a server** (`bash scripts/x2t/build.sh --server`,
+  `x2t-server.wasm`): the page's 28 libraries linked a second time as a
+  WASI command, run with wazero from Go (`server/x2t`), a new instance per
+  conversion. emscripten's standalone libc opens no file but the standard
+  streams; `scripts/x2t/server/wasi-fs.c` gives x2t the file calls the
+  page's build imports, over WASI. setjmp/longjmp still goes through
+  `invoke_*`, which the Go side answers as emscripten's JavaScript does,
+  with the indirect call made inside the module (`dyncalls.py`) so the
+  function-pointer-cast emulation keeps working. The page's x2t is the same
+  bytes as before (rebuilt and checked against the pin).
+- **Page layout without a browser** (`server/layout`): sdkjs, the editor's
+  own layout, in QuickJS (quickjs-ng 0.17.0) compiled to WebAssembly, with
+  `worker.js` in doctrenderer's part - the Document Server's scripts in its
+  order, its native objects answered in JavaScript, FreeType and HarfBuzz
+  as asm.js. Editor.bin -> pages as drawing commands -> x2t -> PDF or a
+  thumbnail; letter.docx came out with the Document Server's pages, pixel
+  for pixel, its thumbnail at the Document Server's size. `layout-host.wasm`
+  (`server/layout/host`) keeps sdkjs as QuickJS bytecode: a worker starts in
+  about 3 s instead of 9-13.
+- `server/cmd`: `x2t-run`, `office-convert` (a document to PDF or a
+  thumbnail, the whole pipeline) and `wasi-run`, the measurement commands.
+- `docs/PARITY.md`: what a Document Server gives a filex installation, row
+  by row, against this app in the browser and without one; the rows that
+  need a decision first. `docs/SERVER.md`: the server build, the layout,
+  the measurements and how filex would run them.
+
 ## [0.3.1] - 2026-10-10
 
 A patch release, from 0.3.0's measurement in filex 0.56 itself: a save that

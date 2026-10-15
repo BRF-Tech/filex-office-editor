@@ -167,6 +167,30 @@ sponsored by Ascensio System SIA.
    05-frame-anchor.patch (x2t v9.4.0.129+1); release 0.1.0 carried
    CryptPad's own build of x2t (release v9.3.2+3) unchanged.
 
+5. The server build of x2t (x2t-server.wasm, made by scripts/x2t/build.sh
+   --server, docs/SERVER.md; not in a release yet) is the same modified
+   ONLYOFFICE core, the same libraries linked a second time as a WASI
+   command, with two files of this project linked in (BRF Tech,
+   2026-10-15): scripts/x2t/server/wasi-fs.c (the file calls of
+   emscripten's standalone C library, over WASI) and the dyncalls.c that
+   scripts/x2t/server/dyncalls.py writes (the indirect calls of
+   setjmp/longjmp).
+
+6. The page layout without a browser (server/layout, docs/SERVER.md; not in
+   a release yet) runs ONLYOFFICE's sdkjs - the same files the bundle
+   carries - with two more files from the same Document Server image,
+   unchanged: sdkjs/common/libfont/engine/fonts_ie.js (ONLYOFFICE's
+   FreeType and HarfBuzz compiled to asm.js; AGPL-3.0, with FreeType's FTL
+   and HarfBuzz's MIT licence) and web-apps/vendor/xregexp/xregexp-all-min.js
+   (MIT). server/layout/worker.js (BRF Tech, 2026-10-15) does what
+   ONLYOFFICE's doctrenderer does with them (core
+   DesktopEditor/doctrenderer, translated in part to JavaScript), so it is
+   a modified version of ONLYOFFICE core. The JavaScript engine is
+   QuickJS-ng (https://github.com/quickjs-ng/quickjs, MIT): its release's
+   qjs-wasi.wasm, or layout-host.wasm, quickjs-ng 0.17.0 built for WASI with
+   server/layout/host/layout-host.c (BRF Tech) by
+   server/layout/host/build.sh, which fetches its source by SHA-256.
+
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:
   - keeps the copyright, license and origin notices;
