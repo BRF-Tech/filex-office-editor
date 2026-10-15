@@ -65,7 +65,7 @@ func main() {
 	qjsWasm := flag.String("qjs", "", "QuickJS for WASI: quickjs-ng's qjs-wasi.wasm or layout-host.wasm (server/layout/host)")
 	engine := flag.String("engine", "", "the engine directory (sdkjs/, fonts/, layout/)")
 	in := flag.String("in", "", "the document")
-	to := flag.String("to", "pdf", "pdf or png")
+	to := flag.String("to", "pdf", "pdf, png, html, md or epub")
 	thumb := flag.Int("thumb", 320, "for png: the first page fitted into N x N")
 	out := flag.String("out", "", "where the result goes")
 	repeat := flag.Int("repeat", 1, "conversions of the same document (the layout worker stays warm)")
