@@ -47,6 +47,10 @@ type Options struct {
 	// compiled by the first worker that needs it: a worker then starts
 	// without parsing it (docs/SERVER.md). Mounted writable.
 	BytecodeDir string
+	// NoInterrupt compiles QuickJS without wazero's context watch: its
+	// interpreter loop runs without the checks wazero adds for it (measured
+	// faster), but a worker can only be stopped by ending its process.
+	NoInterrupt bool
 }
 
 // Engine is a compiled QuickJS.
@@ -63,7 +67,7 @@ func New(ctx context.Context, qjs []byte, o Options) (*Engine, error) {
 	if o.EngineDir == "" {
 		return nil, errors.New("layout: no engine directory")
 	}
-	cfg := wazero.NewRuntimeConfigCompiler().WithCloseOnContextDone(true)
+	cfg := wazero.NewRuntimeConfigCompiler().WithCloseOnContextDone(!o.NoInterrupt)
 	if o.MaxMemoryPages > 0 {
 		cfg = cfg.WithMemoryLimitPages(o.MaxMemoryPages)
 	}
@@ -116,13 +120,14 @@ type Worker struct {
 	Kind   string
 	LoadMs int64
 
-	mu   sync.Mutex
-	in   *io.PipeWriter
-	out  *bufio.Reader
-	dir  string // the jobs directory, mounted at /j
-	n    int
-	done chan error
-	inst interface{ Close(context.Context) error }
+	mu      sync.Mutex
+	in      *os.File
+	outFile *os.File
+	out     *bufio.Reader
+	dir     string // the jobs directory, mounted at /j
+	n       int
+	done    chan error
+	inst    interface{ Close(context.Context) error }
 }
 
 // Start loads one kind's scripts into a new instance and waits until it
@@ -135,8 +140,21 @@ func (e *Engine) Start(ctx context.Context, kind string) (*Worker, error) {
 	if err != nil {
 		return nil, err
 	}
-	inR, inW := io.Pipe()
-	outR, outW := io.Pipe()
+	// OS pipes, not io.Pipe: with an io.Pipe as its stdin the worker took
+	// the first job and never read the second (measured, with qjs and with
+	// layout-host alike); wazero reads an *os.File as the system does.
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		os.RemoveAll(dir)
+		return nil, err
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		inR.Close()
+		inW.Close()
+		os.RemoveAll(dir)
+		return nil, err
+	}
 	fsc := wazero.NewFSConfig().WithReadOnlyDirMount(e.o.EngineDir, "/e").WithDirMount(dir, "/j")
 	if e.o.BytecodeDir != "" {
 		fsc = fsc.WithDirMount(e.o.BytecodeDir, "/c")
@@ -151,13 +169,17 @@ func (e *Engine) Start(ctx context.Context, kind string) (*Worker, error) {
 		WithSysWalltime().WithSysNanotime().WithStartFunctions()
 	inst, err := e.rt.InstantiateModule(ctx, e.mod, cfg)
 	if err != nil {
+		for _, f := range []*os.File{inR, inW, outR, outW} {
+			f.Close()
+		}
 		os.RemoveAll(dir)
 		return nil, err
 	}
-	w := &Worker{Kind: kind, in: inW, out: bufio.NewReaderSize(outR, 1<<16), dir: dir, done: make(chan error, 1), inst: inst}
+	w := &Worker{Kind: kind, in: inW, outFile: outR, out: bufio.NewReaderSize(outR, 1<<16), dir: dir, done: make(chan error, 1), inst: inst}
 	go func() {
 		_, err := inst.ExportedFunction("_start").Call(ctx)
-		outW.CloseWithError(fmt.Errorf("layout: the worker ended: %v", err))
+		outW.Close()
+		inR.Close()
 		w.done <- err
 	}()
 	var ready struct {
@@ -278,6 +300,7 @@ func (w *Worker) Layout(ctx context.Context, editorBin []byte, media map[string]
 func (w *Worker) Close(ctx context.Context) error {
 	w.in.Close()
 	err := w.inst.Close(ctx)
+	w.outFile.Close()
 	os.RemoveAll(w.dir)
 	return err
 }
