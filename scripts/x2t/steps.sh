@@ -199,12 +199,15 @@ LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=128kb -sASSERTIONS=0 -sUS
 
 # One of core's qmake projects, built with emscripten in a directory of its
 # own (CryptPad's embuild.sh). $1 a name, $2 the project, $3 how many jobs,
-# the rest more qmake arguments.
+# the rest more qmake arguments. QBUILD_RELINK=1 keeps the objects of the
+# build before (only the link runs again, with the arguments given now).
 qbuild() {
   local name=$1 pro=$2 jobs=$3
   shift 3
   local dir=$W/b/$name
-  rm -rf "$dir" "$(dirname "$CORE/$pro")/core_build"
+  if [ "${QBUILD_RELINK:-0}" != 1 ]; then
+    rm -rf "$dir" "$(dirname "$CORE/$pro")/core_build"
+  fi
   mkdir -p "$dir"
   (cd "$dir" && qmake \
       "QMAKE_CXXFLAGS_RELEASE -= -O2" \
@@ -296,6 +299,46 @@ x2t() {
   (cd "$OUT" && sha256sum x2t.js x2t.wasm | tee SHA256SUMS)
 }
 
+# The server build (build.sh --server, docs/SERVER.md): the same libraries
+# linked a second time, as a WASI command that a host without a browser
+# runs (filex's engine for apps, with wazero). What differs from the page's
+# link:
+#   - STANDALONE_WASM: clock, arguments and exit through WASI; x2t's own
+#     main, with the params.xml as its argument, as a Document Server runs
+#     x2t. Its libc opens no file but the standard streams, so
+#     server/wasi-fs.c gives it the file calls the page's build imports,
+#     over WASI;
+#   - setjmp/longjmp still goes through invoke_<sig>, which the host
+#     answers; the indirect call itself is the module's own fx_dyncall_<sig>
+#     (server/dyncalls.py writes them from a first link's imports), so
+#     EMULATE_FUNCTION_POINTER_CASTS keeps working - and the module exports
+#     the three functions the host needs around it;
+#   - no closure compiler, import names kept, the functions' names kept
+#     (--profiling-funcs) so a trap says where it stopped.
+# The libraries, the patches and the flags they were compiled with are the
+# page's.
+SERVER_LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=128kb -sASSERTIONS=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 -sSTANDALONE_WASM=1 --profiling-funcs"
+x2t_server() {
+  local shim=$W/b/server-shim bin=$CORE/build/bin/linux_64
+  local em
+  em=$(dirname "$(command -v emcc)")
+  local lflags="-looxmlsignature -L$BOOST/lib -sEXPORTED_FUNCTIONS=_setThrew,_emscripten_stack_get_current,__emscripten_stack_restore"
+  rm -rf "$shim"
+  mkdir -p "$shim"
+  emcc -Os -I"$em/system/lib/libc/musl/arch/emscripten" -c /x2t/server/wasi-fs.c -o "$shim/wasi-fs.o"
+  rm -f "$bin/x2t" "$bin/x2t.wasm"
+  LFLAGS=$SERVER_LFLAGS qbuild X2tConverter-server X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
+    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o"
+  python3 /x2t/server/dyncalls.py "$bin/x2t.wasm" "$shim/dyncalls.c"
+  emcc -Os -c "$shim/dyncalls.c" -o "$shim/dyncalls.o"
+  rm -f "$bin/x2t" "$bin/x2t.wasm"
+  QBUILD_RELINK=1 LFLAGS=$SERVER_LFLAGS qbuild X2tConverter-server X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
+    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o $shim/dyncalls.o"
+  mkdir -p "$OUT/server"
+  cp "$bin/x2t.wasm" "$OUT/server/x2t-server.wasm"
+  (cd "$OUT/server" && sha256sum x2t-server.wasm | tee SHA256SUMS)
+}
+
 step sources sources
 step third-party third_party
 step patches patches
@@ -305,3 +348,7 @@ step icu-port icu_port
 libs
 rm -f "$STAMPS/x2t"
 step x2t x2t
+if [ "${SERVER:-0}" = 1 ]; then
+  rm -f "$STAMPS/x2t-server"
+  step x2t-server x2t_server
+fi

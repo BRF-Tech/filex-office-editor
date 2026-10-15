@@ -7,7 +7,7 @@
 # the tag upstream/onlyoffice.json names ("x2t" -> "build"), and checks the
 # two files it makes against the SHA-256 sums pinned there.
 #
-#   bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N]
+#   bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server]
 #
 #   --work DIR     the build tree (default .x2t-build/ in the repository, about
 #                  4.5 GB); a run that stopped goes on from where it stopped,
@@ -16,6 +16,10 @@
 #   --cpus N       CPUs the build container may use (default 8)
 #   --memory SIZE  its memory, in GiB as 16g (the default; swap as much again)
 #   --jobs N       parallel compilations (default: --cpus)
+#   --server       also link the server build, x2t-server.wasm: the same
+#                  libraries as a WASI command a host runs without a browser
+#                  (README.md "x2t on a server"); checked against the pin
+#                  once "x2t-server.wasm" is pinned, its sum printed until then
 #
 # It needs bash and docker. The toolchain is emscripten's own image, pinned by
 # digest, with the build tools from one day's Ubuntu snapshot
@@ -35,6 +39,7 @@ out=$repo/dist/x2t
 cpus=8
 memory=16g
 jobs=
+server=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -43,7 +48,8 @@ while [ $# -gt 0 ]; do
     --cpus) cpus=$2; shift 2 ;;
     --memory) memory=$2; shift 2 ;;
     --jobs) jobs=$2; shift 2 ;;
-    *) echo "usage: bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N]" >&2; exit 2 ;;
+    --server) server=1; shift ;;
+    *) echo "usage: bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server]" >&2; exit 2 ;;
   esac
 done
 jobs=${jobs:-$cpus}
@@ -62,10 +68,10 @@ if ! docker image inspect "$tag" > /dev/null 2>&1; then
 fi
 
 # The pin, read with the toolchain's python (the host needs only docker).
-read -r release want_js want_wasm < <(docker run --rm -v "$pin:/pin.json:ro" "$tag" python3 -c '
+read -r release want_js want_wasm want_server < <(docker run --rm -v "$pin:/pin.json:ro" "$tag" python3 -c '
 import json
 x = json.load(open("/pin.json"))["x2t"]
-print(x["release"], x["files"]["x2t.js"], x["files"]["x2t.wasm"])')
+print(x["release"], x["files"]["x2t.js"], x["files"]["x2t.wasm"], x["files"].get("x2t-server.wasm", "-"))')
 if [ -z "$want_wasm" ]; then
   echo "upstream/onlyoffice.json: no x2t release or file sums" >&2
   exit 1
@@ -80,6 +86,7 @@ docker run --rm \
   --cpus "$cpus" --memory "$memory" --memory-swap "$(( ${memory%g} * 2 ))g" \
   "${user[@]}" \
   -e JOBS="$jobs" \
+  -e SERVER="$server" \
   -v "$here:/x2t:ro" \
   -v "$pin:/pin.json:ro" \
   -v "$work:/work" \
@@ -98,3 +105,18 @@ cp "$work/out/x2t.js" "$out/.x2t.js.tmp" && mv "$out/.x2t.js.tmp" "$out/x2t.js"
 cp "$work/out/x2t.wasm" "$out/.x2t.wasm.tmp" && mv "$out/.x2t.wasm.tmp" "$out/x2t.wasm"
 echo "$release" > "$out/.version"
 echo "x2t $release: both files match the pin -> $out"
+
+if [ "$server" = 1 ]; then
+  got_server=$(sha256sum "$work/out/server/x2t-server.wasm" | cut -c1-64)
+  echo "x2t-server.wasm  $got_server"
+  if [ "$want_server" != "-" ] && [ "$got_server" != "$want_server" ]; then
+    echo "not the pinned server build: upstream/onlyoffice.json has x2t-server.wasm $want_server" >&2
+    exit 1
+  fi
+  cp "$work/out/server/x2t-server.wasm" "$out/.x2t-server.wasm.tmp" && mv "$out/.x2t-server.wasm.tmp" "$out/x2t-server.wasm"
+  if [ "$want_server" = "-" ]; then
+    echo "x2t-server.wasm is not pinned yet (upstream/onlyoffice.json x2t.files) -> $out"
+  else
+    echo "x2t-server.wasm matches the pin -> $out"
+  fi
+fi
