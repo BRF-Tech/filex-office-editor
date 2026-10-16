@@ -1,0 +1,87 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-16: in a WebAssembly
+build a download or an upload ends at once, as one the converter is not
+allowed to make (Common/Network/FileTransporter/src/FileTransporter_private.h).
+
+x2t fetches what a document names elsewhere with core's CFileDownloader: a
+.docx's linked picture (TargetMode="External", CMediaManager::WriteImage),
+an HTML page's <img> or style sheet (HtmlFile2), a picture of a pptx, an
+xlsx, a ppt or a PDF. CFileTransporter_private starts a thread for it
+(CBaseThread::Start) and TransferSync waits while the thread runs, in a
+loop of NSThreads::Sleep(10). WebAssembly - the page's build and the
+server's - has no threads: pthread_create fails, Start does not look, the
+transfer stays "running" with no thread to end it, and the loop never
+ends. In the server build nanosleep is emscripten's busy wait on the
+clock, so the module spun at full speed until the host's deadline.
+
+Measured (2026-10-16, a .docx whose one picture is linked from
+http://127.0.0.1:9/, an HTML page with an <img> and one with a <link
+rel="stylesheet"> on that address): the server build under wazero did not
+finish in 200 s (into the editor's format; the same .docx without the
+picture 13 ms), the page's x2t in Node not in 40 s (46 ms without);
+counted with a stand-in for WASI's clock_time_get, 3,000,000 calls in half
+a second, every one from CFileDownloader::DownloadSync -> NSThreads::Sleep
+-> nanosleep -> emscripten_get_now (the stacks of a build with names).
+
+Here, under __EMSCRIPTEN__, the transporter's Start runs the transfer on
+the caller's thread, and ThreadProc takes the branch it takes when the
+process environment says allowNetworkRequest is false: nothing is fetched,
+the file is not downloaded (a partial one is removed), the callback hears
+1, IsRunned() is false when Start returns. Every caller already handles a
+download that failed: a linked picture is left out (WriteImage gets no
+file), an HTML page's picture stays a link to its address with its alt
+text, a style sheet is not read - what a Document Server without a network
+does (its own x2t, run with docker's --network none: the same .docx to PDF
+in 1.1 s, its thumbnail the same picture as the .docx without the link; an
+HTML page with a picture elsewhere to docx, the same document.xml as this
+build's). After: 13 ms on the server,
+49 ms in Node, no clock_time_get call; the documents without such
+addresses come out as before.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/Common/Network/FileTransporter/src/FileTransporter_private.h b/Common/Network/FileTransporter/src/FileTransporter_private.h
+index 17acf461..0355df31 100644
+--- a/Common/Network/FileTransporter/src/FileTransporter_private.h
++++ b/Common/Network/FileTransporter/src/FileTransporter_private.h
+@@ -238,6 +238,31 @@ namespace NSNetwork
+ 				m_pInternal->m_pSession = session;
+ 			}
+ 
++#ifdef __EMSCRIPTEN__
++			// filex-office-editor (BRF Tech, 2026-10-16): x2t compiled to
++			// WebAssembly - the page's build and the server's - has no threads
++			// and no network. pthread_create fails there, so CBaseThread::Start
++			// left a transfer running with no thread to end it, and TransferSync
++			// (or a caller waiting on IsRunned()) slept in a loop forever: a
++			// document with a linked picture, an HTML page with a picture or a
++			// style sheet elsewhere. The transfer runs here instead, on the
++			// caller's thread, as one the converter may not make
++			// (allowNetworkRequest false, ThreadProc below): nothing is fetched
++			// and nothing waits, the file is not downloaded and the callback is
++			// told so, as with a Document Server that has no network.
++			virtual void Start(int lPriority) override
++			{
++				if (m_bRunThread)
++					return;
++				m_lError = 0;
++				m_bSuspend = FALSE;
++				m_lThreadPriority = lPriority;
++				m_bIsExit.store(false);
++				m_bRunThread = TRUE;
++				ThreadProc();
++			}
++#endif
++
+ 		protected :
+ 
+ 			virtual DWORD ThreadProc ()
+@@ -247,6 +272,9 @@ namespace NSNetwork
+ 				bool bIsCanUseNetwork = true;
+ 				if (NSProcessEnv::IsPresent(NSProcessEnv::Converter::gc_allowNetworkRequest))
+ 					bIsCanUseNetwork = NSProcessEnv::GetBoolValue(NSProcessEnv::Converter::gc_allowNetworkRequest);
++#ifdef __EMSCRIPTEN__
++				bIsCanUseNetwork = false;
++#endif
+ 
+ 				int hrResultAll = 0;
+ 

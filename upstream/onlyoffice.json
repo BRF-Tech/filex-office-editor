@@ -10,9 +10,9 @@
   "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
   "pinned": "2026-10-08",
   "x2t": {
-    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the page's two files, and with --server the server build (x2t-server.wasm, docs/SERVER.md), against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; release 0.4.0 attaches v9.4.0.129+3, releases 0.2.0 to 0.3.1 attached v9.4.0.129+2, release 0.1.1 v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
+    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the page's two files, and with --server the server build (x2t-server.wasm, docs/SERVER.md), against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; release 0.4.0 attaches v9.4.0.129+4, releases 0.2.0 to 0.3.1 attached v9.4.0.129+2, release 0.1.1 v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
     "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/, and ICU 68.2's conversion tables (scripts/x2t/icu-data.py); built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
-    "release": "v9.4.0.129+3",
+    "release": "v9.4.0.129+4",
     "build": {
       "recipe": {
         "about": "Where scripts/x2t comes from: CryptPad's Dockerfile and embuild.sh at the release commit, and its changes to ONLYOFFICE core (its core/ at the changes commit, against core v9.3.0.140, the commit that core/ was pulled from), ported to source_tag in scripts/x2t/patches/01-cryptpad-wasm.patch.",
@@ -56,8 +56,8 @@
     },
     "files": {
       "x2t.js": "f6551a615e38ef9b013aecd9e2f9fd92d65c20bea641441fb16950b38571d626",
-      "x2t.wasm": "a4add9f6fa9ff21b3095510458ed18856869b22e3a95da8159aea3d93d6d9b2e",
-      "x2t-server.wasm": "7aacc87fb9db4c8e1e1ee370ea952c1d88b994ddd52fa5d69de9986a238f2d5b"
+      "x2t.wasm": "15e094d1eb4af01a7428aaae980f8484ecb8e4e25e9f683e05e6a508277a05bd",
+      "x2t-server.wasm": "36474a79045379715a87c7eb5d07a63d914ccbe0691e1f8445eb0a5f57ac0c4b"
     },
     "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.4.0/x2t.zip",
     "sha512": "da5105af4590c42622b8fb9f56831a465f92be7e3aac2e28e0aa4a06d4059af03e06f560d73e002d294140882c8d5c840f91381c4dd40431cd1e680935848c92",

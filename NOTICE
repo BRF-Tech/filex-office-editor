@@ -174,7 +174,13 @@ sponsored by Ascensio System SIA.
      - 08-cximage-png-rows.patch (BRF Tech, 2026-10-16): CxImage's PNG
        writer and reader (DesktopEditor/cximage/CxImage/ximapng.cpp, .h)
        fill a row of a picture with an alpha channel in a function of its
-       own, the same loop moved out of the two that call setjmp.
+       own, the same loop moved out of the two that call setjmp;
+     - 09-wasm-no-network.patch (BRF Tech, 2026-10-16): in a WebAssembly
+       build the file transporter (Common/Network/FileTransporter/src/
+       FileTransporter_private.h) runs a download or an upload on the
+       caller's thread and takes the branch it takes when the network is
+       not allowed, so it ends at once; it waited for a thread WebAssembly
+       cannot start, forever.
    ICU's conversion tables are linked in too (BRF Tech, 2026-10-16):
    scripts/x2t/icu-data.py takes the converter alias table and the tables
    scripts/x2t/icu-converters.txt names, unchanged, out of the data package
@@ -191,8 +197,8 @@ sponsored by Ascensio System SIA.
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
    LLVM exception, the Unicode license). Release 0.4.0 carries this
-   build (x2t v9.4.0.129+3); releases 0.2.0 to 0.3.1 carried it without
-   patches 06 to 08 and ICU's tables (x2t v9.4.0.129+2); release
+   build (x2t v9.4.0.129+4); releases 0.2.0 to 0.3.1 carried it without
+   patches 06 to 09 and ICU's tables (x2t v9.4.0.129+2); release
    0.1.1 carried it without 05-frame-anchor.patch either (x2t
    v9.4.0.129+1); release 0.1.0 carried CryptPad's own build of x2t
    (release v9.3.2+3) unchanged.
