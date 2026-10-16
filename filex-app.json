@@ -284,7 +284,7 @@
   "ui": {
     "bundle": {
       "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.4.0/ui.zip",
-      "sha256": "70f9ab974c0940bcef755e2bcb5e4030f98b8859508a9e774c485d5263d29b5b"
+      "sha256": "ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c"
     },
     "csp": [
       "unsafe-eval",
@@ -424,7 +424,7 @@
   "engines": {
     "office": {
       "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/engine.zip",
-      "sha256": "a30fbe1ac4d7aa1c6f4e7f49e0b7cf54fa9c2ae25415614db3209d13926ef044",
+      "sha256": "a50931b0cbd779145eade16cbd159f5b929823c84de7ea7e2daabdb8d6a79d6a",
       "editor": "editor"
     }
   }

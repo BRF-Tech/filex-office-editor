@@ -76,7 +76,7 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
 | filex | 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.4.0** (tag `v0.4.0`): `ui.zip`, 119.9 MiB, SHA-256 `70f9ab974c0940bcef755e2bcb5e4030f98b8859508a9e774c485d5263d29b5b`; `engine.zip`, the office engine filex runs on the server, 13.0 MiB, SHA-256 `a30fbe1ac4d7aa1c6f4e7f49e0b7cf54fa9c2ae25415614db3209d13926ef044`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| Release | **0.4.0** (tag `v0.4.0`): `ui.zip`, 119.9 MiB, SHA-256 `ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c`; `engine.zip`, the office engine filex runs on the server, 13.0 MiB, SHA-256 `a50931b0cbd779145eade16cbd159f5b929823c84de7ea7e2daabdb8d6a79d6a`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
@@ -709,8 +709,14 @@ the module fewer `invoke_*` imports, so the glue changes too), `x2t.wasm`
 (39,972,378 bytes, `a4add9f6...`) and `x2t-server.wasm` (41,427,723 bytes,
 `7aacc87f...`), the sums pinned; 45.6 minutes (patches 06 and 07
 alone gave `3d2b46ae...` and `ef492165...` from an empty tree too).
-Release 0.4.0 attaches it as `x2t.zip` (10,977,155 bytes, SHA-512
-`da5105af...35848c92`, pinned under `x2t`).
+`v9.4.0.129+4` (patch 09; 2026-10-16, an x86-64 PC, WSL2,
+`--cpus 10 --memory 12g --server`): a build from an empty tree gave the
+same three files as the tree of `+3` with the patch applied and its
+stamps reset for `kernel_network` and the links - `x2t.js` unchanged
+(`f6551a61...`), `x2t.wasm` (39,972,372 bytes, `15e094d1...`) and
+`x2t-server.wasm` (41,427,742 bytes, `36474a79...`), the sums pinned;
+50.6 minutes. Release 0.4.0 attaches it as `x2t.zip` (10,977,184
+bytes, SHA-512 `851d27f1...54fa1766`, pinned under `x2t`).
 
 ### txt and csv
 
@@ -904,15 +910,17 @@ measured: `1fce1671...`, 37,522 bytes).
 
 Measured for 0.4.0 (2026-10-16, an x86-64 PC, WSL2 with docker-ce): two
 complete builds in two fresh clones of the release commit, from the image
-to the last file, each taking x2t `v9.4.0.129+3` - its three files at the
-pinned sums - from the build of [x2t, the converter](#x2t-the-converter)
+to the last file, each taking x2t `v9.4.0.129+4` (its three files at the
+pinned sums, one clone from the tree the patch was made in, the other
+from the build from an empty tree, [x2t, the converter](#x2t-the-converter))
 and building `layout-host.wasm` again, gave the same `ui.zip` -
-125,771,006 bytes, 2,796 files, SHA-256
-`70f9ab974c0940bcef755e2bcb5e4030f98b8859508a9e774c485d5263d29b5b` - the
-same `x2t.zip` (10,977,155 bytes, SHA-512 `da5105af...35848c92`), the same
-`engine.zip` (13,615,254 bytes, SHA-256 `a30fbe1a...926ef044`), the same
-`editor.zip` as the lock file and the same 159 dictionary files and
-catalog (`1fce1671...`); three and a half minutes each. filex 0.57's own
+125,771,178 bytes, 2,796 files, SHA-256
+`ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c` - the
+same `x2t.zip` (10,977,184 bytes, SHA-512 `851d27f1...54fa1766`), the same
+`engine.zip` (13,615,146 bytes, SHA-256 `a50931b0...a79d6a`) and the same
+`editor.zip` as the lock file; six minutes each. The 159 dictionary
+files and their catalog (`1fce1671...`) are the ones built before patch
+09 the same way, nothing they are made from having changed. filex 0.57's own
 checks then passed on them (`wasmplugin.ParseManifest` and `Validate`, the
 bundle's index, `checkEngineZip`, the catalog's rules, every dictionary
 file at its size and SHA-256): 64 permissions, `office-engine` among them.
@@ -1177,17 +1185,24 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   the editor's scripts and fonts read from the installed bundle; by default
   the app's engine takes the work before a Document Server filex is
   connected to.
-- **Measured in filex 0.57** (2026-10-16, its `int/057-wave` at
-  `6d2feab13`, WSL2 on an x86-64 PC): filex's own test of the engine
-  (`TestEngine_TheRealModules`, `backend/internal/officeengine`) with this
-  release's `engine.zip` and `ui.zip` passed - the engine prepared in
-  59 s, letter.docx to PDF in 17.2 s (the layout worker's first start
-  included) and to odt in 0.4 s, report.xlsx to csv in 0.15 s, four office
-  thumbnails at the Document Server's sizes in 20.5, 13.9, 10.1 and 6.6 s
-  from one warm worker, a password-protected docx answered as a password
-  error (x2t 90), and a deadline the conversion could not meet ending its
-  process, the next job running on a new one (2.7 s); at most 808 MiB in
-  a process.
+- **Measured in filex 0.57** (2026-10-16, its `fix/057-engine-linked-images`
+  at `16461e8d4`, an x86-64 PC, WSL2 and Windows): filex's own tests of the
+  engine (`backend/internal/officeengine`) with this release's `engine.zip`
+  and `ui.zip` passed on both. `TestEngine_TheRealModules` (WSL2, an x2t
+  build running beside it): letter.docx to PDF in 10.9 s (the layout
+  worker's first start included) and to odt in 0.3 s, report.xlsx to csv
+  in 0.09 s, four office thumbnails at the Document Server's sizes in 13.0,
+  10.3, 6.6 and 4.2 s from one warm worker, a password-protected docx
+  answered as a password error (x2t 90), a deadline the conversion could
+  not meet ending its process and the next job running on a new one
+  (1.6 s); at most 808 MiB in a process (Windows: 12.7 s, 0.5, 0.5, 12.9 to
+  6.1 s, at most 734 MiB). `TestEngine_NoRemoteFetch`: a .docx with a
+  linked picture to PDF in 2.2 s and to a thumbnail in 3.2 s (Windows 2.3
+  and 1.8 s; the same .docx without the link first, with the workers'
+  start, 8.1 and 7.3 s), the thumbnail the same pixels as that one's; an
+  HTML page with a picture and a style sheet elsewhere 2.7 s, an EPUB
+  chapter naming them 1.9 s; the server those things are on asked
+  nothing. With `+3` the .docx ran to the 2-minute deadline.
 
 ## Measured in the browsers
 

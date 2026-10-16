@@ -60,7 +60,7 @@
       "x2t-server.wasm": "36474a79045379715a87c7eb5d07a63d914ccbe0691e1f8445eb0a5f57ac0c4b"
     },
     "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.4.0/x2t.zip",
-    "sha512": "da5105af4590c42622b8fb9f56831a465f92be7e3aac2e28e0aa4a06d4059af03e06f560d73e002d294140882c8d5c840f91381c4dd40431cd1e680935848c92",
+    "sha512": "851d27f158dc971516a2bd7001f34487c8da8e143a969e255f9b087880c3a0c6fa95f2bdacc31a4dfe1101e10efd3494f674c578e155118065d38dbc54fa1766",
     "pinned": "2026-10-16"
   },
   "engine": {
