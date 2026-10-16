@@ -55,7 +55,7 @@
       }
     },
     "files": {
-      "x2t.js": "9f2f65ac557470b2895beaa0f9678ee1a998545d49c8b93d67306ff3e7d7fe4b",
+      "x2t.js": "f6551a615e38ef9b013aecd9e2f9fd92d65c20bea641441fb16950b38571d626",
       "x2t.wasm": "a4add9f6fa9ff21b3095510458ed18856869b22e3a95da8159aea3d93d6d9b2e",
       "x2t-server.wasm": "7aacc87fb9db4c8e1e1ee370ea952c1d88b994ddd52fa5d69de9986a238f2d5b"
     },
