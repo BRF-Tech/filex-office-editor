@@ -473,7 +473,7 @@ the other formats of Download as. Here it is the same program, from
 ONLYOFFICE core, compiled to WebAssembly and run in a worker (`src/x2t.ts`
 drives it). It is **this project's own build, from ONLYOFFICE core at the
 editor files' tag** - `v9.4.0.129`, commit `a016fc28` - released here as
-**`v9.4.0.129+2`** and pinned under `x2t` in
+**`v9.4.0.129+3`** and pinned under `x2t` in
 [`upstream/onlyoffice.json`](upstream/onlyoffice.json): how it is built,
 every source by its commit, and the SHA-256 of `x2t.js` and `x2t.wasm`.
 Release 0.1.0 carried CryptPad's build
@@ -488,6 +488,8 @@ bash scripts/x2t/build.sh     # or: npm run x2t:build - needs bash and docker on
 #   --cpus N --memory SIZE    the build container's share (default 8 and 16g)
 #   --work DIR                the build tree (default .x2t-build/, about 4.5 GB)
 #   --out DIR                 where x2t.js and x2t.wasm go (default dist/x2t)
+#   --server                  the server build too, x2t-server.wasm (docs/SERVER.md)
+#   --diag                    a page build with names and checks, to find where x2t stops
 ```
 
 `build.sh` builds the toolchain image (`scripts/x2t/Dockerfile`:
@@ -507,7 +509,8 @@ where it stopped; an empty `--work` builds everything. In the container:
    (harfbuzz, brotli, gumbo, katana, md4c, the iWork readers), each at the
    commit it names;
 2. the patches in `scripts/x2t/patches/` are applied to core (below);
-3. Boost's date_time and regex and emscripten's ICU port are compiled;
+3. Boost's date_time and regex and emscripten's ICU port are compiled, and
+   ICU's conversion tables written as an object (below);
 4. the 28 libraries x2t links - core's qmake projects, from
    UnicodeConverter and the kernel to the OOXML, Microsoft binary, ODF,
    RTF, txt, PDF, HTML, EPUB, XPS, DjVu, iWork and HWP readers and writers -
@@ -553,6 +556,49 @@ and why:
   drawn in front of it (#220, measured on `v9.4.0.129+1`). LibreOffice gives
   every frame a style (a formula's has the parent "Formula"), and its files
   kept their place.
+- `06-svg-css-namespace.patch`: the SVG engine's copy of ONLYOFFICE's CSS
+  calculator gets a namespace of its own. Core builds the calculator into
+  two libraries - the graphics library (for SVG) and HtmlFile2 (with
+  `CSS_CALCULATOR_WITH_XHTML`, which lays its classes out differently:
+  `NSCSS::CNode` 60 and 64 bytes here, `CCssCalculator_Private` 76 and
+  100). Natively each library keeps its own copy; CryptPad's recipe dropped
+  graphics' copy so the two would not clash at the link, and in one module
+  the SVG engine then ran HtmlFile2's code for the larger layout while
+  HtmlFile2 got graphics' `std::vector<NSCSS::CNode>` code for the smaller.
+  Every metafile x2t opened wrote past its block: a .doc or docx with an
+  EMF or WMF picture did not open, a PDF of a document with SVG pictures
+  (and of the Document Server's sample.xlsx) stopped, and HTML to md
+  stopped or looped on any HTML - in `v9.4.0.129+2` and CryptPad's builds
+  alike ([docs/PARITY.md](docs/PARITY.md) A14, found with `build.sh --diag`).
+- `07-doc-word95-upstream.patch`: two of ONLYOFFICE core's own fixes to its
+  Word 97-2003 reader, made after `v9.4.0.129` (commits `507f0ae0`, "fix bug
+  #82318", and `9848afc4`, "fix bug #82612"), carried back unchanged. Core
+  read a Word 95 document's paragraph table as Word 97's whenever the file
+  says it was saved "complex", and the paragraphs came from the wrong
+  places: a 96-page Word 95 document came out as one paragraph with a third
+  of its text. With them it comes in as the Document Server reads it - 3,123
+  of its 3,124 paragraphs, the same 515,791 characters (measured).
+
+And **ICU's conversion tables** (`v9.4.0.129+3`): emscripten's ICU port
+links ICU's empty data stub, so ICU converted only UTF-8, UTF-16, UTF-32 and
+ISO-8859-1 - a windows-1254 csv came in as an empty sheet and a Word 95
+document without its text. `scripts/x2t/icu-data.py` takes the converter
+alias table and the 53 tables core's UnicodeConverter reaches
+(`scripts/x2t/icu-converters.txt`: every encoding of its list, by name, and
+the code pages it opens by number - windows-125x, ISO-8859-x, KOI8, the DOS
+code pages, Shift_JIS, EUC-JP, GBK, GB18030, Big5, the Korean ones, and the
+tables those extend) out of the data package of the ICU release the port is
+built from (ICU 68.2), and writes them as ICU's data entry point, linked
+into both builds in place of the stub: 1,274,128 bytes, 683 KB of
+`x2t.zip`. Measured against ICU's whole data: each of them opens and
+decodes the same.
+
+`bash scripts/x2t/build.sh --diag` also links a page build with function
+names, emscripten's assertions and checked memory access (`SAFE_HEAP`) into
+`dist/x2t/diag/`, never pinned or shipped: run in Node like the page's (the
+round-trip tests take `X2T_DIR`), a trap's stack names the C++ functions.
+The release links are stripped of the names (core's `base.pri` adds
+`-Wl,-s`), so a trap there names functions by number.
 
 What x2t still does without, as CryptPad's build does: the link lists 86
 functions it does not have, and a conversion that reached one would stop
@@ -603,7 +649,7 @@ lists only what x2t writes right here, measured code page by code page
 
 | | Offered | Not offered, measured |
 |---|---|---|
-| csv | UTF-8, UTF-16, UTF-16 big endian (each with its byte order mark), UTF-32 and UTF-32 big endian (without one) | every other code page: emscripten's ICU (68.2) has no conversion tables, so windows-1254, ISO-8859-9, windows-1252... do not open and the text came out cut to its low bytes; ISO-8859-1 opens and has no Ş, Ğ or İ |
+| csv | UTF-8, UTF-16, UTF-16 big endian (each with its byte order mark), UTF-32 and UTF-32 big endian (without one) | every other code page, for now: up to `v9.4.0.129+2` x2t had no conversion tables (emscripten's ICU port carries none) and wrote `^ehir` for "Şehir" in windows-1254; `+3` carries them and writes the Turkish workbook in windows-1254 whole (measured), but the dialog does not offer them yet ([docs/PARITY.md](docs/PARITY.md) A5) |
 | txt | UTF-8 | x2t's txt writer writes UTF-8 for any code page but its "Unicode" (50) and "big endian" (51), and those as UTF-16 with the text left out wherever `wchar_t` is 32 bits - ONLYOFFICE's own, not this build's |
 
 An encoding outside the list that reaches the app anyway is refused, and
@@ -725,6 +771,25 @@ minutes, [x2t, the converter](#x2t-the-converter)): it puts the same two
 files in `dist/x2t/`, and `fetch-x2t.mjs` then finds them in place. The
 release's `x2t.zip` is `node scripts/fetch-x2t.mjs --pack dist/x2t.zip`,
 run in the same Node image.
+
+From 0.4.0 a release attaches **`engine.zip`** too - the office engine filex
+runs on the server without a browser (filex 0.57's `engines.office`,
+[docs/SERVER.md](docs/SERVER.md) "How filex runs it"): `x2t-server.wasm`,
+`layout-host.wasm` and the page layout's scripts, every file checked
+against `upstream/onlyoffice.json` (`x2t.files`, `engine.files`):
+
+```bash
+bash scripts/x2t/build.sh --server    # dist/x2t/, the page's x2t and x2t-server.wasm
+bash server/layout/host/build.sh      # dist/layout/layout-host.wasm (wasi-sdk by its digest)
+bash scripts/engine-ds-files.sh       # dist/layout/fonts_ie.js, xregexp-all-min.js, from the pinned image
+docker run --rm -v "$PWD:/src" -w /src <the Node image above> node scripts/pack-engine.mjs --manifest
+```
+
+`pack-engine.mjs` writes `dist/engine.zip` the way the bundle is written
+(the same bytes in the pinned Node image and under Node 22.22 elsewhere,
+measured: 13,614,237 bytes) and, with `--manifest`, its SHA-256 into
+`filex-app.json` (`engines.office.sha256`; the url names the release by
+`{tag}`).
 
 Measured for 0.3.1 (2026-10-10, an x86-64 Linux machine), the same way as
 0.2.0: the same `ui.zip` from both builds - 103,098,008 bytes, 2,633
@@ -964,10 +1029,11 @@ Server gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   runs it in V8; `worker.js` answers what doctrenderer's native objects
   answer, and x2t turns the drawing into a PDF or a thumbnail. Measured: the
   same pages as the Document Server's, letter.docx's PDF pixel for pixel.
-- ⚠ **Not yet**: x2t's picture code stops in WebAssembly - in the page's
-  x2t too - on SVG pictures drawn into a PDF, on some .doc files with
-  EMF/WMF pictures, and on HTML to md ([docs/PARITY.md](docs/PARITY.md),
-  row A14); to be fixed in x2t's build before 0.4.0.
+- **Pictures and HTML to md**: x2t `v9.4.0.129+3` opens the .doc files
+  with EMF/WMF pictures, draws SVG pictures into a PDF and writes md, in the
+  page's x2t as in the server's - x2t's picture code stopped in WebAssembly
+  until `06-svg-css-namespace.patch` ([docs/PARITY.md](docs/PARITY.md), row
+  A14) - and reads the legacy code pages (ICU's conversion tables).
 - Measured, not shipped: the release that brings it attaches the engine,
   and filex 0.57 runs it (docs/SERVER.md, "How filex runs it").
 

@@ -151,7 +151,24 @@ sponsored by Ascensio System SIA.
      - 05-frame-anchor.patch (BRF Tech, 2026-10-10): the ODF reader reads a
        frame's anchor (text:anchor-type) from the frame whether or not the
        frame has a graphic style (OdfFile/Reader/Format/draw_frame_docx.cpp);
-       a frame without a style lost its anchor and became a floating shape.
+       a frame without a style lost its anchor and became a floating shape;
+     - 06-svg-css-namespace.patch (BRF Tech, 2026-10-16): the graphics
+       library's copy of the CSS calculator (its SVG engine's) is built in
+       a namespace of its own (DesktopEditor/graphics/pro/metafile.pri), so
+       it no longer runs HtmlFile2's copy, built for another layout of the
+       same classes; scripts/x2t/steps.sh builds it again instead of
+       leaving it out, as CryptPad's recipe did;
+     - 07-doc-word95-upstream.patch (BRF Tech, 2026-10-16): two later
+       commits of ONLYOFFICE core itself (507f0ae06b67, "fix bug #82318",
+       and 9848afc4066a, "fix bug #82612", by Ascensio System SIA), applied
+       unchanged to v9.4.0.129: the Word 97-2003 reader reads a Word 95
+       document's paragraphs, and keeps its reads of a document's pages and
+       tables inside them.
+   ICU's conversion tables are linked in too (BRF Tech, 2026-10-16):
+   scripts/x2t/icu-data.py takes the converter alias table and the tables
+   scripts/x2t/icu-converters.txt names, unchanged, out of the data package
+   of ICU 68.2 (icudt68l.dat, in the ICU release emscripten's port is built
+   from; the Unicode license) and writes them as ICU's data entry point.
    The build is CryptPad's recipe (its Dockerfile and embuild.sh) carried
    over to that tag. The third-party code ONLYOFFICE core builds into x2t
    is fetched by core's own scripts at the commits they name, and keeps its
@@ -162,10 +179,12 @@ sponsored by Ascensio System SIA.
    1.1.1f (no OpenSSL code is linked), hyphen (MPL 1.1, GPL 2.0 or LGPL
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
-   LLVM exception, the Unicode license). Releases 0.2.0 to 0.3.1 carry
-   this build (x2t v9.4.0.129+2); release 0.1.1 carried it without
-   05-frame-anchor.patch (x2t v9.4.0.129+1); release 0.1.0 carried
-   CryptPad's own build of x2t (release v9.3.2+3) unchanged.
+   LLVM exception, the Unicode license). The next release carries this
+   build (x2t v9.4.0.129+3); releases 0.2.0 to 0.3.1 carried it without
+   patches 06 and 07 and ICU's tables (x2t v9.4.0.129+2); release
+   0.1.1 carried it without 05-frame-anchor.patch either (x2t
+   v9.4.0.129+1); release 0.1.0 carried CryptPad's own build of x2t
+   (release v9.3.2+3) unchanged.
 
 5. The server build of x2t (x2t-server.wasm, made by scripts/x2t/build.sh
    --server, docs/SERVER.md; not in a release yet) is the same modified

@@ -13,7 +13,7 @@ code of ONLYOFFICE's.
  document ──x2t-server.wasm──> Editor.bin ──QuickJS + sdkjs──> pdf.bin ──x2t-server.wasm──> PDF / PNG
  (docx, doc, odt, xlsx, csv...)  (+ media/)   (worker.js:         (the pages as        (+ the fonts the pages
                                                doctrenderer's     drawing commands)      were drawn with)
-                                               part)        └───> HTML ──x2t-server.wasm──> epub (md: ⚠)
+                                               part)        └───> HTML ──x2t-server.wasm──> epub, md
  document ──x2t-server.wasm──> docx, odt, xlsx, ods, csv, pptx, odp, rtf, txt ...   (no layout needed)
 ```
 
@@ -23,9 +23,9 @@ objects by `server/layout/worker.js`.
 
 **In short:** every office-to-office conversion works, at the Document
 Server's sizes; PDF, thumbnails, HTML and epub through the layout work, the
-same pages as the Document Server's. ⚠ Three things do not, in the page's
-x2t either: a picture in SVG drawn into a PDF or a thumbnail, some .doc
-files with EMF/WMF pictures, and HTML to md ("What x2t still lacks").
+same pages as the Document Server's, pictures in SVG, EMF and WMF and md
+included since x2t `v9.4.0.129+3`, which reads the legacy code pages too
+("Pictures, HTML to md and the legacy code pages").
 
 ## What is here
 
@@ -42,6 +42,8 @@ files with EMF/WMF pictures, and HTML to md ("What x2t still lacks").
 ```bash
 bash scripts/x2t/build.sh --server              # dist/x2t/x2t-server.wasm (needs docker)
 bash server/layout/host/build.sh                # dist/layout/layout-host.wasm (needs docker)
+bash scripts/engine-ds-files.sh                  # dist/layout/fonts_ie.js, xregexp-all-min.js (the DS image)
+node scripts/pack-engine.mjs                     # dist/engine.zip, every file checked against its pin
 cd server && go test ./...                       # the Go tests; X2T_SERVER_WASM, LAYOUT_* run the real modules
 go run ./cmd/office-convert -x2t ../dist/x2t/x2t-server.wasm -qjs ../dist/layout/layout-host.wasm \
    -engine <dir with sdkjs/, fonts/, layout/> -bytecode /tmp/qbc -in report.docx -to pdf -out report.pdf
@@ -73,21 +75,24 @@ the same 28 libraries linked a second time (`steps.sh x2t_server`):
   emscripten package does - traps ("indirect call type mismatch",
   measured). Each `fx_dyncall` keeps the stack pointer it was called with;
   after a longjmp the host calls `fx_unwind`.
-- **An 8 MiB stack** (the page's build has 128 KiB; the .doc files that stop
-  with it stop with 8 MiB too, so that was not the stack), **memory from
+- **An 8 MiB stack** (the page's build has 128 KiB; the .doc files that
+  stopped with it stopped with 8 MiB too: not the stack, the CSS calculator
+  below), **memory from
   320 MiB up to 4 GiB** (a 200,000-row csv takes 2.6 GiB), no closure
-  compiler. `--profiling-funcs` is passed, but the module keeps only
-  binaryen's thunk names: a trap's stack names functions by number.
+  compiler. `--profiling-funcs` is passed, but core's `base.pri` strips
+  every release link (`-Wl,-s`) and the module keeps only binaryen's thunk
+  names: a trap's stack names functions by number. `build.sh --diag` links
+  a page build with the names (and SAFE_HEAP) to find one.
 - Everything else - the patches, the compile flags, ICU, the 86 undefined
   functions (README.md "x2t, the converter") - as in the page's build. A
   conversion that reaches an undefined function ends with `missing
   function: <name>` (`x2t.MissingFunction`).
 
-`x2t-server.wasm` is 40.2 MB (`aa39e83b...` at this branch's last link), its
-imports 26 WASI functions, 13 `invoke_*`, two emscripten ones and the 87
-undefined. It is not pinned yet: `build.sh --server` prints its SHA-256; two
-links of the same tree gave the same bytes. Linking it again with the
-libraries built takes about 7 minutes, the whole tree about an hour.
+`x2t-server.wasm` of x2t `v9.4.0.129+3` is 41.4 MB (`ef492165...`, pinned in
+`upstream/onlyoffice.json` beside the page's two files), its imports 26 WASI
+functions, 13 `invoke_*`, two emscripten ones and the 87 undefined. Linking
+it again with the libraries built takes about 5-7 minutes, the whole tree
+about an hour.
 
 ### What the Go side learnt (server/x2t/env.go)
 
@@ -101,6 +106,16 @@ libraries built takes about 7 minutes, the whole tree about an hour.
   be stopped by ending its process - which is how F3 runs it.
 - A warm worker's stdin is an OS pipe: with an `io.Pipe` wazero read the
   first job and never the second.
+- **Random numbers and clocks from the system** (`internal/wasmsys`): a
+  wazero module configuration answers WASI's `random_get` from a
+  deterministic source unless it is given one. x2t reads it (as
+  `/dev/urandom`) for the salt and the key of a document it protects with a
+  password, so every protected document got the same ones - measured: two
+  saves of one document, the same `saltValue`s in the docx, the same IV and
+  salt in the odt. Every module now gets `crypto/rand` and the system's
+  clocks (`engine_test.go` saves twice and compares). The page's x2t was
+  not affected: emscripten fills its `/dev/urandom` with
+  `crypto.getRandomValues` (Node: `crypto.randomFillSync`).
 
 ### The conversion matrix
 
@@ -131,8 +146,9 @@ Into the editor's format (`-format-to` the editor's type), with the watch:
 | sample.docx (the DS's sample, pictures) | 410 KB | 1.7 s | 293 MiB | 5 pictures out (3 EMF as SVG) |
 | SampleDoc.doc, Lists.doc (Word 97-2003) | 27 KB | 0.11-0.14 s | 284 MiB | |
 | Bug46220.doc (four PNG pictures) | 1.1 MB | 0.13 s | 320 MiB | without the watch |
-| ⚠ Bug61268.doc, picture.doc, Bug47731.doc (EMF/WMF pictures) | 0.9-6.2 MB | - | | **x2t stops** (memory access out of bounds), the page's x2t too; the DS: 0.49-10.4 s |
-| ⚠ Bug50955.doc (Word 95, code page 1251, 96 pages) | 603 KB | 4.7 s | 303 MiB | 2 KB out: the text is lost (ICU, below) |
+| picture.doc, Bug47731.doc (EMF/WMF pictures) | 1.4 / 0.9 MB | 1.6 / 0.57 s | 306-334 MiB | without the watch, x2t `+3` (until `+2` x2t stopped, the page's too: below); 7,766 / 80,533 B, the DS's sizes before its base64; the DS: 0.49 / 0.5 s |
+| Bug61268.doc (509 pictures, EMF among them) | 6.2 MB | 39.7 s | 397 MiB | without the watch, x2t `+3`, at a load of 12-20 (the page's x2t in Node: 14.4 s); 6,899,264 B, the DS's; the DS: 10.4 s |
+| Bug50955.doc (Word 95, code page 1251, 96 pages) | 603 KB | 1.4 s (to docx) | 303 MiB | without the watch, x2t `+3`: 3,123 of the DS's 3,124 paragraphs, the same 515,791 characters (until `+2`: 2 KB, the text lost; below) |
 | notes.odt | 43 KB | 0.38 s | 284 MiB | |
 | tr.xlsx / sample.xlsx | 2.5 / 77 KB | 0.87 / 2.8 s | 287 MiB | |
 | SampleSS.xls | 17 KB | 1.6 s | 287 MiB | |
@@ -140,7 +156,7 @@ Into the editor's format (`-format-to` the editor's type), with the watch:
 | tr.pptx / slides.pptx / sample.pptx | 5 / 35 / 87 KB | 0.08 / 0.48 / 4.2 s | 284-291 MiB | |
 | basic_test_ppt_file.ppt | 15 KB | 0.94 s | 284 MiB | |
 | csv, UTF-8 `;` | 116 B | 0.17 s | 284 MiB | |
-| ⚠ csv, windows-1254 | 96 B | 0.32 s | 284 MiB | an empty sheet (the app never sends one) |
+| csv, windows-1254 (x2t's code page 36) | 96 B | 0.02 s | 284 MiB | without the watch, x2t `+3`: the Turkish text whole, as the DS reads it (until `+2`: an empty sheet) |
 | book.epub | 4 KB | - | | 88 (the DS: 88 too) |
 
 Between formats (wasm `run` with the watch, the busy hour / the Document
@@ -161,7 +177,7 @@ Server's whole x2t run):
 | tr.pptx -> odp, sample.pptx -> odp | 0.11, 3.4 s | -, 0.27 s | 3,384 / 48,374 B (DS 48,374) |
 | tr.docx -> rtf, txt | 0.91, 0.27 s | 0.07 s | 2,488 B (DS 2,488) / 339 B |
 | tr.xlsx -> csv `,` `;` `\|` | 0.7-1.1 s | | UTF-8 with a BOM, the delimiter asked for |
-| ⚠ tr.xlsx -> csv windows-1254 | | | `^ehir`: no conversion tables |
+| tr.xlsx -> csv windows-1254 | 0.1 s | | x2t `+3`: `Şehir;Sıcaklık` in windows-1254 (until `+2`: `^ehir`) |
 | tr.docx -> epub, html, md (x2t alone) | trap / 80 / 80 | 1.0 s each | the DS's x2t goes through doctrenderer; here the layout makes the HTML (below) |
 
 Every format x2t writes, read back into the editor's format and out to
@@ -182,31 +198,58 @@ way (0.75 s). **Saving protected works** (`/dev/urandom`): tr.docx to an
 encrypted odt in 1.4 s (11,057 B). (A docx encrypted by msoffcrypto-tool is
 opened by neither x2t, the DS's included.)
 
-### What x2t still lacks here
+### Pictures, HTML to md and the legacy code pages
 
-- ⚠ **Pictures in SVG, and some EMF/WMF ones.** x2t stops - "memory access
-  out of bounds", boost's `px != 0` assertion, or "invalid table access" -
-  in **both** builds, the page's run in Node on the very same files:
-  - drawing a document whose media hold an SVG into a PDF or a thumbnail
-    (sample.docx: its three EMF pictures become SVG in the editor's format;
-    the same job with the SVG files taken out gives the PDF, 382 KB);
-  - turning three of four Word 97-2003 files with EMF/WMF pictures into the
-    editor's format (picture.doc, Bug47731.doc, Bug61268.doc; the docx x2t
-    makes of them stops the same way); sample.xlsx drawn into a PDF.
-  The Document Server does all of them. The stacks are the same functions
-  in both builds (unnamed: see `--profiling-funcs` above), so it is one bug
-  in how x2t's picture code is compiled to WebAssembly, not in the server
-  shim. Next: a build with names and `-sSAFE_HEAP`/`-sASSERTIONS=2` to find
-  the function, then a patch for both builds.
-- ⚠ **HTML to md** stops too (the page's build: out of bounds; the server
-  build loops until the deadline). epub from the same HTML works.
-- **ICU's conversion tables.** emscripten's ICU port carries none, so
-  everything in a code page other than UTF-8/16/32 is lost: a windows-1254
-  csv reads as an empty sheet and writes as `^ehir`, a Word 95 document's
-  text disappears (both builds). The app turns a csv into UTF-8 before x2t
-  sees it (src/csv.ts); for legacy binary documents x2t needs the data:
-  ICU's `icudt` with the converters, loaded by x2t at start
-  (`udata_setCommonData`) - a patch to both builds.
+Until x2t `v9.4.0.129+3` three things stopped, in **both** builds - the
+page's run in Node on the very same files - and a fourth was lost:
+
+- **Pictures in SVG, EMF and WMF.** "memory access out of bounds", boost's
+  `px != 0` assertion, "null function or function signature mismatch":
+  drawing a document whose media hold an SVG into a PDF or a thumbnail
+  (sample.docx: its EMF pictures become SVG in the editor's format), the
+  DS's sample.xlsx into a PDF, and three of four Word 97-2003 files with
+  EMF/WMF pictures - or a docx with one EMF picture of 132 bytes - into the
+  editor's format.
+- **HTML to md**, of any HTML (`<p>Hello world</p>` too): out of bounds in
+  the page's build, a loop until the deadline in the server's.
+- **The cause**, found with a page build that keeps the function names and
+  checks every memory access (`build.sh --diag`, run in Node): ONLYOFFICE
+  core builds its CSS calculator (`Common/3dParty/html/css`) twice - into
+  the graphics library for the SVG engine, and into HtmlFile2 with
+  `CSS_CALCULATOR_WITH_XHTML`, which lays the same classes out differently
+  (wasm32: `NSCSS::CNode` 60 and 64 bytes, `CStyleStorage` 60 and 72,
+  `CCssCalculator_Private` 76 and 100). Natively each library keeps its own
+  copy. CryptPad's recipe left graphics' copy out (the two clashed at the
+  link), so the SVG engine ran HtmlFile2's code - every `MetaFile::CMetaFile`
+  allocated its SVG file's calculator with 76 bytes and initialised 100 -
+  and the `std::vector<NSCSS::CNode>` code both instantiate was kept once,
+  graphics', so HtmlFile2 moved 64-byte nodes 60 bytes at a time. The
+  stacks: `SVG::CSvgCalculator::SetData` -> the vector's destruction ->
+  `free` aborting (sample.docx); `CSvgFile::Clear` -> `~CElement` (picture.doc,
+  sample.xlsx); `HTML::CHTMLReader::GetSubClass` -> `push_back` (md).
+  `patches/06-svg-css-namespace.patch` builds graphics' copy in a namespace
+  of its own; nothing else in x2t uses it.
+- **ICU's conversion tables.** emscripten's ICU port links ICU's empty data
+  stub: everything in a code page other than UTF-8/16/32 and ISO-8859-1 was
+  lost - a windows-1254 csv read as an empty sheet and written as `^ehir`, a
+  Word 95 document's text gone. `scripts/x2t/icu-data.py` links the
+  converter alias table and the 53 tables core's UnicodeConverter reaches
+  (`icu-converters.txt`) as ICU's data entry point, 1.2 MiB of the module;
+  each decodes as with ICU's whole data. The app still turns a csv into
+  UTF-8 before x2t sees it (`src/csv.ts`).
+- **A Word 95 document's paragraphs**: core `v9.4.0.129` read a Word 95
+  paragraph table as Word 97's when the file says it was saved "complex";
+  two of core's own later fixes (`patches/07-doc-word95-upstream.patch`)
+  read it as the Document Server does.
+
+Measured on `+3` (2026-10-16), page and server alike: picture.doc,
+Bug47731.doc and Bug61268.doc open (above); sample.docx's PDF is the DS's
+page with its SVG, EMF and WMF pictures (0.73 % of the pixels differ, the
+fonts), sample.xlsx's the DS's 24 pages (0.36 %), their thumbnails the DS's
+sizes (226 x 320, 247 x 320); tr.docx's md the DS's 276 bytes; the Word 95
+document and the windows-1254 csv as above. What had worked before gives
+the same bytes (sample.docx -> odt 369,221 B, the DS's; letter.docx's PDF
+pixel for pixel the DS's).
 - What doctrenderer does - PDF, images, HTML - is the layout's (below).
 
 ## Page layout without a browser
@@ -258,15 +301,15 @@ Server image's x2t + doctrenderer (allfontsgen run as on its first start).
 | tr.docx (Turkish, Times New Roman) | PDF | 1 | 2.3 / 2.5 s | the same text and lines; Liberation Serif where the DS drew Times New Roman (the image's Microsoft font) |
 | tr.docx | HTML | 1 | | **the same 3,983 bytes** |
 | tr.docx | epub | 1 | 4.4 / 4.9 s | the DS's files (`content.opf`, `toc.ncx`, `index0.html` 4,137 B, DS 4,141 B), the Turkish text whole |
-| tr.docx | md | | | ⚠ x2t stops on the HTML (above); the DS: 276 B |
+| tr.docx | md | | 2.2 s (first) | **the DS's 276 bytes** (x2t `+3`; it stopped on the HTML until `+2`, above) |
 | SampleDoc.doc | PDF | 2 | 2.3 / 2.4 s | |
 | slides.pptx | PDF | 8 | 9.5 / 9.2 s | the same text; **0-0.04 % of the pixels differ** (Liberation Sans where the DS drew Arial) |
 | sample.pptx (the DS's sample) | PDF | 7 | 18.5 / 23.9 s | the same text; 0.01-1.33 % of the pixels differ (the fonts); 190 KB (DS 228 KB) |
 | sample.pptx | PNG | | 19.3 / 17.9 s | 320 x 180, as the DS's |
 | report.xlsx | PNG | 1 | 4.4 / 7.1 s (a third: 10.8 s) | 226 x 320, as the DS's; the DS wrote "Category" in every header cell, this layout the file's own headers |
 | report.xlsx, tr.xlsx | PDF | 1 | 4.0 / 3.3 s, 1.8 / 1.5 s | the same bytes on the warm worker |
-| ⚠ sample.docx | PDF, PNG | | - | x2t stops drawing its SVG pictures (above); the DS: 3.4 s |
-| ⚠ sample.xlsx | PDF, PNG | | - | x2t stops drawing it (above) |
+| sample.docx (SVG, EMF and WMF pictures) | PDF, PNG | 1 | 6.8 s (first) | x2t `+3`: the DS's page with its pictures, 0.73 % of the pixels differ (the fonts); PNG 226 x 320, as the DS's (until `+2` x2t stopped, above) |
+| sample.xlsx (the DS's sample) | PDF, PNG | 24 | 18.0 s (first) | x2t `+3`: the DS's 24 pages, 0.36 % of the pixels differ (3.8 % on the worst page); PNG 247 x 320, as the DS's |
 
 - **Where the time goes**: the layout's calculation, most of it the font
   engine in asm.js (sample.pptx: 12-18 s of calculation, 3-4 s of it in
@@ -307,7 +350,7 @@ The design, from these measurements, for the filex side of task #268.
 **Where the engine lives: in the app's release, never in filex.** The engine
 is ONLYOFFICE's code (x2t, sdkjs, `fonts_ie.js`) and AGPL; filex is MIT and
 never links it. A release attaches an `engine.zip` beside `ui.zip` -
-`x2t-server.wasm` (40.2 MB), `layout-host.wasm` (1.6 MB) and `layout/`
+`x2t-server.wasm` (41.4 MB), `layout-host.wasm` (1.6 MB) and `layout/`
 (`worker.js`, `fonts_ie.js`, `xregexp-all-min.js`) - named in the manifest
 with its SHA-256, as `ui.bundle` is (a new block, `engines.office`, whose
 derived permission the install review shows). sdkjs and the fonts are in
@@ -364,8 +407,12 @@ Server's job (`m_oThumbnail` 320 x 320, aspect 1, first page; a sheet's
 `spreadsheetLayout` in the json), the same sizes. Decided: the engine counts
 as the same drawer - existing pictures do not go stale.
 
-**What the app's release still adds:** `engine.zip` and its pins
-(`upstream/onlyoffice.json`, as x2t's), `layout-host.wasm` built
-reproducibly, an x2t whose picture code does not stop (both builds, a new
-pin; above), and the editor lock written again for the dictionaries and the
-macro editor.
+**What the app's release adds:** `engine.zip`, written by
+`scripts/pack-engine.mjs` from files pinned in `upstream/onlyoffice.json`
+(`x2t-server.wasm` under `x2t`; `layout-host.wasm`, built with wasi-sdk by
+its digest - two builds a day apart gave the same bytes - and the two
+Document Server scripts under `engine`; `worker.js` is this repository's),
+its SHA-256 in `filex-app.json`'s `engines.office` (the release commit
+writes it again with `--manifest` when a file changes), x2t `+3` (above),
+and the editor lock written again for the dictionaries and the macro
+editor.

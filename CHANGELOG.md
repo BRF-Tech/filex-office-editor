@@ -25,8 +25,8 @@ attaches the engine, and filex runs it.
   page's build imports, over WASI. setjmp/longjmp still goes through
   `invoke_*`, which the Go side answers as emscripten's JavaScript does,
   with the indirect call made inside the module (`dyncalls.py`) so the
-  function-pointer-cast emulation keeps working. The page's x2t is the same
-  bytes as before (rebuilt and checked against the pin).
+  function-pointer-cast emulation keeps working; linking it changes
+  nothing in the page's x2t.
 - **Page layout without a browser** (`server/layout`): sdkjs, the editor's
   own layout, in QuickJS (quickjs-ng 0.17.0) compiled to WebAssembly, with
   `worker.js` in doctrenderer's part - the Document Server's scripts in its
@@ -70,6 +70,9 @@ attaches the engine, and filex runs it.
 - `server/layout`: an `html` job - the document as doctrenderer's HTML
   (`asc_nativeGetHtml`); tr.docx came out the same bytes as the Document
   Server's.
+- `bash scripts/x2t/build.sh --diag`: a page build of x2t with function
+  names, emscripten's assertions and checked memory access, to find where
+  x2t stops (never pinned or shipped).
 
 ### Changed
 
@@ -80,14 +83,39 @@ attaches the engine, and filex runs it.
   written again (`bash scripts/extract-editor.sh --update`) for the
   dictionaries.
 
-### Not yet
+### Fixed
 
-- ⚠ **x2t's picture code stops in WebAssembly**, in the page's x2t as in
-  the server's: three of four .doc files with EMF/WMF pictures do not open,
-  a document whose pictures are SVG cannot be written as PDF (Download as,
-  Print, and on a server PDF and thumbnails), and HTML to md stops. The
-  Document Server does all of them; found in the last measurement, to be
-  fixed in x2t's build before the release (`docs/PARITY.md`, row A14).
+- **Documents with EMF, WMF or SVG pictures** (x2t `v9.4.0.129+3`, both
+  builds; `docs/PARITY.md` A14). x2t's picture code wrote past its memory
+  in WebAssembly: the graphics library's SVG engine and HtmlFile2 build
+  ONLYOFFICE's CSS calculator with two layouts of the same classes, and in
+  one module each ran the other's code. A .doc or docx with an EMF or WMF
+  picture did not open (three of four such .doc files measured; 0.3.1's
+  x2t too), a PDF of a document with SVG pictures - Download as, Print - and
+  of the Document Server's sample.xlsx stopped, and HTML to md stopped or
+  looped. `scripts/x2t/patches/06-svg-css-namespace.patch` gives the SVG
+  engine's copy a namespace of its own; all of them come out now, the PDFs
+  with the Document Server's page counts and md the same bytes.
+- **Legacy code pages** (x2t `v9.4.0.129+3`, both builds): ICU's
+  conversion tables are linked in (`scripts/x2t/icu-data.py`, 1.2 MiB) - a
+  Word 95 document's text, a csv in windows-1254, windows-1251, Shift_JIS,
+  GBK, Big5 or a Korean code page come in, and x2t writes windows-1254
+  whole where it wrote `^ehir`.
+- **Word 95 documents keep their paragraphs**: two of ONLYOFFICE core's
+  own later fixes to its Word 97-2003 reader, carried back
+  (`scripts/x2t/patches/07-doc-word95-upstream.patch`). A 96-page Word 95
+  document came in as one paragraph with a third of its text; now as the
+  Document Server reads it.
+
+### Security
+
+- `server/`: every WebAssembly module now gets the operating system's
+  random numbers (`internal/wasmsys`, `crypto/rand`): wazero's default
+  source is deterministic, and x2t-server encrypted every document saved
+  with a password with the same salt and IV (measured: the same
+  `saltValue` in two protected docx, the same IV in two odt). The page's
+  x2t was not affected: emscripten fills its `/dev/urandom` from
+  `crypto.getRandomValues`.
 
 ## [0.3.1] - 2026-10-10
 
