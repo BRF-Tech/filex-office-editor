@@ -134,4 +134,15 @@ describe('the build recipe (scripts/x2t)', () => {
     expect(fix).toMatch(/^\+\t_CP_OPT\(anchor_type\) anchor = attlists_\.shape_with_text_and_styles_\.common_text_anchor_attlist_\.type_;$/m);
     expect(fix).toMatch(/^-\t\tanchor = attlists_\.shape_with_text_and_styles_\.common_text_anchor_attlist_\.type_;$/m);
   });
+
+  it('keeps the no-network fix: in WebAssembly a transfer runs on the calling thread, the network not allowed (patches/09)', () => {
+    const fix = readFileSync(path.join(dir, 'patches', '09-wasm-no-network.patch'), 'latin1');
+    const file = 'Common/Network/FileTransporter/src/FileTransporter_private.h';
+    expect(fix).toContain(`diff --git a/${file} b/${file}`);
+    // Without it a document naming another server never finished: the
+    // transfer's thread never starts in WebAssembly, and TransferSync waited.
+    expect(fix).toMatch(/^\+#ifdef __EMSCRIPTEN__\n(\+\t\t\t\/\/[^\n]*\n)+\+\t\t\tvirtual void Start\(int lPriority\) override$/m);
+    expect(fix).toMatch(/^\+\t\t\t\tThreadProc\(\);$/m);
+    expect(fix).toMatch(/^\+#ifdef __EMSCRIPTEN__\n\+\t\t\t\tbIsCanUseNetwork = false;\n\+#endif$/m);
+  });
 });
