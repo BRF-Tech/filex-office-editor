@@ -330,7 +330,8 @@ func TestConvert_ACsvInALegacyCodePageComesInWhole(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
-		s := part(t, res.Output, "xl/sharedStrings.xml")
+		// x2t writes a csv's cells as inline strings (no sharedStrings.xml).
+		s := part(t, res.Output, "xl/worksheets/sheet1.xml")
 		for _, cell := range c.cells {
 			if !strings.Contains(s, cell) {
 				t.Errorf("%s: no %q in\n%.400s", c.name, cell, s)

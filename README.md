@@ -597,8 +597,11 @@ decodes the same.
 names, emscripten's assertions and checked memory access (`SAFE_HEAP`) into
 `dist/x2t/diag/`, never pinned or shipped: run in Node like the page's (the
 round-trip tests take `X2T_DIR`), a trap's stack names the C++ functions.
-The release links are stripped of the names (core's `base.pri` adds
-`-Wl,-s`), so a trap there names functions by number.
+`SAFE_HEAP` also stops at an unaligned load or store, which WebAssembly
+allows and core's Word 97-2003 reader makes (measured: a Word 95 .doc stops
+in `COfficeDocFile::LoadFromFile`, "alignment fault", and converts fine
+without the check). The release links are stripped of the names (core's
+`base.pri` adds `-Wl,-s`), so a trap there names functions by number.
 
 What x2t still does without, as CryptPad's build does: the link lists 86
 functions it does not have, and a conversion that reached one would stop
