@@ -313,12 +313,14 @@ x2t() {
 #     (server/dyncalls.py writes them from a first link's imports), so
 #     EMULATE_FUNCTION_POINTER_CASTS keeps working - and the module exports
 #     the three functions the host needs around it;
-#   - no closure compiler, import names kept, the functions' names kept
-#     (--profiling-funcs) so a trap says where it stopped;
-#   - an 8 MiB stack, a native x2t's (the page's 128 KiB ran out on three
-#     .doc files of 0.9-6 MB: "out of bounds memory access" in a
-#     recursion, measured), and memory up to 4 GiB (a 200,000-row csv went
-#     past the 2 GiB a module may grow to by default; the host caps it),
+#   - no closure compiler, import names kept; --profiling-funcs is passed,
+#     yet the module keeps only binaryen's fpcast thunk names (measured), so
+#     a trap names functions by number;
+#   - an 8 MiB stack, a native x2t's (three .doc files with EMF/WMF
+#     pictures that stop with the page's 128 KiB stop with 8 MiB too: not
+#     the stack, docs/PARITY.md A14), and memory up to 4 GiB (a 200,000-row
+#     csv takes 2.6 GiB, past the 2 GiB a module may grow to by default; the
+#     host caps it),
 #     starting at 320 MiB (the data and the bigger stack no longer fit the
 #     size emscripten works out, 284 MiB: wasm-ld "initial memory too small").
 # The libraries, the patches and the flags they were compiled with are the
