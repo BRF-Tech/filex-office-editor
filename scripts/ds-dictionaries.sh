@@ -27,12 +27,21 @@ done
 
 . "$here/lib/ds-image.sh"
 ref=$(ds_image_ref "$repo/upstream/onlyoffice.json")
+# The image's dictionary folders are r-x (dr-xr-xr-x) and tar keeps that, so
+# a copy from an earlier run cannot be removed until its folders are writable
+# again; the files' bytes are not touched.
+writable() {
+  if [ -d "$1" ]; then chmod -R u+w -- "$1"; fi
+}
+writable "$out.tmp"
 rm -rf "$out.tmp"
 mkdir -p "$out.tmp"
 # tar inside the image: some of its files are readable by root only, which
 # docker cp to a user's folder is refused.
 docker run --rm --network none --platform linux/amd64 --entrypoint tar "$ref" \
   -C /var/www/onlyoffice/documentserver -cf - dictionaries | tar -C "$out.tmp" -xf -
+writable "$out.tmp"
+writable "$out"
 rm -rf "$out"
 mv "$out.tmp" "$out"
 echo "$(find "$out/dictionaries" -mindepth 1 -maxdepth 1 -type d | wc -l) dictionaries -> $out/dictionaries"
