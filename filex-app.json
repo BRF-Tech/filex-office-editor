@@ -294,7 +294,15 @@
     "frame_package": true,
     "connect_blob": true,
     "download": true,
-    "print": true
+    "print": true,
+    "extras": {
+      "dictionaries": {
+        "catalog": {
+          "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/dictionaries.json",
+          "sha256": "1fce1671b25545bcac9a96fbc319253993dc5436b68069c58b954543be30418e"
+        }
+      }
+    }
   },
   "encrypted_folders": {
     "open": true

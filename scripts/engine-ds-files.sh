@@ -30,15 +30,8 @@ while [ $# -gt 0 ]; do
 done
 mkdir -p "$out"
 
-pin=$repo/upstream/onlyoffice.json
-image=$(sed -n 's/^  "image": "\(.*\)",$/\1/p' "$pin")
-digest=$(sed -n 's/^  "digest": "\(sha256:[0-9a-f]*\)",$/\1/p' "$pin")
-if [ -z "$image" ] || [ -z "$digest" ]; then
-  echo "upstream/onlyoffice.json: no image or digest" >&2
-  exit 1
-fi
-ref=$image@$digest
-docker pull -q --platform linux/amd64 "$ref" > /dev/null
+. "$here/lib/ds-image.sh"
+ref=$(ds_image_ref "$repo/upstream/onlyoffice.json")
 id=$(docker create --platform linux/amd64 "$ref")
 trap 'docker rm -f "$id" > /dev/null' EXIT
 ds=/var/www/onlyoffice/documentserver

@@ -66,7 +66,14 @@ describe('the manifest and the locked editor files', () => {
     // manifest asks for filex 0.56 (0.55 would refuse either block).
     const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'co_edit', 'ui', 'encrypted_folders', 'views', 'new_documents', 'engines'];
     expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
-    expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
+    expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print', 'extras'].includes(k))).toEqual([]);
+    // filex 0.57's ui.extras: the app reads dictionaries an administrator adds
+    // (extra/dictionaries/, which needs package_fetch), and names the catalog
+    // its release publishes for them, pinned (scripts/pack-dictionaries.mjs).
+    expect(Object.keys(manifest.ui.extras)).toEqual(['dictionaries']);
+    expect(manifest.ui.package_fetch).toBe(true);
+    expect(manifest.ui.extras.dictionaries.catalog.url).toBe('https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/dictionaries.json');
+    expect(manifest.ui.extras.dictionaries.catalog.sha256).toMatch(/^[0-9a-f]{64}$/);
     // files:e2e-plaintext and files:co-edit are derived from their blocks:
     // filex refuses either written into `permissions`.
     expect(manifest.permissions).toEqual(['files:read', 'files:write']);
