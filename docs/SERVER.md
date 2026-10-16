@@ -317,7 +317,7 @@ Server image's x2t + doctrenderer (allfontsgen run as on its first start).
 | slides.pptx | PDF | 8 | 9.5 / 9.2 s | the same text; **0-0.04 % of the pixels differ** (Liberation Sans where the DS drew Arial) |
 | sample.pptx (the DS's sample) | PDF | 7 | 18.5 / 23.9 s | the same text; 0.01-1.33 % of the pixels differ (the fonts); 190 KB (DS 228 KB) |
 | sample.pptx | PNG | | 19.3 / 17.9 s | 320 x 180, as the DS's |
-| report.xlsx | PNG | 1 | 4.4 / 7.1 s (a third: 10.8 s) | 226 x 320, as the DS's; the DS wrote "Category" in every header cell, this layout the file's own headers |
+| report.xlsx | PNG | 1 | 4.4 / 7.1 s (a third: 10.8 s) | 226 x 320, as the DS's: the file's own page, without `-json`. With filex's thumbnail layout (`-json`, a 120 mm square page, 2 mm margins, grid lines) 320 x 320, as the DS's (both measured 2026-10-16); the DS wrote "Category" in every header cell, this layout the file's own headers |
 | report.xlsx, tr.xlsx | PDF | 1 | 4.0 / 3.3 s, 1.8 / 1.5 s | the same bytes on the warm worker |
 | sample.docx (SVG, EMF and WMF pictures) | PDF, PNG | 1 | 6.8 s (first) | x2t `+3`: the DS's page with its pictures, 0.73 % of the pixels differ (the fonts); PNG 226 x 320, as the DS's (until `+2` x2t stopped, above) |
 | sample.xlsx (the DS's sample) | PDF, PNG | 24 | 18.0 s (first) | x2t `+3`: the DS's 24 pages, 0.36 % of the pixels differ (3.8 % on the worst page); PNG 247 x 320, as the DS's |
