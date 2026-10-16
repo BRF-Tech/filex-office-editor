@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/BRF-Tech/filex-office-editor/server/internal/measure"
+	"github.com/BRF-Tech/filex-office-editor/server/internal/wasmsys"
 	"github.com/BRF-Tech/filex-office-editor/server/x2t"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -80,9 +81,9 @@ func main() {
 		}
 		fsc = fsc.WithDirMount(host, guest)
 	}
-	mc := wazero.NewModuleConfig().WithName("").WithArgs(flag.Args()...).
+	mc := wasmsys.ModuleConfig().WithName("").WithArgs(flag.Args()...).
 		WithFSConfig(fsc).WithStdout(os.Stdout).WithStderr(os.Stderr).WithStdin(os.Stdin).
-		WithSysWalltime().WithSysNanotime().WithSysNanosleep().WithStartFunctions()
+		WithSysNanosleep().WithStartFunctions()
 	for _, kv := range envs {
 		k, v, _ := strings.Cut(kv, "=")
 		mc = mc.WithEnv(k, v)

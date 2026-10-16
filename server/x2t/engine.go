@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/BRF-Tech/filex-office-editor/server/internal/wasmsys"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
@@ -169,13 +170,12 @@ func (e *Engine) Convert(ctx context.Context, j Job) (*Result, error) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	cfg := wazero.NewModuleConfig().
+	cfg := wasmsys.ModuleConfig().
 		WithName("").
 		WithArgs("x2t", Dir+"/params.xml").
 		WithEnv("TMPDIR", Dir+"/tmp").
 		WithFSConfig(wazero.NewFSConfig().WithDirMount(dir, Dir)).
 		WithStdout(&stdout).WithStderr(&stderr).
-		WithSysWalltime().WithSysNanotime().
 		WithStartFunctions() // _start is called below, to time it apart
 	res := &Result{}
 	ctx = WithCallCache(ctx)

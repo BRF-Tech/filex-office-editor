@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BRF-Tech/filex-office-editor/server/internal/wasmsys"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -159,14 +160,14 @@ func (e *Engine) Start(ctx context.Context, kind string) (*Worker, error) {
 	if e.o.BytecodeDir != "" {
 		fsc = fsc.WithDirMount(e.o.BytecodeDir, "/c")
 	}
-	cfg := wazero.NewModuleConfig().WithName("").
+	cfg := wasmsys.ModuleConfig().WithName("").
 		// qjs takes --std; layout-host.wasm makes std and os global itself
 		// and takes the script first.
 		WithArgs(e.args(kind)...).
 		WithEnv("LAYOUT_CACHE", e.cacheGuest()).
 		WithFSConfig(fsc).
 		WithStdin(inR).WithStdout(outW).WithStderr(io.Discard).
-		WithSysWalltime().WithSysNanotime().WithStartFunctions()
+		WithStartFunctions()
 	inst, err := e.rt.InstantiateModule(ctx, e.mod, cfg)
 	if err != nil {
 		for _, f := range []*os.File{inR, inW, outR, outW} {
