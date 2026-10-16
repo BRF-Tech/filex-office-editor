@@ -216,6 +216,10 @@ export async function buildApp(o) {
   for (const [p, data] of files) if (isHtml(p) && !p.startsWith(EDITOR_PREFIX)) problems.push(...inlineCodeIn(data.toString('utf8'), p));
   for (const v of manifest.views ?? []) if (v.ui && !files.has(v.ui)) problems.push(`filex-app.json: view ${v.id} opens ${v.ui}, which the bundle does not hold`);
   for (const n of manifest.new_documents ?? []) {
+    // Without a template filex makes the new document empty (filex 0.57's
+    // checkNewDocuments: "made from a file of the package or empty"), and
+    // the editor opens an empty file as its blank (src/app/main.ts).
+    if (n.template === undefined) continue;
     if (!files.has(n.template)) problems.push(`filex-app.json: the new ${n.ext} copies ${n.template}, which the bundle does not hold`);
     else if (files.get(n.template).length > 16 * 1024 * 1024) problems.push(`${n.template}: a template over 16 MiB`);
   }
