@@ -65,6 +65,11 @@ const RULES = [
   // dialog edits them in it); its build for Internet Explorer and its
   // example page do not.
   { re: /^web-apps\/vendor\/monaco\/(monaco-for-ie\/|example\.html$)/, drop: "the macro editor's Internet Explorer build and its example page" },
+  // monaco.d.ts is the macro editor's API for its developers (TypeScript
+  // declarations): no page or script asks for it (9.4.0.129, read
+  // 2026-10-16: only its README and CHANGELOG name it), and filex does not
+  // serve .ts.
+  { re: /^web-apps\/vendor\/monaco\/monaco\/monaco\.d\.ts$/, drop: "the macro editor's TypeScript declarations (nothing loads them)" },
   { re: /^sdkjs\/(pdf|visio)\//, drop: 'the PDF and Visio engines' },
   { re: /^sdkjs\/[^/]+\/sdk-all\.bin$/, drop: "the server's script snapshot (doctrenderer)" },
   { re: /^sdkjs\/slide\/themes\/src\//, drop: 'the theme sources (the generated themes stay)' },

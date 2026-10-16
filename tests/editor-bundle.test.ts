@@ -100,6 +100,7 @@ describe('what the bundle keeps', () => {
     // 0.4.0: macros run, and the Macros dialog edits them in the macro editor.
     ['web-apps/vendor/monaco/monaco/min/vs/loader.js', 'keep'],
     ['web-apps/vendor/monaco/monaco-for-ie/monaco.js', 'drop'],
+    ['web-apps/vendor/monaco/monaco/monaco.d.ts', 'drop'],
     // 0.4.0: the dictionaries of filex's interface languages (docs/PARITY.md A7).
     ['dictionaries/tr_TR/tr_TR.dic', 'rename'],
     ['dictionaries/en_US/hyph_en_US.dic', 'rename'],
