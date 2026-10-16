@@ -626,6 +626,12 @@ machine, `--cpus 6 --memory 7g`): two builds from empty trees gave the
 same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`, the same as
 `v9.4.0.129+1`'s: only the module changed) and `x2t.wasm` (38,763,027
 bytes, `cabaa6e3...`), the sums pinned; 18.6 and 17.4 minutes.
+`v9.4.0.129+3` (patches 06 and 07, the ICU data; 2026-10-16, an x86-64
+Linux machine under other builds' load, `--cpus 8 --memory 12g --server`):
+a build from an empty tree gave the same three files as the tree the fix
+was made in, resumed from its stamps - `x2t.js` (133,782 bytes, unchanged),
+`x2t.wasm` (39,972,412 bytes, `3d2b46ae...`) and `x2t-server.wasm`
+(41,427,638 bytes, `ef492165...`), the sums pinned; 31.5 minutes.
 
 ### txt and csv
 
