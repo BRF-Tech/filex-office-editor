@@ -90,7 +90,8 @@ describe("the editor's Download as", () => {
     const common: { c_oAscEncodings: unknown[][] } = { c_oAscEncodings: encodings };
     const win: Record<string, unknown> = { AscCommon: common, SSE: { Views: { FileMenuPanels: { ViewSaveAs: { prototype: { formats: [[{ type: CSV }]] } } } } } };
     expect(trimDownloadFormats(win, 'cell')).toBe(true);
-    expect(common.c_oAscEncodings.map((e) => e[0])).toEqual([46, 48, 49, 50, 51]);
+    // csv: every code page of the editor's list stays (x2t v9.4.0.129+3 carries ICU's tables); txt: UTF-8 only.
+    expect(common.c_oAscEncodings.map((e) => e[0])).toEqual([36, 46, 47, 48, 49, 50, 51]);
     const words: { c_oAscEncodings: unknown[][] } = { c_oAscEncodings: encodings };
     const de: Record<string, unknown> = { AscCommon: words, DE: { Views: { FileMenuPanels: { ViewSaveAs: { prototype: { formats: [[{ type: TXT }]] } } } } } };
     expect(trimDownloadFormats(de, 'word')).toBe(true);

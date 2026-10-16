@@ -52,7 +52,7 @@ describe('the kind of document', () => {
     expect(kindOf('dotx')).toMatchObject({ writes: 0x004c, beside: null });
   });
 
-  it('a blank document for each OOXML kind, in the bundle as the manifest names it; every kind opens an empty file as its editor's', () => {
+  it("a blank document for each OOXML kind, in the bundle as the manifest names it; every kind opens an empty file as its editor's", () => {
     expect(kindOf('docx')!.blank).toBe('editor/document-templates/new/default/new.docx.bin');
     expect(kindOf('xlsx')!.blank).toBe('editor/document-templates/new/default/new.xlsx.bin');
     expect(kindOf('pptx')!.blank).toBe('editor/document-templates/new/default/new.pptx.bin');
