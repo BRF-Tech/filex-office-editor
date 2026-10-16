@@ -36,18 +36,28 @@ describe('the way out', () => {
     expect(saveTarget(k('xls'))).toMatchObject({ ext: 'xlsx', beside: true });
     expect(saveTarget(k('ppt'))).toMatchObject({ ext: 'pptx', beside: true });
     expect(saveTarget(k('fodt'))).toMatchObject({ ext: 'docx', beside: true });
-    expect(saveExtra({ kind: k('doc'), csv: null }, new Uint8Array([0x50, 0x4b]))).toEqual({ beside: 'docx' });
-    expect(saveExtra({ kind: k('docx'), csv: null }, new Uint8Array([0x50, 0x4b]))).toEqual({});
+    expect(saveExtra({ kind: k('doc'), csv: null }, new Uint8Array([0x50, 0x4b]))).toEqual({ beside: 'docx', conflict: 'copy' });
+    expect(saveExtra({ kind: k('docx'), csv: null }, new Uint8Array([0x50, 0x4b]))).toEqual({ conflict: 'copy' });
   });
 
   it("a csv is written in its delimiter and declared as x2t wrote it", () => {
     expect(saveOptions({ kind: k('csv'), csv: CSV })).toEqual({ formatTo: 0x0104, text: { codepage: 46, delimiter: 2 } });
     const out = new TextEncoder().encode('\ufeffa;b\nc;d\n');
-    expect(saveExtra({ kind: k('csv'), csv: CSV }, out)).toEqual({ csv: { delimiter: ';', encoding: 'utf-8', bom: true, eol: 'lf' } });
+    expect(saveExtra({ kind: k('csv'), csv: CSV }, out)).toEqual({ csv: { delimiter: ';', encoding: 'utf-8', bom: true, eol: 'lf' }, conflict: 'copy' });
   });
 
   it('a protected document stays protected', () => {
     expect(saveOptions({ kind: k('docx'), csv: null, password: 'gizli' })).toEqual({ formatTo: 0x0041, savePassword: 'gizli' });
+  });
+
+  // filex 0.57: a file somebody else changed after it was read gets the save
+  // as a conflict copy beside it (named in the answer), as a Document
+  // Server's save does, rather than a refusal (docs/PARITY.md A9). Every
+  // save asks; the frame sends the version the read answered with.
+  it('every save asks for a conflict copy instead of a refusal', () => {
+    for (const ext of ['docx', 'xlsx', 'pptx', 'odt', 'doc', 'csv']) {
+      expect(saveExtra({ kind: k(ext), csv: ext === 'csv' ? CSV : null }, new TextEncoder().encode('a;b')).conflict, ext).toBe('copy');
+    }
   });
 });
 

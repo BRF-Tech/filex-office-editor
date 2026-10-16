@@ -12,6 +12,7 @@ import {
   PHONE_THEME_LIGHT,
   editorConfig,
   editorLang,
+  editorLocale,
   editorRegion,
   encryptedNotHanded,
   isPhone,
@@ -107,6 +108,20 @@ describe('languages', () => {
     expect(editorRegion('nonsense!')).toBe('en-US');
   });
 
+  // filex 0.57: session.editor_lang, the language the administrator fixed
+  // for document editors, as ONLYOFFICE's list writes it - given to the
+  // editor as it is ("pt-PT" is Portugal's, not Brazil's), the region with
+  // it; absent or not a language code, the reader's own decides.
+  it("the language the administrator fixed for editors comes before the reader's", () => {
+    expect(editorLocale('de', 'tr')).toEqual({ lang: 'de', region: 'de-DE' });
+    expect(editorLocale('pt-PT', 'tr')).toEqual({ lang: 'pt-PT', region: 'pt-PT' });
+    expect(editorLocale('zh-TW', 'en')).toEqual({ lang: 'zh-TW', region: 'zh-TW' });
+    expect(editorLocale(undefined, 'tr')).toEqual({ lang: 'tr', region: 'tr-TR' });
+    expect(editorLocale(null, 'pt-BR')).toEqual({ lang: 'pt', region: 'pt-BR' });
+    expect(editorLocale('auto!', 'tr')).toEqual({ lang: 'tr', region: 'tr-TR' });
+    expect(editorLocale('', 'tr')).toEqual({ lang: 'tr', region: 'tr-TR' });
+  });
+
   it('the legal line names ONLYOFFICE, says the version is modified, and where the source is - in both languages', () => {
     const o = { version: '9.4.0', build: 129, tag: 'v9.4.0.129', app: '0.1.0' };
     for (const t of [STRINGS.en, STRINGS.tr]) {
@@ -135,6 +150,8 @@ describe('the editor configuration', () => {
     expect(c.document).toMatchObject({ fileType: 'docx', key: 'k1', title: 'Rapor.docx' });
     expect(c.document.url).toBe('filex:document');
     expect(c.editorConfig).toMatchObject({ mode: 'edit', lang: 'tr', region: 'tr-TR', coEditing: { mode: 'fast', change: false } });
+    // The language fixed for editors (filex 0.57) draws the editor; the app's own words keep the reader's.
+    expect((editorConfig({ ...base, editorLang: 'de' }) as any).editorConfig).toMatchObject({ lang: 'de', region: 'de-DE' });
     expect(c.editorConfig.user).toEqual({ id: EDITOR_USER_ID, name: 'Ayşe' });
     // 0.4.0 (docs/PARITY.md): macros as a Document Server runs them, after
     // its question; spell checking with the bundle's dictionaries.

@@ -52,13 +52,21 @@ export function saveOptions(d: OpenedDocument): ConvertOptions {
  * What file.save is asked beyond the bytes (filex 0.57): `beside` - write it
  * next to the file, in this format, under a name filex chooses (the file
  * itself is left as it is); `csv` - the dialect the bytes are in, which
- * filex checks against them and turns into the file's own.
+ * filex checks against them and turns into the file's own; `conflict:
+ * 'copy'` - when the file was changed by someone else after it was read,
+ * the save becomes a conflict copy beside it (`<name>.filex-conflict-<time>`,
+ * named in the answer) instead of a refusal, as a Document Server's save
+ * does (docs/PARITY.md A9). filex notices the change against the version
+ * its read answered with (X-Filex-Version), which the frame sends with the
+ * save itself; for a file of an encrypted folder or a vault the option has
+ * no effect (a changed file is refused there as before).
  */
 export function saveExtra(d: OpenedDocument, bytes: Uint8Array): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const target = saveTarget(d.kind);
   if (target.beside) out.beside = target.ext;
   if (d.csv) out.csv = writtenDialect(bytes, d.csv.delimiter);
+  out.conflict = 'copy';
   return out;
 }
 

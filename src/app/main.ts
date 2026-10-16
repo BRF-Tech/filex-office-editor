@@ -686,6 +686,9 @@ async function main(): Promise<void> {
   const app = new OfficeApp(fx, t, kind, x2t, canEdit, info.name);
   app.grants = { download: canDownload, print: canPrintPdf };
   const userName = s.user?.name || 'filex';
+  // The language the administrator fixed for document editors (filex 0.57); absent while each person's decides.
+  const fixed = (s as unknown as { editor_lang?: unknown }).editor_lang;
+  const fixedEditorLang = typeof fixed === 'string' ? fixed : null;
   let dark = s.theme?.mode === 'dark';
   // A phone opens ONLYOFFICE's phone app, to read (config.ts phoneLayout);
   // "Edit" switches to the editor, folded. Decided once, at the opening.
@@ -826,6 +829,7 @@ async function main(): Promise<void> {
       title: info.name,
       key,
       locale: s.locale,
+      editorLang: fixedEditorLang,
       dark,
       userName,
       userId,

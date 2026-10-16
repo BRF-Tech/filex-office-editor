@@ -78,6 +78,21 @@ export function editorLang(locale: string | undefined | null): string {
   return m ? m[1].toLowerCase() : 'en';
 }
 
+/** A language as ONLYOFFICE's list writes it: "de", "pt-PT", "zh-TW", "sr-Latn-RS". */
+const EDITOR_LANG_CODE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/;
+
+/**
+ * The editor's language and region for this opening (filex 0.57): the
+ * language the administrator fixed for document editors
+ * (`session.editor_lang` - a code from ONLYOFFICE's own list, given as it
+ * is, as a Document Server is: "pt-PT" stays Portugal's), else the reader's
+ * own (`session.locale`, editorLang). The region follows the same language.
+ */
+export function editorLocale(fixed: unknown, locale: string | undefined | null): { lang: string; region: string } {
+  if (typeof fixed === 'string' && EDITOR_LANG_CODE.test(fixed)) return { lang: fixed, region: editorRegion(fixed) };
+  return { lang: editorLang(locale), region: editorRegion(locale) };
+}
+
 /** The editor's region (number and date formats): "tr" → "tr-TR". */
 export function editorRegion(locale: string | undefined | null): string {
   const m = /^([a-z]{2,3})(?:[-_]([A-Za-z]{2}))?$/i.exec(String(locale ?? ''));
@@ -112,6 +127,8 @@ export interface ConfigInput {
   /** The document's key for this opening (the editor's docId). */
   key: string;
   locale: string;
+  /** The language the administrator fixed for document editors (session.editor_lang, filex 0.57); absent: the reader's. */
+  editorLang?: string | null;
   dark: boolean;
   userName: string;
   /**
@@ -238,8 +255,7 @@ export function editorConfig(o: ConfigInput): Record<string, unknown> {
     },
     editorConfig: {
       mode: edit ? 'edit' : 'view',
-      lang: editorLang(o.locale),
-      region: editorRegion(o.locale),
+      ...editorLocale(o.editorLang, o.locale),
       user: { id: o.userId || EDITOR_USER_ID, name: personName(o.userName) },
       coEditing: { mode: 'fast', change: false },
       plugins: { autostart: [], pluginsData: [] },
