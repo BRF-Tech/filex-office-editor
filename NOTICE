@@ -62,9 +62,10 @@ sponsored by Ascensio System SIA.
    and the fonts' own licenses; every copyright, license and origin notice
    they ship is kept.
 
-   Changes this project makes to those files, by BRF Tech, 2026-10-08
-   (each one listed with its file in upstream/editor.lock.json, "changed"
-   and "added", and in the bundle as filex/CHANGES.txt):
+   Changes this project makes to those files, by BRF Tech, 2026-10-08 to
+   2026-10-16 (each one listed with its file in upstream/editor.lock.json,
+   "changed" and "added", and in the bundle as filex/CHANGES.txt, which
+   dates them 2026-10-16, the last change of the rules that make them):
      - the HTML pages of web-apps: each inline script moved, unchanged, into
        a file next to its page (index.inline-1.js, ...) and loaded from the
        same place; the stylesheet loaded as media="print" with an onload
@@ -74,14 +75,19 @@ sponsored by Ascensio System SIA.
        (filex/storage.js, this project's own);
      - web-apps/apps/api/documents/api.js is api.js.tpl, with the cache tag
        left as a placeholder;
-     - ONLYOFFICE's license/*.license files and the editors' interface
-       templates (web-apps/apps/*/main/{app,lib}/template/*.template) carry
-       a .txt extension, and the Document Server's blank documents
+     - ONLYOFFICE's license/*.license files, the editors' interface
+       templates (web-apps/apps/*/main/{app,lib}/template/*.template) and
+       the dictionaries' files (dictionaries/<lang>/*.aff, *.dic and their
+       licence and notice files; 2026-10-16) carry a .txt extension, and
+       the Document Server's blank documents
        (document-templates/new/default/new.docx, .xlsx, .pptx) a .bin one;
        their content is unchanged;
      - parts the app does not use are left out (help pages, the PDF and
-       Visio editors, the embedded and forms apps, the macro editor, the
-       dictionaries of languages other than filex's interface ones (item 7),
+       Visio editors, the embedded and forms apps, the macro editor's
+       Internet Explorer build, example page and TypeScript declarations
+       (the macro editor itself is kept, 2026-10-16: macros run), the
+       dictionaries of languages other than filex's interface ones (item 7)
+       and the dictionaries' thesauruses and LibreOffice extension files,
        asm.js fallbacks, the server's script snapshots, the
        per-theme thumbnails, some fonts); the lock file names each kind and
        how many files. The three editors' phone apps
@@ -184,7 +190,7 @@ sponsored by Ascensio System SIA.
    1.1.1f (no OpenSSL code is linked), hyphen (MPL 1.1, GPL 2.0 or LGPL
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
-   LLVM exception, the Unicode license). The next release carries this
+   LLVM exception, the Unicode license). Release 0.4.0 carries this
    build (x2t v9.4.0.129+3); releases 0.2.0 to 0.3.1 carried it without
    patches 06 to 08 and ICU's tables (x2t v9.4.0.129+2); release
    0.1.1 carried it without 05-frame-anchor.patch either (x2t
@@ -192,7 +198,8 @@ sponsored by Ascensio System SIA.
    (release v9.3.2+3) unchanged.
 
 5. The server build of x2t (x2t-server.wasm, made by scripts/x2t/build.sh
-   --server, docs/SERVER.md; not in a release yet) is the same modified
+   --server, docs/SERVER.md; in engine.zip, which releases attach from
+   0.4.0) is the same modified
    ONLYOFFICE core, the same libraries linked a second time as a WASI
    command, with two files of this project linked in (BRF Tech,
    2026-10-15): scripts/x2t/server/wasi-fs.c (the file calls of
@@ -200,9 +207,10 @@ sponsored by Ascensio System SIA.
    scripts/x2t/server/dyncalls.py writes (the indirect calls of
    setjmp/longjmp).
 
-6. The page layout without a browser (server/layout, docs/SERVER.md; not in
-   a release yet) runs ONLYOFFICE's sdkjs - the same files the bundle
-   carries - with two more files from the same Document Server image,
+6. The page layout without a browser (server/layout, docs/SERVER.md; in
+   engine.zip from release 0.4.0) runs ONLYOFFICE's sdkjs - the same files
+   the bundle carries - with two more files from the same Document Server
+   image,
    unchanged: sdkjs/common/libfont/engine/fonts_ie.js (ONLYOFFICE's
    FreeType and HarfBuzz compiled to asm.js; AGPL-3.0, with FreeType's FTL
    and HarfBuzz's MIT licence) and web-apps/vendor/xregexp/xregexp-all-min.js
@@ -213,7 +221,9 @@ sponsored by Ascensio System SIA.
    QuickJS-ng (https://github.com/quickjs-ng/quickjs, MIT): its release's
    qjs-wasi.wasm, or layout-host.wasm, quickjs-ng 0.17.0 built for WASI with
    server/layout/host/layout-host.c (BRF Tech) by
-   server/layout/host/build.sh, which fetches its source by SHA-256.
+   server/layout/host/build.sh, which fetches its source by SHA-256;
+   engine.zip carries layout-host.wasm, worker.js and the two files of the
+   image.
 
 7. The dictionaries a release publishes beside the app (dict-<lang>.aff,
    .dic and hyph_<lang>.dic, made by scripts/pack-dictionaries.mjs from
