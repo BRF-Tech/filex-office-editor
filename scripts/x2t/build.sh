@@ -7,7 +7,7 @@
 # the tag upstream/onlyoffice.json names ("x2t" -> "build"), and checks the
 # two files it makes against the SHA-256 sums pinned there.
 #
-#   bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server]
+#   bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server] [--diag]
 #
 #   --work DIR     the build tree (default .x2t-build/ in the repository, about
 #                  4.5 GB); a run that stopped goes on from where it stopped,
@@ -20,6 +20,9 @@
 #                  libraries as a WASI command a host runs without a browser
 #                  (README.md "x2t on a server"); checked against the pin
 #                  once "x2t-server.wasm" is pinned, its sum printed until then
+#   --diag         also link a page build to find where x2t stops - function
+#                  names, emscripten's assertions and SAFE_HEAP - into
+#                  diag/ of --out (steps.sh x2t_diag); never pinned or shipped
 #
 # It needs bash and docker. The toolchain is emscripten's own image, pinned by
 # digest, with the build tools from one day's Ubuntu snapshot
@@ -40,6 +43,7 @@ cpus=8
 memory=16g
 jobs=
 server=0
+diag=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -49,7 +53,8 @@ while [ $# -gt 0 ]; do
     --memory) memory=$2; shift 2 ;;
     --jobs) jobs=$2; shift 2 ;;
     --server) server=1; shift ;;
-    *) echo "usage: bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server]" >&2; exit 2 ;;
+    --diag) diag=1; shift ;;
+    *) echo "usage: bash scripts/x2t/build.sh [--work DIR] [--out DIR] [--cpus N] [--memory SIZE] [--jobs N] [--server] [--diag]" >&2; exit 2 ;;
   esac
 done
 jobs=${jobs:-$cpus}
@@ -87,10 +92,18 @@ docker run --rm \
   "${user[@]}" \
   -e JOBS="$jobs" \
   -e SERVER="$server" \
+  -e DIAG="$diag" \
   -v "$here:/x2t:ro" \
   -v "$pin:/pin.json:ro" \
   -v "$work:/work" \
   "$tag" bash /x2t/steps.sh
+
+if [ "$diag" = 1 ]; then
+  mkdir -p "$out/diag"
+  cp "$work/out/diag/x2t.js" "$out/diag/x2t.js"
+  cp "$work/out/diag/x2t.wasm" "$out/diag/x2t.wasm"
+  echo "the diagnostic build (names, assertions, SAFE_HEAP; not for shipping) -> $out/diag"
+fi
 
 got_js=$(sha256sum "$work/out/x2t.js" | cut -c1-64)
 got_wasm=$(sha256sum "$work/out/x2t.wasm" | cut -c1-64)

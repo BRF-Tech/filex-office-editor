@@ -17,8 +17,8 @@
 # Dockerfile and embuild.sh of 7debf5e6): the same libraries of ONLYOFFICE
 # core in the same order, each one a qmake project built with emcc, linked
 # into one module. Its changes to the sources are patches/01, ported to
-# ONLYOFFICE core 9.4; patches/02-05 are this project's (README.md, "x2t,
-# the converter").
+# ONLYOFFICE core 9.4; patches/02-06 are this project's, and so is the ICU
+# data linked in (icu-data.py; README.md, "x2t, the converter").
 
 set -euo pipefail
 
@@ -154,6 +154,22 @@ CPP
   em++ -sUSE_ICU=1 -Os "$d/icu.cpp" -o "$d/icu.js"
 }
 
+# ICU's conversion tables. The port links ICU's empty data stub, so ICU
+# converts only UTF-8/16/32 and ISO-8859-1: a csv in windows-1254 read as an
+# empty sheet and a Word 95 document lost its text. icu-data.py takes the
+# alias table and the tables icu-converters.txt names out of the data
+# package of the ICU release the port is built from (its sha512 pinned by
+# emscripten) and writes them as ICU's data entry point (icudt68_dat), an
+# object linked into both builds before the port's stub: 1.2 MiB.
+icu_data() {
+  local d=$W/b/icu-data dat
+  dat=$(ls "$EM_CACHE"/ports/icu/icu/source/data/in/icudt*l.dat)
+  rm -rf "$d"
+  mkdir -p "$d"
+  python3 /x2t/icu-data.py "$dat" /x2t/icu-converters.txt "$d/icudata.dat" "$d/icudata.c"
+  emcc -Os -c "$d/icudata.c" -o "$d/icudata.o"
+}
+
 # Boost: the release's headers, and the two of its libraries x2t links
 # (date_time and regex), compiled with emscripten from the files b2 builds
 # them from (b2's own emscripten toolset predates this emscripten and fails).
@@ -238,8 +254,11 @@ qbuild() {
 # one library (two libraries carrying the same file would clash at the
 # link); here the .pri is changed for that build and put back after it.
 # The .pri is taken from the copy the patches step kept (a run stopped in
-# the middle of such a build leaves the changed one behind).
-PRI_EDITED=(Common/3dParty/html/css/CssCalculator.pri DesktopEditor/graphics/pro/freetype.pri)
+# the middle of such a build leaves the changed one behind). Only where the
+# copies are the same code: CryptPad's recipe also dropped graphics' CSS
+# calculator, which is not HtmlFile2's (patches/06-svg-css-namespace.patch
+# gives it a namespace of its own instead).
+PRI_EDITED=(DesktopEditor/graphics/pro/freetype.pri)
 with_pri_edit() {
   local file=$1 expr=$2
   shift 2
@@ -259,8 +278,7 @@ libs() {
   step lib-ooxmlsignature qbuild ooxmlsignature DesktopEditor/xmlsec/src/ooxmlsignature.pro "$JOBS"
   step lib-UnicodeConverter qbuild UnicodeConverter UnicodeConverter/UnicodeConverter.pro "$JOBS"
   step lib-kernel qbuild kernel Common/kernel.pro "$JOBS"
-  step lib-graphics with_pri_edit Common/3dParty/html/css/CssCalculator.pri 's,$$PWD/src/[^ ]*\.cpp,,' \
-    qbuild graphics DesktopEditor/graphics/pro/graphics.pro 1 "QMAKE_CXXFLAGS+=-Wno-register"
+  step lib-graphics qbuild graphics DesktopEditor/graphics/pro/graphics.pro 1 "QMAKE_CXXFLAGS+=-Wno-register"
   step lib-TxtXmlFormatLib qbuild TxtXmlFormatLib TxtFile/Projects/Linux/TxtXmlFormatLib.pro "$JOBS"
   step lib-BinDocument qbuild BinDocument OOXML/Projects/Linux/BinDocument/BinDocument.pro "$JOBS"
   step lib-DocxFormatLib qbuild DocxFormatLib OOXML/Projects/Linux/DocxFormatLib/DocxFormatLib.pro "$JOBS"
@@ -290,13 +308,47 @@ libs() {
   step lib-DocxRenderer qbuild DocxRenderer DocxRenderer/DocxRenderer.pro "$JOBS"
 }
 
+ICU_DATA=$W/b/icu-data/icudata.o
+PAGE_LFLAGS="-looxmlsignature -L$BOOST/lib --pre-js /x2t/pre-js.js -sEXPORTED_RUNTIME_METHODS=ccall,FS -sEXPORTED_FUNCTIONS=_main1"
+
 x2t() {
   qbuild X2tConverter X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
-    "QMAKE_LFLAGS+=-looxmlsignature -L$BOOST/lib --pre-js /x2t/pre-js.js -sEXPORTED_RUNTIME_METHODS=ccall,FS -sEXPORTED_FUNCTIONS=_main1"
+    "QMAKE_LFLAGS+=$PAGE_LFLAGS" "LIBS+=$ICU_DATA"
   local bin=$CORE/build/bin/linux_64
   cp "$bin/x2t" "$OUT/x2t.js"
   cp "$bin/x2t.wasm" "$OUT/x2t.wasm"
   (cd "$OUT" && sha256sum x2t.js x2t.wasm | tee SHA256SUMS)
+}
+
+# A page build to find where x2t stops (build.sh --diag; not pinned, never
+# shipped): function names kept, emscripten's assertions and its checked
+# memory access (SAFE_HEAP: a load or store at a null or past-the-heap
+# address stops with "segmentation fault" where it happens), no closure
+# compiler. core's base.pri adds -Wl,-s (strip, which drops the names) to
+# every release link after the command line's settings, so this link goes
+# through a wrapper that leaves it out. Run it in Node as the page's build
+# (tests/x2t-wasm.test.ts with X2T_DIR): a trap's stack names the
+# functions. It is how docs/PARITY.md A14 was found.
+x2t_diag() {
+  local wrap=$W/b/diag-link bin=$CORE/build/bin/linux_64
+  mkdir -p "$wrap"
+  cat > "$wrap/em++" <<'SH'
+#!/bin/sh
+for a in "$@"; do
+  shift
+  [ "$a" = "-Wl,-s" ] || set -- "$@" "$a"
+done
+exec em++ "$@"
+SH
+  chmod +x "$wrap/em++"
+  rm -f "$bin/x2t" "$bin/x2t.wasm"
+  QBUILD_RELINK=1 LFLAGS="-sUSE_ICU=1 -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=128kb -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_OVERFLOW_CHECK=2 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEMULATE_FUNCTION_POINTER_CASTS=1 --profiling-funcs" \
+    qbuild X2tConverter-diag X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
+    "QMAKE_LINK=$wrap/em++" "QMAKE_LFLAGS+=$PAGE_LFLAGS" "LIBS+=$ICU_DATA"
+  mkdir -p "$OUT/diag"
+  cp "$bin/x2t" "$OUT/diag/x2t.js"
+  cp "$bin/x2t.wasm" "$OUT/diag/x2t.wasm"
+  rm -f "$bin/x2t" "$bin/x2t.wasm"
 }
 
 # The server build (build.sh --server, docs/SERVER.md): the same libraries
@@ -314,11 +366,12 @@ x2t() {
 #     EMULATE_FUNCTION_POINTER_CASTS keeps working - and the module exports
 #     the three functions the host needs around it;
 #   - no closure compiler, import names kept; --profiling-funcs is passed,
-#     yet the module keeps only binaryen's fpcast thunk names (measured), so
-#     a trap names functions by number;
-#   - an 8 MiB stack, a native x2t's (three .doc files with EMF/WMF
-#     pictures that stop with the page's 128 KiB stop with 8 MiB too: not
-#     the stack, docs/PARITY.md A14), and memory up to 4 GiB (a 200,000-row
+#     yet core's base.pri strips the link (-Wl,-s) and the module keeps
+#     only binaryen's fpcast thunk names, so a trap names functions by
+#     number (build.sh --diag makes a page build with the names);
+#   - an 8 MiB stack, a native x2t's (the .doc files with EMF/WMF pictures
+#     that stopped did so with 8 MiB too: not the stack but the CSS
+#     calculator, patches/06), and memory up to 4 GiB (a 200,000-row
 #     csv takes 2.6 GiB, past the 2 GiB a module may grow to by default; the
 #     host caps it),
 #     starting at 320 MiB (the data and the bigger stack no longer fit the
@@ -336,12 +389,12 @@ x2t_server() {
   emcc -Os -I"$em/system/lib/libc/musl/arch/emscripten" -c /x2t/server/wasi-fs.c -o "$shim/wasi-fs.o"
   rm -f "$bin/x2t" "$bin/x2t.wasm"
   LFLAGS=$SERVER_LFLAGS qbuild X2tConverter-server X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
-    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o"
+    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o $ICU_DATA"
   python3 /x2t/server/dyncalls.py "$bin/x2t.wasm" "$shim/dyncalls.c"
   emcc -Os -c "$shim/dyncalls.c" -o "$shim/dyncalls.o"
   rm -f "$bin/x2t" "$bin/x2t.wasm"
   QBUILD_RELINK=1 LFLAGS=$SERVER_LFLAGS qbuild X2tConverter-server X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
-    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o $shim/dyncalls.o"
+    "QMAKE_LFLAGS+=$lflags" "LIBS+=$shim/wasi-fs.o $shim/dyncalls.o $ICU_DATA"
   mkdir -p "$OUT/server"
   cp "$bin/x2t.wasm" "$OUT/server/x2t-server.wasm"
   (cd "$OUT/server" && sha256sum x2t-server.wasm | tee SHA256SUMS)
@@ -353,10 +406,15 @@ step patches patches
 step openssl-headers openssl_headers
 step boost boost
 step icu-port icu_port
+step icu-data icu_data
 libs
 rm -f "$STAMPS/x2t"
 step x2t x2t
 if [ "${SERVER:-0}" = 1 ]; then
   rm -f "$STAMPS/x2t-server"
   step x2t-server x2t_server
+fi
+if [ "${DIAG:-0}" = 1 ]; then
+  rm -f "$STAMPS/x2t-diag"
+  step x2t-diag x2t_diag
 fi

@@ -1,0 +1,59 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-16: the SVG engine's
+copy of the CSS calculator gets a namespace of its own in a WebAssembly
+build.
+
+ONLYOFFICE core builds its CSS calculator (Common/3dParty/html/css) twice:
+into graphics, for the SVG engine (css_calculator_without_xhtml), and into
+HtmlFile2, with CSS_CALCULATOR_WITH_XHTML - which adds members to
+NSCSS::CNode, NSCSS::CStyleStorage and NSCSS::CCssCalculator_Private.
+Natively the two are separate libraries and each keeps its own copy. In one
+WebAssembly module they met: CryptPad's recipe left graphics' copy out (the
+two clashed at the link), so the SVG engine, compiled for the smaller
+layout, ran HtmlFile2's code for the larger one; and the std::vector code
+both instantiate for NSCSS::CNode (push_back, its relocation, its
+destruction) was kept once, graphics', with the smaller element size, for
+HtmlFile2 too.
+
+Measured (2026-10-16, emscripten 4.0.11, wasm32): NSCSS::CNode is 60 bytes
+here and 64 in HtmlFile2, CStyleStorage 60 and 72, CCssCalculator_Private 76
+and 100 - so every metafile x2t opened (MetaFile::CMetaFile holds an SVG
+file, whose calculator is allocated with 76 bytes and initialised with 100)
+wrote past its block. A build with function names showed where it ended:
+  - a PDF of a document with SVG pictures (the DS's sample.docx):
+    SVG::CSvgCalculator::SetData, std::vector<NSCSS::CNode>'s destruction,
+    free() aborting on the broken heap;
+  - a .doc with EMF/WMF pictures into the editor's format (picture.doc) and
+    sample.xlsx into a PDF: CSvgFile::Clear, CStyleStorage::Clear,
+    ~CElement, "memory access out of bounds";
+  - HTML to md, of any HTML (<p>Hello</p> too): HTML::CHTMLReader::
+    GetSubClass, std::vector<NSCSS::CNode>::push_back moving 64-byte nodes
+    with graphics' 60-byte code, a segmentation fault (SAFE_HEAP) - or a
+    loop, depending on what the bytes held.
+With graphics' sources built again in a namespace of their own
+(steps.sh no longer drops them), each library has its copy, as natively.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/DesktopEditor/graphics/pro/metafile.pri b/DesktopEditor/graphics/pro/metafile.pri
+index bc3b103a..5c5f1962 100644
+--- a/DesktopEditor/graphics/pro/metafile.pri
++++ b/DesktopEditor/graphics/pro/metafile.pri
+@@ -184,6 +184,18 @@ METAFILE_PATH = $$PWD/../../raster/Metafile
+ 
+ 		CONFIG += css_calculator_without_xhtml
+ 
++		# filex-office-editor (BRF Tech, 2026-10-16): in a WebAssembly build
++		# every library is linked into one module, HtmlFile2 with them, and
++		# HtmlFile2 builds the same CSS calculator with
++		# CSS_CALCULATOR_WITH_XHTML, which lays NSCSS::CNode,
++		# NSCSS::CStyleStorage and NSCSS::CCssCalculator_Private out
++		# differently (wasm32: 64, 72 and 100 bytes; 60, 60 and 76 here).
++		# Natively each library keeps its own copy (hidden symbols); in one
++		# module the two would meet - the same functions defined twice, the
++		# same std::vector<NSCSS::CNode> code instantiated by both and kept
++		# once. This copy gets a namespace of its own instead.
++		core_wasm:DEFINES += NSCSS=NSCSS_Svg
++
+ 		include($$METAFILE_PATH/../../../Common/3dParty/html/css/CssCalculator.pri)
+ 	}
+ }

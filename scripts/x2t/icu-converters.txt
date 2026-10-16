@@ -1,0 +1,62 @@
+# The ICU data x2t carries (scripts/x2t/icu-data.py): ICU 68's converter
+# alias table and the conversion tables ONLYOFFICE core's UnicodeConverter
+# reaches - each encoding in UnicodeConverter_Encodings.h, by its name
+# (ucnv_open), and each of its code page numbers ICU knows by number
+# (ucnv_openCCSID, which toUnicode uses for the code page of a Word, Excel
+# or PowerPoint 97-2003 file). The names on the right are what ICU opens for
+# them, measured with ICU's whole data. UTF-8, UTF-7, UTF-16, UTF-32 and
+# ISO-8859-1 need no table.
+cnvalias.icu
+ibm-1089_P100-1995.cnv        # ISO-8859-6 (Arabic)
+ibm-720_P100-1997.cnv         # DOS-720 (Arabic)
+ibm-9448_X100-2005.cnv        # windows-1256 (Arabic)
+ibm-914_P100-1995.cnv         # ISO-8859-4 (Baltic)
+ibm-921_P100-1995.cnv         # ISO-8859-13 (Baltic)
+ibm-775_P100-1996.cnv         # IBM775, 775 (Baltic)
+ibm-9449_P100-2002.cnv        # windows-1257 (Baltic)
+iso-8859_14-1998.cnv          # ISO-8859-14 (Celtic)
+ibm-915_P100-1995.cnv         # ISO-8859-5 (Cyrillic)
+ibm-878_P100-1996.cnv         # KOI8-R
+ibm-1168_P100-2002.cnv        # KOI8-U
+macos-7_3-10.2.cnv            # x-mac-cyrillic
+ibm-855_P100-1995.cnv         # IBM855, 855 (Cyrillic)
+ibm-866_P100-1995.cnv         # cp866, 866 (Cyrillic)
+ibm-5347_P100-1998.cnv        # windows-1251 (Cyrillic)
+ibm-852_P100-1995.cnv         # IBM852, 852 (Central European)
+ibm-5346_P100-1998.cnv        # windows-1250 (Central European)
+windows-950-2000.cnv          # Big5 (Chinese, traditional)
+ibm-950_P110-1999.cnv         # 950
+ibm-1373_P100-2002.cnv        # the table both of them extend
+windows-936-2000.cnv          # GBK (Chinese, simplified)
+ibm-1386_P100-2001.cnv        # the table it extends
+ibm-912_P100-1995.cnv         # ISO-8859-2 (Eastern European)
+ibm-9005_X110-2007.cnv        # ISO-8859-7 (Greek)
+ibm-737_P100-1997.cnv         # IBM737, 737 (Greek)
+ibm-869_P100-1995.cnv         # IBM869, 869 (Greek)
+ibm-5349_P100-1998.cnv        # windows-1253 (Greek)
+ibm-5012_P100-1999.cnv        # ISO-8859-8 (Hebrew)
+ibm-862_P100-1995.cnv         # DOS-862, 862 (Hebrew)
+ibm-9447_P100-2002.cnv        # windows-1255 (Hebrew)
+ibm-943_P15A-2003.cnv         # Shift_JIS (Japanese)
+euc-jp-2007.cnv               # EUC-JP (Japanese)
+windows-949-2000.cnv          # KS_C_5601-1987 (Korean)
+ibm-1363_P11B-1998.cnv        # the table it extends
+ibm-949_P110-1999.cnv         # 949
+ibm-949_P11A-1999.cnv         # the table it extends
+ibm-970_P110_P110-2006_U2.cnv # EUC-KR (Korean)
+ibm-861_P100-1995.cnv         # IBM861, 861 (Icelandic)
+ibm-865_P100-1995.cnv         # IBM865, 865 (Nordic)
+windows-874-2000.cnv          # windows-874 (Thai)
+ibm-913_P100-2000.cnv         # ISO-8859-3
+ibm-920_P100-1995.cnv         # ISO-8859-9 (Turkish)
+ibm-857_P100-1995.cnv         # IBM857, 857 (Turkish)
+ibm-5350_P100-1998.cnv        # windows-1254 (Turkish)
+ibm-923_P100-1998.cnv         # ISO-8859-15 (Western European)
+ibm-850_P100-1995.cnv         # IBM850, 850 (Western European)
+ibm-858_P100-1997.cnv         # IBM858
+ibm-860_P100-1995.cnv         # IBM860, 860 (Portuguese)
+ibm-863_P100-1995.cnv         # IBM863, 863 (French Canadian)
+ibm-437_P100-1995.cnv         # IBM437, 437 (US)
+ibm-5348_P100-1997.cnv        # windows-1252 (Western European)
+ibm-5354_P100-1998.cnv        # windows-1258 (Vietnamese)
+gb18030.cnv                   # GB18030 (Chinese)
