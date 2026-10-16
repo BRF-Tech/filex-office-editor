@@ -80,6 +80,15 @@ attaches the engine, and filex runs it.
   written again (`bash scripts/extract-editor.sh --update`) for the
   dictionaries.
 
+### Not yet
+
+- ⚠ **x2t's picture code stops in WebAssembly**, in the page's x2t as in
+  the server's: three of four .doc files with EMF/WMF pictures do not open,
+  a document whose pictures are SVG cannot be written as PDF (Download as,
+  Print, and on a server PDF and thumbnails), and HTML to md stops. The
+  Document Server does all of them; found in the last measurement, to be
+  fixed in x2t's build before the release (`docs/PARITY.md`, row A14).
+
 ## [0.3.1] - 2026-10-10
 
 A patch release, from 0.3.0's measurement in filex 0.56 itself: a save that

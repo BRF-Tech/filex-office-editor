@@ -964,6 +964,10 @@ Server gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   runs it in V8; `worker.js` answers what doctrenderer's native objects
   answer, and x2t turns the drawing into a PDF or a thumbnail. Measured: the
   same pages as the Document Server's, letter.docx's PDF pixel for pixel.
+- ⚠ **Not yet**: x2t's picture code stops in WebAssembly - in the page's
+  x2t too - on SVG pictures drawn into a PDF, on some .doc files with
+  EMF/WMF pictures, and on HTML to md ([docs/PARITY.md](docs/PARITY.md),
+  row A14); to be fixed in x2t's build before 0.4.0.
 - Measured, not shipped: the release that brings it attaches the engine,
   and filex 0.57 runs it (docs/SERVER.md, "How filex runs it").
 
