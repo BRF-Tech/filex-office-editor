@@ -356,7 +356,9 @@ Server image's x2t + doctrenderer (allfontsgen run as on its first start).
 
 ## How filex runs it (F3)
 
-The design, from these measurements, for the filex side of task #268.
+What filex 0.57 does with the engine (the filex side of task #268),
+designed from these measurements; 0.4.0 is the first release that attaches
+it.
 
 **Where the engine lives: in the app's release, never in filex.** The engine
 is ONLYOFFICE's code (x2t, sdkjs, `fonts_ie.js`) and AGPL; filex is MIT and
@@ -367,7 +369,8 @@ with its SHA-256, as `ui.bundle` is (a new block, `engines.office`, whose
 derived permission the install review shows). sdkjs and the fonts are in
 `ui.zip` already: the engine mounts the installed package read-only. A
 browser never downloads `engine.zip`, and `ui.zip` keeps its room under
-filex's 128 MiB (about 122 MiB with the dictionaries and the macro editor).
+filex's 128 MiB (0.4.0's: 119.9 MiB with the dictionaries and the macro
+editor).
 
 **The runner: a process of its own, wazero without the context watch.**
 filex starts `filex office-engine` (a hidden command of its own binary) and
@@ -385,9 +388,11 @@ talks to it over stdin/stdout, one JSON job per line:
   with the process;
 - **memory**: each instance capped with `WithMemoryLimitPages`
   (`FILEX_OFFICE_ENGINE_MAX_MB`, default 2048, 4096 at most - x2t's own
-  maximum); the memory reserved up to the cap
-  (`WithMemoryCapacityFromMax`) so that growing it does not copy it (the
-  200,000-row csv: 2.6 GiB in the module, 6.2 GB in the process); the
+  maximum); x2t's memory reserved up to the cap so that growing it does
+  not copy it (the 200,000-row csv: 2.6 GiB in the module, 6.2 GB in the
+  process with the copies) - filex reserves the address space itself
+  (wazero's `WithMemoryCapacityFromMax` takes the module's declared 4 GiB
+  and refuses a lower cap); the
   process's own limit about twice the cap; a worker started again after 20
   jobs or 1.5 GB, the process ended after a few idle minutes;
 - **concurrency**: one process per slot - `thumbs.office_slots` (1-4) for
@@ -401,9 +406,9 @@ talks to it over stdin/stdout, one JSON job per line:
 MB, in filex's data directory, keyed by the module, wazero's version and the
 machine) loads it in about 1 s in every engine process after that; the
 layout's bytecode (23 MB) is written by the first worker. filex compiles at
-install and upgrade, in the background, and says "preparing the office
-engine" until it is ready (`Ready()` false: a Document Server, if there is
-one, takes the jobs meanwhile).
+install and upgrade, in the background, and its Default apps say "Being
+prepared" until it is ready (`Ready()` false: a Document Server, if there
+is one, takes the jobs meanwhile).
 
 **The contract stays.** `wasmplugin.OfficeConverter` (`Ready`, `Convert`)
 gets a second implementation beside the Document Server's; `officecmd`,
@@ -418,7 +423,7 @@ Server's job (`m_oThumbnail` 320 x 320, aspect 1, first page; a sheet's
 `spreadsheetLayout` in the json), the same sizes. Decided: the engine counts
 as the same drawer - existing pictures do not go stale.
 
-**What the app's release adds:** `engine.zip`, written by
+**What the app's release adds** (from 0.4.0): `engine.zip`, written by
 `scripts/pack-engine.mjs` from files pinned in `upstream/onlyoffice.json`
 (`x2t-server.wasm` under `x2t`; `layout-host.wasm`, built with wasi-sdk by
 its digest - two builds a day apart gave the same bytes - and the two

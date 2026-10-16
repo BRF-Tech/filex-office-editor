@@ -9,14 +9,35 @@ update.
 
 ## [Unreleased]
 
-The groundwork for filex 0.57, where an administrator can delete the
-Document Server container: the app does on the server what a Document
-Server did for filex - conversions and office thumbnails - without a
-browser, all of it WebAssembly. Measured here; the release that ships it
-attaches the engine, and filex runs it.
+## [0.4.0] - 2026-10-16
+
+For filex 0.57.0 or later, where an administrator can delete the Document
+Server container: the app does on the server what a Document Server did
+for filex - the conversions apps ask for and office thumbnails - without a
+browser, all of it WebAssembly, in the `engine.zip` the release attaches
+(filex 0.57's `engines.office`); and in the browser it opens every kind a
+Document Server edits for filex, saves a format x2t cannot write beside
+the file, keeps a csv's own delimiter and encoding, opens
+password-protected documents, checks spelling and runs macros after the
+editor's question. It asks for one permission more than 0.3.1,
+`office-engine`, which filex derives from the manifest's `engines.office`
+block (the review says what it means: filex runs ONLYOFFICE's converter and
+page layout in a process of its own, with the documents it hands them and
+nothing else), and names a catalog of the dictionaries of 43 more languages
+for filex to add with one click (`ui.extras`); installing it over 0.3.1 is
+an update. filex 0.56 refuses this manifest (its blocks and its range):
+there, keep 0.3.1.
 
 ### Added
 
+- **`engine.zip`, the office engine for filex 0.57** (the manifest's
+  `engines.office`, granted as `office-engine`): `x2t-server.wasm`,
+  `layout-host.wasm` and the layout's scripts, each pinned in
+  `upstream/onlyoffice.json`, which filex runs on the server for the
+  conversions apps ask for (`engines:office`: the Convert app, MCP's
+  `file_convert`) and for office thumbnails, in a process of its own; the
+  editor's scripts and fonts are read from the installed bundle
+  (`scripts/pack-engine.mjs`, `scripts/engine-ds-files.sh`).
 - **x2t for a server** (`bash scripts/x2t/build.sh --server`,
   `x2t-server.wasm`): the page's 28 libraries linked a second time as a
   WASI command, run with wazero from Go (`server/x2t`), a new instance per
@@ -91,17 +112,22 @@ attaches the engine, and filex runs it.
   a file somebody changed after it was opened keeps their version and gets
   this one beside it (`<name>.filex-conflict-<time>.<ext>`), as a Document
   Server's save does; the app says where it went.
-- `engine.zip` and the manifest's `engines.office` for filex 0.57's office
-  engine (`scripts/pack-engine.mjs`, `scripts/engine-ds-files.sh`).
 
 ### Changed
 
 - **Macros run**, as a Document Server runs them: in the editor, after the
   person answers its "run the macros?" question (`macrosMode: "warn"`).
-- The manifest asks for filex 0.57.0 or later (file.save's `beside` and
-  `csv`, FileInfo's `text_dialect`). The editor bundle's lock has to be
-  written again (`bash scripts/extract-editor.sh --update`) for the
-  dictionaries.
+- The manifest asks for filex 0.57.0 or later (file.save's `beside`, `csv`
+  and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`,
+  `engines.office`, `ui.extras`).
+- **x2t is `v9.4.0.129+3`**, in the page and on the server (patches 06 to
+  08 and ICU's conversion tables, below); the release's `x2t.zip` carries
+  it.
+- **The app's bundle is larger**: 119.9 MiB zipped (2,796 files, 391.9 MiB
+  unpacked), from 0.3.1's 98.3 MiB - the dictionaries of filex's interface
+  languages (en_US, tr_TR, de_DE, es_ES, fr_FR, ar) and the macro editor
+  travel in it; filex's limit is 128 MiB. The editor part's lock is written
+  again from the pinned image (2,786 files, 109.4 MiB zipped).
 
 ### Fixed
 

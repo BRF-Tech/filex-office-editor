@@ -7,19 +7,18 @@ open in the editor in place of filex's preview, and saving writes a new
 version of the file. Nothing of the editor runs on the server: its files come
 from the app's package and the document is converted in the browser.
 
-**No Document Server is needed** - neither to edit office documents nor to
-edit them together. With filex 0.56 or later this app is all it takes:
-several people can edit one document at the same time, each in their own
-browser, through filex's relay ([Editing together](#editing-together)).
-filex keeps its Document Server support, and it is optional: an instance
-that has one can stay connected to it. What still needs a Document Server
-is what filex itself does with an office file **on the server** through one
-(a conversion run there, an office thumbnail made there); this app does
-neither yet - its Download as, PDF and Print run x2t in the browser. The
-next release brings both to the server, without a browser and without a
-Document Server: x2t built for WASI and the editor's own layout (sdkjs) in
-QuickJS, all of it WebAssembly - measured on this branch, page for page as
-the Document Server makes them ([The app on a server](#the-app-on-a-server)).
+**No Document Server is needed** - not to edit office documents, not to
+edit them together and, with filex 0.57, not for what filex itself does
+with an office file **on the server**. This app is all it takes: several
+people can edit one document at the same time, each in their own browser,
+through filex's relay ([Editing together](#editing-together)), and since
+0.4.0 the app brings filex an office engine for the server - the
+conversions apps ask for and office thumbnails, without a browser: x2t
+built for WASI and the editor's own layout (sdkjs) in QuickJS, all of it
+WebAssembly, page for page as the Document Server makes them
+([The app on a server](#the-app-on-a-server)). filex keeps its Document
+Server support, and it is optional: an instance that has one can stay
+connected to it.
 
 It goes further with filex 0.56: documents **inside encrypted folders**,
 decrypted in the browser, edited there and encrypted again before they are
@@ -39,42 +38,57 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.3.1**, for filex 0.56 or later. Several people edit one
+> **Status: 0.4.0**, for filex 0.57 or later. On the server, filex runs
+> the app's office engine (`engine.zip`) for the conversions apps ask for
+> and for office thumbnails, without a browser and without a Document
+> Server ([The app on a server](#the-app-on-a-server)). In the browser,
+> every kind a Document Server edits for filex opens in the editor - doc,
+> xls, ppt, rtf, csv, the templates, the macro-enabled and the flat
+> OpenDocument kinds (`src/kinds.ts`) - and a format x2t cannot write is
+> saved beside the file as OOXML; a csv keeps its delimiter and encoding, a
+> password-protected document opens with its password and stays protected,
+> spelling is checked with the dictionaries of filex's languages (43 more
+> an administrator adds with one click), macros run after the editor's
+> question, and a document somebody changed while it was open gets a
+> conflict copy ([docs/PARITY.md](docs/PARITY.md)). Several people edit one
 > document together through filex's relay, with the Document Server's lock
 > rules, and a person who may only read follows it live
-> ([Editing together](#editing-together)); no Document Server is needed for
-> it. One person edits a document and saves it as a new version - in an
-> encrypted folder or a vault too:
-> filex decrypts the document for the editor in the person's browser and
-> encrypts the save, and no server reads it
+> ([Editing together](#editing-together)); in an encrypted folder or a
+> vault filex decrypts the document for the editor in the person's browser
+> and encrypts the save, and no server reads it
 > ([In an encrypted folder](#in-an-encrypted-folder)). Download as and
-> Print go through filex; the editor's settings are kept; New document gets
-> three rows; on a phone the document opens in ONLYOFFICE's phone view to
-> read, with "Edit". Its x2t is this project's own build: a document with a
-> formula opens with the formula in its line, txt and csv are in Download
-> as with every Turkish letter, and a document x2t stops on ends its
-> opening with the reason ([When x2t stops](#when-x2t-stops)). Measured in
-> Chromium, Firefox and WebKit against a stand-in for filex 0.56 and in a
-> filex built from 0.56's code ([Measured in filex 0.56](#measured-in-filex-056));
-> 0.1.1, the same app without encrypted folders or editing together, in a
-> real filex 0.55.0 ([Measured in filex 0.55](#measured-in-filex-055)). On
-> filex 0.55, install 0.1.1: 0.55 refuses the manifests from 0.2.0 on.
+> Print go through filex (csv in every code page of the editor's list); the
+> editor's settings are kept; New document gets six rows; on a phone the
+> document opens in ONLYOFFICE's phone view to read, with "Edit". Its x2t
+> is this project's own build, `v9.4.0.129+3`
+> ([x2t, the converter](#x2t-the-converter)). Measured for 0.4.0: the unit
+> tests, x2t's round trips with the pinned build, the server's Go tests
+> with the real modules, filex 0.57's own checks of the release's files and
+> its test of the office engine with them
+> ([Building a release](#building-a-release),
+> [The app on a server](#the-app-on-a-server)); the browser run
+> ([Measured in the browsers](#measured-in-the-browsers)) and the
+> measurement in a real filex ([Measured in filex 0.56](#measured-in-filex-056))
+> are 0.3.1's. On filex 0.56, install 0.3.1; on filex 0.55, 0.1.1: each
+> refuses the manifests after its own.
 
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.3.1 (and 0.2.0, 0.3.0): **0.56.0** or later (`"filex": ">=0.56.0"`; editing together, the manifest's `co_edit` block, granted as `files:co-edit`; encrypted folders, its `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.3.1** (tag `v0.3.1`): `ui.zip`, 98.3 MiB, SHA-256 `cd3bc0741f97e471ec26d639da65835fccff2605fc255974ecb5f21d2b179baf`; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| filex | 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
+| Release | **0.4.0** (tag `v0.4.0`): `ui.zip`, 119.9 MiB, SHA-256 `70f9ab974c0940bcef755e2bcb5e4030f98b8859508a9e774c485d5263d29b5b`; `engine.zip`, the office engine filex runs on the server, 13.0 MiB, SHA-256 `a30fbe1ac4d7aa1c6f4e7f49e0b7cf54fa9c2ae25415614db3209d13926ef044`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
 
 Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
-or together. In filex 0.56.0 or later, as an administrator: **Admin →
+or together, nor, with filex 0.57, for conversions and office thumbnails on
+the server. In filex 0.57.0 or later, as an administrator: **Admin →
 Plugins → Apps → Install an app → GitHub repository**,
-`BRF-Tech/filex-office-editor`, tag `v0.3.1` (in filex 0.55, `v0.1.1`).
-filex reads `filex-app.json` at that tag, downloads the release's `ui.zip`
-and refuses it unless its SHA-256 is the one the manifest names.
+`BRF-Tech/filex-office-editor`, tag `v0.4.0` (in filex 0.56, `v0.3.1`; in
+filex 0.55, `v0.1.1`). filex reads `filex-app.json` at that tag, downloads
+the release's `ui.zip` and `engine.zip` and refuses each unless its SHA-256
+is the one the manifest names.
 The review lists what the app asks for: `files:read` and `files:write` (the
 file it was opened with, and its new versions), `files:e2e-plaintext` (the
 documents of encrypted folders the person opens with it, handed over in the
@@ -82,21 +96,32 @@ clear by the person's browser), and what its interface is
 allowed - its own package, frames of its own package, `blob:` addresses it
 made, the script-policy exceptions ONLYOFFICE's editor and x2t need
 (`ui:eval`, `ui:wasm-eval`), handing the person a file (`ui:download`) and
-a PDF to print (`ui:print`), the six kinds it opens and the three rows it
-adds to New document - and `files:co-edit` (several people editing a
+a PDF to print (`ui:print`), the 45 kinds it opens and the six rows it
+adds to New document - `files:co-edit` (several people editing a
 document together through filex's relay; filex seals what they share, the
-app holds no key). A store that lists the app installs the same release
-through the same review. On a server that downloads nothing, **Upload
-files** with the release's `filex-app.json` and `ui.zip` does the same.
+app holds no key) and `office-engine` (filex runs the app's converter and
+page layout on the server, in a process of its own, with the documents it
+hands them and nothing else). A store that lists the app installs the same
+release through the same review. On a server that downloads nothing, the
+install takes the release's files as an upload: `filex-app.json`, `ui.zip`
+and `engine.zip` (`POST /api/admin/app-plugins`, the parts `manifest`,
+`ui` and `engine`).
 
-Once installed, a `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods` or `.odp`
-opens in the editor, and **New → New document** offers a document, a
-spreadsheet and a presentation under Apps. The next release (0.4.0, filex
-0.57) opens every kind a Document Server edits for filex - doc, xls, ppt,
-rtf, the templates and macro-enabled kinds, csv... (`src/kinds.ts`) - saves
-a format x2t cannot write beside the file as OOXML, checks spelling with
-the dictionaries of filex's languages, opens password-protected documents
-and runs macros after the editor's question ([docs/PARITY.md](docs/PARITY.md)).
+Once installed, every kind a Document Server edits for filex opens in the
+editor - `.docx`, `.xlsx`, `.pptx`, the OpenDocument kinds, `.doc`, `.xls`,
+`.ppt`, `.rtf`, `.csv`, the templates and the macro-enabled kinds...
+(`src/kinds.ts`) - and **New → New document** offers a document, a
+spreadsheet and a presentation, as OOXML and as OpenDocument, under Apps.
+A format x2t cannot write is saved beside the file as OOXML, spelling is
+checked with the dictionaries of filex's languages, password-protected
+documents open and macros run after the editor's question
+([docs/PARITY.md](docs/PARITY.md)). The app's **Dictionaries** section in
+filex lists the other 43 languages of the release and installs one with a
+click, each file checked against the release's SHA-256. filex compiles the
+office engine once after the install, in the background (a few minutes;
+**Default apps → Office engine** says "Being prepared"), and then sends it
+its conversions and office thumbnails - by default before a Document
+Server it is connected to ([The app on a server](#the-app-on-a-server)).
 
 ## What it is for
 
@@ -104,9 +129,13 @@ and runs macros after the editor's question ([docs/PARITY.md](docs/PARITY.md)).
   an ONLYOFFICE Document Server it is connected to. An instance without one
   installs this app and edits them in the browser instead - alone, or, with
   filex 0.56, together with others
-  ([Editing together](#editing-together)). A Document Server stays
-  optional: filex goes on using one it is connected to for what it does on
-  the server.
+  ([Editing together](#editing-together)). With filex 0.57 the app's
+  office engine does what filex itself did through a Document Server on
+  the server - the conversions apps ask for and office thumbnails
+  (0.4.0, [The app on a server](#the-app-on-a-server)) - so an instance
+  can delete its Document Server container. A Document Server stays
+  optional: an instance can keep one connected, after the app's engine or
+  before it (filex's Default apps, Office engine).
 - **Encrypted folders** (0.2.0, filex 0.56,
   [In an encrypted folder](#in-an-encrypted-folder)). A Document Server
   reads the document it edits, so filex never offers it in an encrypted
@@ -145,7 +174,10 @@ This app gives the editor all of that in the browser:
   the Document Server's lock rules (`src/locks.ts`), so the first request
   for a paragraph or a range wins everywhere.
 - **The conversion** runs in the browser: x2t, ONLYOFFICE's converter,
-  compiled to WebAssembly, in a worker (`src/x2t.ts` drives it).
+  compiled to WebAssembly, in a worker (`src/x2t.ts` drives it). What
+  filex itself converts on the server, and its office thumbnails, run in
+  the app's office engine with filex 0.57
+  ([The app on a server](#the-app-on-a-server)).
 
 ```
 filex page (keys, network)        the app: two sandboxed pages (this repository)
@@ -280,7 +312,8 @@ The half of the protocol filex owns is MIT and lives in filex: the relay
 (`packages/core/src/lib/e2eoffice.ts`), who saves when
 (`e2eofficeSave.ts`). Running the app needs platform features filex 0.55
 added for it (0.1.0 uses them); encrypted folders and editing together need
-more, which later filex releases bring.
+filex 0.56's, and 0.4.0 - the office engine, saving beside, csv, the
+dictionaries - filex 0.57's.
 
 | The app needs | filex 0.55 | Used by |
 |---|---|---|
@@ -289,12 +322,16 @@ more, which later filex releases bring.
 | The editor loads the document from a `blob:` address | `ui.connect_blob` → `ui:connect-blob`: `connect-src` adds `blob:` | 0.1.0 |
 | The plaintext of a document in an encrypted folder | not given in 0.55: every door an app reaches a file through refuses an encrypted one (`403 encrypted`), and the file's row says how it is encrypted (`encrypted: "folder"`, `"vault"`, `"file"`). **filex 0.56:** the manifest's `encrypted_folders: {"open": true}` → the derived permission `files:e2e-plaintext` (a stern sentence in the review): the person's browser decrypts the document for the app (`FileInfo.plaintext`) and encrypts the save, written only over the file as it was opened | 0.2.0 ([In an encrypted folder](#in-an-encrypted-folder)) |
 | Editing together | filex 0.55: the SDK's `coedit.*` methods are defined, and answer `unavailable`. **filex 0.56:** they are answered through filex's relay (its routes and WebSocket, its tables, the sealed blob store), with the permission `files:co-edit` | 0.3.0 ([Editing together](#editing-together)); on filex 0.55 the app edits alone |
+| The office engine on the server (the conversions apps ask for, office thumbnails) | filex 0.56 sends them to a Document Server. **filex 0.57:** the manifest's `engines.office` (`engine.zip`, by its SHA-256) → the derived permission `office-engine`; filex compiles it after the install and runs it in a process of its own (`filex office-engine`), the editor's scripts and fonts read from the installed bundle | 0.4.0 ([The app on a server](#the-app-on-a-server)) |
+| Saving a format x2t cannot write beside the file, a csv in its own dialect, a conflict copy | **filex 0.57:** file.save's `beside`, `csv` and `conflict: 'copy'`, FileInfo's `text_dialect` - the rules filex applies to a Document Server's save | 0.4.0 ([docs/PARITY.md](docs/PARITY.md) A4, A5, A9) |
+| The language fixed for editors | **filex 0.57:** `session.editor_lang` | 0.4.0 |
+| Dictionaries an administrator adds | **filex 0.57:** `ui.extras` (the kind `dictionaries`, a catalog pinned by SHA-256, its files served under the package's `extra/dictionaries/`); the app's Dictionaries section installs a language of the catalog with one click | 0.4.0 |
 | `localStorage` (the editor keeps settings there) | an opaque frame has none; reading it throws | in the app: an in-memory stand-in loaded first in every page (`scripts/editor/storage.js`) - **measured in Chromium, Firefox and WebKit**: none of them gives the sandboxed pages storage, the stand-in takes its place in both pages and the editor's settings land in it ([Measured in the browsers](#measured-in-the-browsers)) |
 | The editor's settings from one opening to the next | `state.get` / `state.set`: a small store per person and app, in the person's preferences (8 KiB a value, 16 KiB an app, enforced by the server since 0.54) | used as it is: the app keeps the editor's settings under one key (`src/settings.ts`) |
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
 | Print (a sandboxed frame without `allow-modals` may not open the browser's print dialog: measured, in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox) | `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`), filex asks the person every time, and its own print page (`/_print/`, a frame of a `blob:` PDF) opens the print dialog on their Allow | 0.1.0; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
 | No inline scripts | `script-src` is the package only | 0.1.0: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (0.1.0: 98.2 MiB zipped with x2t and the phone apps, 2,633 files, 323.4 MiB unpacked, 37 MiB for `x2t.wasm`) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | a later filex: serving the package's files compressed (`Content-Encoding`), cached by version |
+| A large package (0.4.0: 119.9 MiB zipped with x2t, the phone apps, the dictionaries of filex's languages and the macro editor, 2,796 files, 391.9 MiB unpacked, 38.1 MiB for `x2t.wasm`; 0.1.0: 98.2 MiB) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | a later filex: serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -321,14 +358,16 @@ more, which later filex releases bring.
 | `upstream/editor.lock.json` | What the editor bundle built from that release holds: every file with its SHA-256 and size, what was left out and why, what was changed and why, the zip's size and SHA-256 |
 | `scripts/extract-editor.sh` | Builds the editor bundle from the pinned image ([The editor bundle](#the-editor-bundle)); `scripts/editor/` holds its steps: `in-image.sh` (in the image), `rules.mjs` (what is kept, filex's limits), `html.mjs` (no inline code), `storage.js` (the storage stand-in), `bundle.mjs`, `fontnames.mjs`, `config.mjs` |
 | `scripts/x2t/` | Builds x2t from ONLYOFFICE core at the editor's tag ([x2t, the converter](#x2t-the-converter)): `build.sh` (the host's side, docker only), `Dockerfile` (the toolchain), `steps.sh` (the build, in its container), `patches/` (the changes to core), `main1.cpp` and `pre-js.js` (x2t's entry for the page) |
-| `scripts/fetch-x2t.mjs` | Puts an x2t build made elsewhere in `dist/x2t/` (`--dir`, `--from`), checked against the pin |
+| `scripts/fetch-x2t.mjs` | Puts an x2t build made elsewhere in `dist/x2t/` (`--dir`, `--from`), checked against the pin, or downloads the release's `x2t.zip` the pin names; `--pack` writes that zip |
+| `scripts/pack-engine.mjs`, `scripts/engine-ds-files.sh` | `engine.zip`, the office engine a release attaches for filex 0.57 (`x2t-server.wasm`, `layout-host.wasm`, the layout's scripts, each checked against its pin), and the two Document Server scripts it takes from the pinned image ([Building a release](#building-a-release)) |
+| `scripts/ds-dictionaries.sh`, `scripts/pack-dictionaries.mjs` | The dictionaries a release publishes (the 43 languages of the image the bundle does not carry) and their catalog, `dictionaries.json`, which the manifest pins (`ui.extras`) |
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
 | `server/` | The app on a server, in Go with wazero ([The app on a server](#the-app-on-a-server)): `x2t/` runs the server build of x2t, `layout/` lays a document out into pages with sdkjs in QuickJS (`worker.js` plays the Document Server's doctrenderer), `cmd/` the measurement commands (`x2t-run`, `office-convert`, `wasi-run`); Go tests of its own (`cd server && go test ./...`) |
 | `scripts/x2t/server/` | What the server build of x2t adds to the page's: file calls over WASI (`wasi-fs.c`) and the module's own indirect calls for setjmp/longjmp (`dyncalls.py`) |
 | `docs/` | [PARITY.md](docs/PARITY.md): what a Document Server gives filex, row by row, against this app; [SERVER.md](docs/SERVER.md): the server build, the layout without a browser, the measurements |
-| `filex-app.json` | The app's manifest: what filex installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.56's fields and permissions |
+| `filex-app.json` | The app's manifest: what filex installs ([Installing](#installing)); `tests/app-bundle.test.ts` holds it to filex 0.57's fields and permissions |
 
 ```bash
 npm install
@@ -366,14 +405,16 @@ in three containers, none of them with network access after the pull:
    phone app (`mobile`, see [On a phone](#on-a-phone)) - sdkjs, the
    fonts, ONLYOFFICE's license files. It leaves out the help pages (533 MiB),
    the PDF and Visio editors and engines, the embedded and forms
-   apps, the macro editor's Internet Explorer build (the macro editor
-   itself stays on this branch: macros run), the server's script snapshots, the theme
-   sources, the asm.js builds for browsers without WebAssembly, the large
-   CJK fonts (a fallback CJK font stays) and pre-compressed copies; of the
-   dictionaries, those of filex's interface languages are copied (on this
-   branch: en_US, tr_TR, de_DE, es_ES, fr_FR, ar - 18.4 MB zipped, their
-   `.aff` and `.dic` as `.txt`), the rest an administrator adds. Every HTML page loses its inline code
-   (`scripts/editor/html.mjs`, below).
+   apps, the macro editor's Internet Explorer build, example page and
+   TypeScript declarations (the macro editor itself stays: macros run), the
+   server's script snapshots, the theme sources, the asm.js builds for
+   browsers without WebAssembly, the large CJK fonts (a fallback CJK font
+   stays) and pre-compressed copies; of the dictionaries, those of filex's
+   interface languages are copied (en_US, tr_TR, de_DE, es_ES, fr_FR, ar -
+   18.4 MB zipped, their `.aff` and `.dic` as `.txt`), and a release
+   publishes the other 43 for an administrator to add
+   ([Building a release](#building-a-release)). Every HTML page loses its
+   inline code (`scripts/editor/html.mjs`, below).
 3. **The checks**: every file is one filex serves (its extension, a clean
    path, no two names that differ only in case), no HTML page holds inline
    code, and the zip is within filex's limits for an app's bundle. Then the
@@ -391,7 +432,8 @@ the zlib that makes them).
 Measured with ONLYOFFICE Docs 9.4.0 (build 9.4.0.129), on an x86-64 Linux
 machine (about three minutes, most of it the font and theme generators),
 after the browser measurement of 2026-10-08 (the interface templates in,
-the per-theme thumbnails out, below):
+the per-theme thumbnails out, below), with the dictionaries and the macro
+editor 0.4.0 adds (2026-10-16):
 
 | Part | Files | Unpacked (MiB) | Zipped (MiB) |
 |---|---:|---:|---:|
@@ -404,15 +446,18 @@ the per-theme thumbnails out, below):
 | sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.3 | 3.4 |
 | Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
 | The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
-| **The editor bundle** | **2,623** | **286.1** | **88.5** |
-| **The app's bundle** (`ui.zip` of 0.3.1: with x2t, 37.1 MiB unpacked, and the app; built in the pinned Node image; 0.3.0's, 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,633** | **323.4** | **98.3** |
+| The dictionaries of filex's six interface languages (`.aff`, `.dic`, `hyph_` patterns, their licences) | 46 | 52.0 | 17.6 |
+| The macro editor (`web-apps/vendor/monaco`) | 117 | 15.3 | 3.3 |
+| **The editor bundle** | **2,786** | **353.5** | **109.4** |
+| **The app's bundle** (`ui.zip` of 0.4.0: with x2t, 38.2 MiB unpacked, and the app; built in the pinned Node image; 0.3.1's, 0.3.0's, 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,796** | **391.9** | **119.9** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
-64 MiB a file; the largest files are `x2t.wasm` (37.0 MiB) and
-`sdkjs/cell/sdk-all.js` (30.9 MiB). The editor part was within the 2,000
-files and 100 MB aimed for; with the phone apps it stays under 100 MB
-(92.8 MB) and goes over the file count (2,623), which the build
-only notes - filex's limits are what refuse.
+64 MiB a file; the largest files are `x2t.wasm` (38.1 MiB), the Turkish
+dictionary (`tr_TR.dic`, 34.5 MiB) and `sdkjs/cell/sdk-all.js`
+(30.9 MiB). The editor part is 114.7 MB in 2,786 files, within the 120 MB
+and 3,000 files the build aims for (`BUDGET`, `scripts/editor/rules.mjs`;
+what grows next goes to the files an administrator adds) - filex's limits
+are what refuse.
 
 Two corrections came from the browser measurement (2026-10-08):
 
@@ -449,8 +494,9 @@ the lock file (`changed`, `added`) and in the bundle itself
   `'serviceWorker' in navigator` first and now go on without one.
 - `web-apps/apps/api/documents/api.js` is `api.js.tpl`, as the Document
   Server's first start makes it, with the cache tag left as a placeholder so
-  the editor's paths are not rewritten; ONLYOFFICE's `.license` files and
-  the interface templates get a `.txt` extension, and the Document Server's
+  the editor's paths are not rewritten; ONLYOFFICE's `.license` files, the
+  interface templates and the dictionaries' files get a `.txt` extension,
+  and the Document Server's
   three blank documents (`document-templates/new/default/new.docx` ...,
   what filex's New menu copies) a `.bin` one, so filex serves them. Their
   content is unchanged.
@@ -462,8 +508,9 @@ The app's build ([The app](#the-app)) then makes one more change, and only
 in the app's bundle: `web-apps/vendor/socketio/socket.io.min.js`, ONLYOFFICE's
 copy of the socket.io client, is replaced by the editor page's script, and
 an empty `themes.json` (the Document Server's list of custom themes, which
-the editor asks for on every opening) is added. `editor/filex/CHANGES.txt`
-in the bundle says so.
+the editor asks for on every opening) and an empty `plugins.json` (the
+phone apps ask for it) are added. `editor/filex/CHANGES.txt` in the bundle
+says so, and dates the changes 2026-10-16.
 
 ## x2t, the converter
 
@@ -623,7 +670,7 @@ stops, and starts it again for the next conversion ([When x2t
 stops](#when-x2t-stops)).
 
 **Measured** (2026-10-10, an x86-64 Linux machine, `--cpus 6 --memory 7g`):
-two builds from empty trees, each from a fresh clone of this branch, the
+two builds from empty trees, each from a fresh clone, the
 second with the toolchain image built again without Docker's cache (another
 image id), gave the same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`)
 and `x2t.wasm` (38,763,076 bytes, `8f643075...`) of `v9.4.0.129+1`; so did
@@ -643,6 +690,8 @@ the module fewer `invoke_*` imports, so the glue changes too), `x2t.wasm`
 (39,972,378 bytes, `a4add9f6...`) and `x2t-server.wasm` (41,427,723 bytes,
 `7aacc87f...`), the sums pinned; 45.6 minutes (patches 06 and 07
 alone gave `3d2b46ae...` and `ef492165...` from an empty tree too).
+Release 0.4.0 attaches it as `x2t.zip` (10,977,155 bytes, SHA-512
+`da5105af...35848c92`, pinned under `x2t`).
 
 ### txt and csv
 
@@ -777,7 +826,7 @@ packages by `package-lock.json`, x2t by its hashes - so anyone can make the
 same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 
 ```bash
-git clone --branch v0.3.1 https://github.com/BRF-Tech/filex-office-editor
+git clone --branch v0.4.0 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
 docker run --rm -v "$PWD:/src" -w /src \
@@ -833,6 +882,21 @@ beside the catalog, size and SHA-256). The release attaches all of them;
 `--manifest` writes the catalog's SHA-256 into `ui.extras.dictionaries`.
 The same image gives the same files and catalog (no dates, no compression;
 measured: `1fce1671...`, 37,522 bytes).
+
+Measured for 0.4.0 (2026-10-16, an x86-64 PC, WSL2 with docker-ce): two
+complete builds in two fresh clones of the release commit, from the image
+to the last file, each taking x2t `v9.4.0.129+3` - its three files at the
+pinned sums - from the build of [x2t, the converter](#x2t-the-converter)
+and building `layout-host.wasm` again, gave the same `ui.zip` -
+125,771,006 bytes, 2,796 files, SHA-256
+`70f9ab974c0940bcef755e2bcb5e4030f98b8859508a9e774c485d5263d29b5b` - the
+same `x2t.zip` (10,977,155 bytes, SHA-512 `da5105af...35848c92`), the same
+`engine.zip` (13,615,254 bytes, SHA-256 `a30fbe1a...926ef044`), the same
+`editor.zip` as the lock file and the same 159 dictionary files and
+catalog (`1fce1671...`); three and a half minutes each. filex 0.57's own
+checks then passed on them (`wasmplugin.ParseManifest` and `Validate`, the
+bundle's index, `checkEngineZip`, the catalog's rules, every dictionary
+file at its size and SHA-256): 64 permissions, `office-engine` among them.
 
 Measured for 0.3.1 (2026-10-10, an x86-64 Linux machine), the same way as
 0.2.0: the same `ui.zip` from both builds - 103,098,008 bytes, 2,633
@@ -896,8 +960,8 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    opens ONLYOFFICE's phone app instead ([On a phone](#on-a-phone)).
    Everything that
    would reach a Document Server is off: plugins, chat, help, "suggest a
-   feature" (on this branch macros run after the editor's question, and the
-   spell checker has its dictionaries). Download as and Print are on when
+   feature" (macros run after the editor's question, and the spell
+   checker has its dictionaries). Download as and Print are on when
    filex can hand a file over (the app's `ui:download` grant).
 4. It hands the editor page the converted document over a `MessagePort`,
    as bytes (transferred, not copied).
@@ -940,7 +1004,7 @@ measured in the browser before it was written:
 |---|---|---|
 | The two pages hear each other | `api.js` and the editor's Gateway take a message only from the origin of the other's address; a sandboxed page's messages carry the origin `"null"`, so the editor never got its configuration | `src/origin.ts`: a message that comes from the one window it should come from is handed on with the origin they expect (the window is a stronger check than the origin was); everything else is left as it is |
 | The interface templates | served as `.template.txt` (above) | `src/frame/text.ts`: the text plugin's `createXhr` setting |
-| The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening | `src/frame/workers.ts`: every worker from the package starts from a `blob:` address; the spell engine's (on this branch) with spell.wasm's place and its dictionaries' addresses - the bundle's `editor/dictionaries/`, or `extra/dictionaries/` for a language an administrator added - and the editor page's hyphenation requests go the same way |
+| The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening | `src/frame/workers.ts`: every worker from the package starts from a `blob:` address; the spell engine's with spell.wasm's place and its dictionaries' addresses - the bundle's `editor/dictionaries/`, or `extra/dictionaries/` for a language an administrator added - and the editor page's hyphenation requests go the same way |
 | The presentation themes | the editor loads `sdkjs/slide/themes//themes.js`; nginx merges the two slashes, filex refuses an empty path segment | `src/frame/themes-path.ts`: the editor is given its themes folder without the trailing slash |
 | Save while the editor hands over its changes | the editor's Save does nothing while a hand-over runs, and keeps nothing for later (sdkjs `asc_Save`); a Ctrl+S right after typing was lost | `src/frame/save-retry.ts`: the Save is kept until the editor has started it, and asked again when the editor is free |
 | Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture |
@@ -1050,17 +1114,18 @@ document's own; on filex 0.55 the app said, in the run's Turkish, that the
 document is encrypted and that filex does not hand it to this app there,
 asked for nothing, and nothing was saved. In the same run the rest passed
 again: 36 of 36, no request outside the package, no failed request, 63
-screenshots ([Measured in the browsers](#measured-in-the-browsers)). Not
-yet measured in a real filex 0.56.
+screenshots ([Measured in the browsers](#measured-in-the-browsers)). In a
+filex built from 0.56's code: [Measured in filex 0.56](#measured-in-filex-056).
 
 ## The app on a server
 
 What filex does with an office file on the server - a conversion for an
-app (`engines:office`), an office thumbnail - goes to a Document Server
-today. The next release does it with this app, without a browser and
-without a Document Server, all of it WebAssembly under wazero, the runtime
-filex runs its apps with ([docs/SERVER.md](docs/SERVER.md); what a Document
-Server gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
+app (`engines:office`: the Convert app, MCP's `file_convert`), an office
+thumbnail - went to a Document Server up to filex 0.56. With filex 0.57 and
+0.4.0 it runs on this app's office engine, without a browser and without a
+Document Server, all of it WebAssembly under wazero, the runtime filex runs
+its apps with ([docs/SERVER.md](docs/SERVER.md); what a Document Server
+gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
 
 - **x2t for a server** (`bash scripts/x2t/build.sh --server`): the same
   libraries as the page's x2t, linked as a WASI command - files through
@@ -1077,10 +1142,34 @@ Server gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   page's x2t as in the server's - x2t's picture code stopped in WebAssembly
   until `06-svg-css-namespace.patch` ([docs/PARITY.md](docs/PARITY.md), row
   A14) - and reads the legacy code pages (ICU's conversion tables).
-- Measured, not shipped: the release that brings it attaches the engine,
-  and filex 0.57 runs it (docs/SERVER.md, "How filex runs it").
+- **How filex runs it** ([docs/SERVER.md](docs/SERVER.md), "How filex
+  runs it"): the release attaches `engine.zip` - `x2t-server.wasm`,
+  `layout-host.wasm` and the layout's scripts, 13.0 MiB - named in the
+  manifest by its SHA-256 (`engines.office`, granted as `office-engine`).
+  filex 0.57 installs it beside the app, compiles it once in the background
+  (a few minutes; **Default apps → Office engine** says "Being prepared")
+  and runs it in a process of its own (`filex office-engine`, a job a line),
+  the editor's scripts and fonts read from the installed bundle; by default
+  the app's engine takes the work before a Document Server filex is
+  connected to.
+- **Measured in filex 0.57** (2026-10-16, its `int/057-wave` at
+  `6d2feab13`, WSL2 on an x86-64 PC): filex's own test of the engine
+  (`TestEngine_TheRealModules`, `backend/internal/officeengine`) with this
+  release's `engine.zip` and `ui.zip` passed - the engine prepared in
+  59 s, letter.docx to PDF in 17.2 s (the layout worker's first start
+  included) and to odt in 0.4 s, report.xlsx to csv in 0.15 s, four office
+  thumbnails at the Document Server's sizes in 20.5, 13.9, 10.1 and 6.6 s
+  from one warm worker, a password-protected docx answered as a password
+  error (x2t 90), and a deadline the conversion could not meet ending its
+  process, the next job running on a new one (2.7 s); at most 808 MiB in
+  a process.
 
 ## Measured in the browsers
+
+The run below imitates filex 0.55 and 0.56 and last measured 0.3.1; what
+0.4.0 adds for filex 0.57 (saving beside, csv, passwords, the dictionaries,
+conflict copies, the fixed editor language) is measured by the unit tests
+and x2t's round trips, not by this run yet.
 
 `npm run e2e` (`node e2e/run.mjs`, `--shots` for screenshots) serves the
 built bundle the way filex 0.55 serves an app's interface - the address
@@ -1402,9 +1491,10 @@ put the new release in `upstream/onlyoffice.json`, run
 ## Roadmap
 
 **0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
-for filex 0.55.0 or later, and **0.2.0** (2026-10-10, encrypted folders)
+for filex 0.55.0 or later, **0.2.0** (2026-10-10, encrypted folders)
 and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
-0.56.0 or later, are what works today:
+0.56.0 or later, and **0.4.0** (2026-10-16, the app on a server), for
+filex 0.57.0 or later, are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
@@ -1434,18 +1524,25 @@ and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
    Document Server's lock rules in every bridge; a person who may only read
    follows it live; no Document Server
    ([Editing together](#editing-together)).
+7. With filex 0.57: the app's office engine on the server - the
+   conversions apps ask for and office thumbnails, without a browser and
+   without a Document Server ([The app on a server](#the-app-on-a-server));
+   in the browser, every kind a Document Server edits for filex, a format
+   x2t cannot write saved beside the file, a csv in its own dialect,
+   password-protected documents, spell checking and hyphenation with the
+   dictionaries of filex's languages and 43 more an administrator adds,
+   macros, conflict copies and the fixed editor language
+   ([docs/PARITY.md](docs/PARITY.md)).
 
 Next - the numbers are a plan, and each waits for what filex has to give it
 ([What filex provides](#what-filex-provides)):
 
-- **0.4.0, with filex 0.57**: the app on a server - conversions and
-  office thumbnails without a browser and without a Document Server
-  ([The app on a server](#the-app-on-a-server)), and the rows of
-  [docs/PARITY.md](docs/PARITY.md) that 0.57 closes: the legacy formats,
-  csv, spell checking.
-- **In a next release**: a corpus of real documents compared
-  with what a Document Server makes of them; and, when filex serves an
-  app's package compressed, a lighter download for the browser.
+- **In a next release**: the browser run for 0.4.0's paths against a
+  stand-in for filex 0.57, and the measurement in a real filex 0.57; a
+  corpus of real documents compared with what a Document Server makes of
+  them; the rows of [docs/PARITY.md](docs/PARITY.md) still marked **part**
+  or **no**; and, when filex serves an app's package compressed, a lighter
+  download for the browser.
 
 ## License
 

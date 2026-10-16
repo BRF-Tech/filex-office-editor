@@ -11,21 +11,22 @@ everything the Document Server did for filex.
   `thumb/office.go`, `server/office_engine.go`, `wasmplugin/office.go`,
   `pkg/pluginkit/officecmd`, `desktop/src/openwith.ts`), filex-convert's
   office edges (`internal/graph/edges.go`), ONLYOFFICE Docs 9.4.0.129 (the
-  image this app's files come from) and this app on this branch.
+  image this app's files come from) and this app's 0.4.0.
 - **Measured** (2026-10-15/16): the server build of x2t and the page layout
-  without a browser, both new on this branch - numbers, method and files in
+  without a browser, both new in 0.4.0 - numbers, method and files in
   [SERVER.md](SERVER.md). The pinned Document Server image, in a throwaway
   container that never starts the server (its own `x2t` with doctrenderer),
   made the reference outputs.
-- **Columns:** *DS* - what the Document Server does for filex today. *App* -
-  this app in the browser after this branch (0.4.0), with the evidence.
-  *Without a browser* - what this branch measured. *0.57* - what is left and
-  where: F1 is filex (the CSV fix, the save rules, the deploy files), F2
-  this app, F3 filex running the app's server engine.
+- **Columns:** *DS* - what the Document Server does for filex. *App* -
+  this app in the browser in 0.4.0, with the evidence. *Without a
+  browser* - what 0.4.0 measured on the server (its `engine.zip`, which
+  filex 0.57 runs). *0.57* - what is left and where: F1 is filex (the CSV
+  fix, the save rules, the deploy files), F2 this app, F3 filex running
+  the app's server engine.
 
 Legend: **yes** - as the Document Server does it; **part** - some of it;
 **no**; **n/a** - filex does not use it with the Document Server either.
-**⚠** marks a row that still carries a risk worth knowing before 0.57 ships;
+**⚠** marks a row that still carries a risk worth knowing with 0.57;
 **decided** marks a choice the owner made on 2026-10-16.
 
 ## Where filex uses the Document Server
@@ -37,8 +38,9 @@ Legend: **yes** - as the Document Server does it; **part** - some of it;
    `ConvertService.ashx`: office **thumbnails** (`thumb/office.go`,
    `onlyoffice/purpose.go DrawThumbnail`) and the **office engine for apps**
    (`engines:office`, `wasmplugin/office.go`, `server/office_engine.go`),
-   which the Convert app and MCP's `file_convert` use. This branch builds
-   and measures the app's own (SERVER.md); F3 runs it in filex.
+   which the Convert app and MCP's `file_convert` use. 0.4.0 builds and
+   measures the app's own (SERVER.md) and attaches it as `engine.zip`;
+   filex 0.57 runs it (F3).
 3. **The rules filex applies to what a save brings** (the callback): a CSV
    keeps its own delimiter, BOM and line ends; an edited `.doc`/`.xls`/`.ppt`
    is saved beside it as `.docx`/`.xlsx`/`.pptx`; a document changed under
