@@ -29,6 +29,7 @@ import { CANVAS } from '../src/kinds';
 import { X2tError, stopsX2t, x2tConvert, x2tExport, x2tStopReason, type X2tFormat, type X2tModule } from '../src/x2t';
 import { writeZip } from '../scripts/lib/zip.mjs';
 import {
+  CSV_SAMPLES,
   FORMULA,
   LEGACY_CSV,
   TR,
@@ -44,6 +45,7 @@ import {
   pptx,
   texts,
   xlsx,
+  xlsxWithCells,
 } from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -124,6 +126,9 @@ function decodeAs(bytes: Uint8Array, codepage: number): { bom: boolean; text: st
 }
 /** Which encodings x2t starts with a byte order mark (measured): UTF-8 and UTF-16. */
 const WITH_BOM = new Set([46, 48, 49]);
+const BOM_BYTES: Record<number, Buffer> = { 46: Buffer.from([0xef, 0xbb, 0xbf]), 48: Buffer.from([0xff, 0xfe]), 49: Buffer.from([0xfe, 0xff]) };
+/** The Unicode code pages decodeAs reads: UTF-8, UTF-16 and UTF-32, each byte order. */
+const UNICODE_CODEPAGES = new Set([46, 48, 49, 50, 51]);
 const same = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
 
 /** The parts that differ between two office files (compared by content: x2t's zips carry the time). */
@@ -313,12 +318,33 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     expect(csv({ codepage: 46, delimiter: 2 }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]};${TR.cells[1]}`);
     expect(csv({ codepage: 46, delimiter: 1 }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]}\t${TR.cells[1]}`);
     expect(csv({ codepage: 46, delimiterChar: '|' }).text.split(/\r?\n/)[0]).toBe(`${TR.cells[0]}|${TR.cells[1]}`);
-    for (const codepage of TEXT_ENCODINGS.csv) {
+    // The Unicode ones hold the Turkish cells; every code page has its own test below.
+    for (const codepage of TEXT_ENCODINGS.csv.filter((c) => UNICODE_CODEPAGES.has(c))) {
       const { bom, text } = csv({ codepage });
       expect(bom, `code page ${codepage}`).toBe(WITH_BOM.has(codepage));
       for (const t of TR.cells) expect(text, `code page ${codepage}: ${t}`).toContain(t);
     }
     measured.push(`csv: ${rows.length} rows, first ${JSON.stringify(rows[0])}`);
+  });
+
+  // Download as csv offers every code page of the editor's list, as a
+  // Document Server's dialog does (x2t v9.4.0.129+3 carries ICU's tables):
+  // each one writes a sample of its own script byte for byte as Python's
+  // codec does (fixtures/office.ts CSV_SAMPLES). Red on +2: only UTF-8, -16
+  // and -32 came out whole.
+  it('csv: every code page offered writes its own script, byte for byte', () => {
+    expect(CSV_SAMPLES.map((c) => c.codepage)).toEqual([...TEXT_ENCODINGS.csv]);
+    const done: string[] = [];
+    for (const c of CSV_SAMPLES) {
+      const bin = toBin(xlsxWithCells(c.sample, 'abc'), 'xlsx');
+      const out = Buffer.from(x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: CSV, ext: 'csv', text: { codepage: c.codepage, delimiter: 2 } }));
+      const bom = BOM_BYTES[c.codepage];
+      if (bom) expect(out.subarray(0, bom.length).equals(bom), `${c.name}: its byte order mark`).toBe(true);
+      const body = bom ? out.subarray(bom.length) : out;
+      expect(body.toString('hex').startsWith(c.bytes), `${c.name} (x2t's ${c.codepage}): ${c.sample}`).toBe(true);
+      done.push(c.name);
+    }
+    measured.push(`csv in ${done.length} code pages, each byte for byte`);
   });
 
   // ⚠ emscripten's ICU port carries no conversion tables: before x2t

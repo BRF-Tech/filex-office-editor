@@ -303,6 +303,86 @@ export const LEGACY_CSV: ReadonlyArray<{ codepage: number; name: string; bytes: 
   { codepage: 28, name: 'KS_C_5601-1987', bytes: [0xbc, 0xad, 0xbf, 0xef, 0x3b, 0xba, 0xce, 0xbb, 0xea], cells: ['서울', '부산'] },
 ];
 
+/**
+ * A sample of each code page of x2t's list (the editor's TXT and CSV
+ * dialogs, AscCommon.c_oAscEncodings, by x2t's number), with the bytes a
+ * csv line "<sample>;abc" is in that encoding - Python's codecs, which
+ * x2t v9.4.0.129+3 matched in every one of them (measured 2026-10-16,
+ * read back the same too). A byte order mark, where x2t writes one (UTF-8,
+ * UTF-16), comes before them.
+ */
+export const CSV_SAMPLES: ReadonlyArray<{ codepage: number; name: string; sample: string; bytes: string }> = [
+  { codepage: 0, name: 'ISO-8859-6', sample: 'مرحبا', bytes: 'e5d1cdc8c73b616263' },
+  { codepage: 1, name: 'DOS-720', sample: 'مرحبا', bytes: 'eaa9a5a09f3b616263' },
+  { codepage: 2, name: 'windows-1256', sample: 'مرحبا', bytes: 'e3d1cdc8c73b616263' },
+  { codepage: 3, name: 'ISO-8859-4', sample: 'Ąčęėįšųūž', bytes: 'a1e8eaece7b9f9febe3b616263' },
+  { codepage: 4, name: 'ISO-8859-13', sample: 'Ąčęėįšųūž', bytes: 'c0e8e6ebe1f0f8fbfe3b616263' },
+  { codepage: 5, name: 'IBM775', sample: 'Ąčęėįšųūž', bytes: 'b5d1d2d3d4d5d6d7d83b616263' },
+  { codepage: 6, name: 'windows-1257', sample: 'Ąčęėįšųūž', bytes: 'c0e8e6ebe1f0f8fbfe3b616263' },
+  { codepage: 7, name: 'ISO-8859-14', sample: 'Ŵŷ ẁẃ', bytes: 'd0fe20b8ba3b616263' },
+  { codepage: 8, name: 'ISO-8859-5', sample: 'Привет', bytes: 'bfe0d8d2d5e23b616263' },
+  { codepage: 9, name: 'KOI8-R', sample: 'Привет', bytes: 'f0d2c9d7c5d43b616263' },
+  { codepage: 10, name: 'KOI8-U', sample: 'Привіт', bytes: 'f0d2c9d7a6d43b616263' },
+  { codepage: 11, name: 'x-mac-cyrillic', sample: 'Привет', bytes: '8ff0e8e2e5f23b616263' },
+  { codepage: 12, name: 'IBM855', sample: 'Привет', bytes: 'dde1b7eba8e53b616263' },
+  { codepage: 13, name: 'cp866', sample: 'Привет', bytes: '8fe0a8a2a5e23b616263' },
+  { codepage: 14, name: 'windows-1251', sample: 'Привет', bytes: 'cff0e8e2e5f23b616263' },
+  { codepage: 15, name: 'IBM852', sample: 'Łódź Žluťoučký', bytes: '9da264ab20a66c759c6f759f6bec3b616263' },
+  { codepage: 16, name: 'windows-1250', sample: 'Łódź Žluťoučký', bytes: 'a3f3649f208e6c759d6f75e86bfd3b616263' },
+  { codepage: 17, name: 'Big5', sample: '臺北', bytes: 'bb4fa55f3b616263' },
+  { codepage: 18, name: 'GBK', sample: '北京', bytes: 'b1b1bea93b616263' },
+  { codepage: 19, name: 'ISO-8859-2', sample: 'Łódź Žluťoučký', bytes: 'a3f364bc20ae6c75bb6f75e86bfd3b616263' },
+  { codepage: 20, name: 'ISO-8859-7', sample: 'ΑΘΗΝΑ αθηνα', bytes: 'c1c8c7cdc120e1e8e7ede13b616263' },
+  { codepage: 21, name: 'IBM737', sample: 'ΑΘΗΝΑ αθηνα', bytes: '8087868c8020989f9ea4983b616263' },
+  { codepage: 22, name: 'IBM869', sample: 'ΑΘΗΝΑ αθηνα', bytes: 'a4acaab8a420d6e2e1e7d63b616263' },
+  { codepage: 23, name: 'windows-1253', sample: 'ΑΘΗΝΑ αθηνα', bytes: 'c1c8c7cdc120e1e8e7ede13b616263' },
+  { codepage: 24, name: 'ISO-8859-8', sample: 'שלום', bytes: 'f9ece5ed3b616263' },
+  { codepage: 25, name: 'DOS-862', sample: 'שלום', bytes: '998c858d3b616263' },
+  { codepage: 26, name: 'windows-1255', sample: 'שלום', bytes: 'f9ece5ed3b616263' },
+  { codepage: 27, name: 'Shift_JIS', sample: '東京', bytes: '938c8b9e3b616263' },
+  { codepage: 28, name: 'KS_C_5601-1987', sample: '서울', bytes: 'bcadbfef3b616263' },
+  { codepage: 29, name: 'EUC-KR', sample: '서울', bytes: 'bcadbfef3b616263' },
+  { codepage: 30, name: 'IBM861', sample: 'Þórður', bytes: '8da2728c75723b616263' },
+  { codepage: 31, name: 'IBM865', sample: 'Ærø', bytes: '92729b3b616263' },
+  { codepage: 32, name: 'windows-874', sample: 'สวัสดี', bytes: 'cac7d1cab4d53b616263' },
+  { codepage: 33, name: 'ISO-8859-3', sample: 'Şehir Iğdır İzmir', bytes: 'aa656869722049bb64b97220a97a6d69723b616263' },
+  { codepage: 34, name: 'ISO-8859-9', sample: 'Şehir Iğdır İzmir', bytes: 'de656869722049f064fd7220dd7a6d69723b616263' },
+  { codepage: 35, name: 'IBM857', sample: 'Şehir Iğdır İzmir', bytes: '9e656869722049a7648d7220987a6d69723b616263' },
+  { codepage: 36, name: 'windows-1254', sample: 'Şehir Iğdır İzmir', bytes: 'de656869722049f064fd7220dd7a6d69723b616263' },
+  { codepage: 37, name: 'ISO-8859-1', sample: 'Café Größe', bytes: '436166e9204772f6df653b616263' },
+  { codepage: 38, name: 'ISO-8859-15', sample: 'Café 5 €', bytes: '436166e9203520a43b616263' },
+  { codepage: 39, name: 'IBM850', sample: 'Café Größe', bytes: '4361668220477294e1653b616263' },
+  { codepage: 40, name: 'IBM858', sample: 'Café 5 €', bytes: '43616682203520d53b616263' },
+  { codepage: 41, name: 'IBM860', sample: 'Ação', bytes: '4187846f3b616263' },
+  { codepage: 42, name: 'IBM863', sample: 'Québec', bytes: '5175826265633b616263' },
+  { codepage: 43, name: 'IBM437', sample: 'Café Größe', bytes: '4361668220477294e1653b616263' },
+  { codepage: 44, name: 'windows-1252', sample: 'Café 5 €', bytes: '436166e9203520803b616263' },
+  { codepage: 45, name: 'windows-1258', sample: 'Đđ Ơơ Ưư', bytes: 'd0f020d5f520ddfd3b616263' },
+  { codepage: 46, name: 'UTF-8', sample: 'Şehir 東京', bytes: 'c59e6568697220e69db1e4baac3b616263' },
+  { codepage: 47, name: 'UTF-7', sample: 'Şehir 東京', bytes: '2b4156342d65686972202b5a33464f72413b616263' },
+  { codepage: 48, name: 'UTF-16LE', sample: 'Şehir 東京', bytes: '5e01650068006900720020007167ac4e3b00610062006300' },
+  { codepage: 49, name: 'UTF-16BE', sample: 'Şehir 東京', bytes: '015e0065006800690072002067714eac003b006100620063' },
+  { codepage: 50, name: 'UTF-32LE', sample: 'Şehir 東京', bytes: '5e010000650000006800000069000000720000002000000071670000ac4e00003b000000610000006200000063000000' },
+  { codepage: 51, name: 'UTF-32BE', sample: 'Şehir 東京', bytes: '0000015e00000065000000680000006900000072000000200000677100004eac0000003b000000610000006200000063' },
+  { codepage: 52, name: 'EUC-JP', sample: '東京', bytes: 'c5ecb5fe3b616263' },
+  { codepage: 53, name: 'GB18030', sample: '北京', bytes: 'b1b1bea93b616263' },
+];
+
+/** A workbook of one sheet, one row: the two cells as inline strings. */
+export function xlsxWithCells(a1: string, b1: string): Uint8Array {
+  const cell = (ref: string, t: string) => `<c r="${ref}" t="inlineStr"><is><t>${esc(t)}</t></is></c>`;
+  return zip({
+    '[Content_Types].xml': types([
+      ['/xl/workbook.xml', `${CT}.spreadsheetml.sheet.main+xml`],
+      ['/xl/worksheets/sheet1.xml', `${CT}.spreadsheetml.worksheet+xml`],
+    ]),
+    '_rels/.rels': rels([['rId1', 'officeDocument', 'xl/workbook.xml']]),
+    'xl/workbook.xml': `${XML}<workbook xmlns="${NS_S}" xmlns:r="${NS_R}"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    'xl/_rels/workbook.xml.rels': rels([['rId1', 'worksheet', 'worksheets/sheet1.xml']]),
+    'xl/worksheets/sheet1.xml': `${XML}<worksheet xmlns="${NS_S}"><sheetData><row r="1">${cell('A1', a1)}${cell('B1', b1)}</row></sheetData></worksheet>`,
+  });
+}
+
 // ---- reading what comes back -------------------------------------------
 
 const unesc = (s: string) =>

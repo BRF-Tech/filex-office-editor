@@ -109,26 +109,27 @@ export function exportName(title: string, f: ExportFormat): string {
 export const UTF8 = 46;
 
 /**
- * The encodings x2t writes a txt or csv in here, by x2t's number. Measured
- * (2026-10-10, tests/x2t-wasm.test.ts):
- *   - csv: UTF-8 (46), UTF-16 (48) and UTF-16 big endian (49), each with its
- *     byte order mark, and UTF-32 (50, 51), without one;
+ * The encodings x2t writes a txt or csv in here, by x2t's number:
+ *   - csv: every one of the editor's list (0-53: Arabic, Baltic, Celtic,
+ *     Cyrillic, Central European, Chinese, Greek, Hebrew, Japanese, Korean,
+ *     Nordic, Thai, Turkish, Western European and Vietnamese code pages,
+ *     UTF-7, UTF-8, UTF-16, UTF-32), as a Document Server's dialog offers
+ *     them. Measured on x2t v9.4.0.129+3 (2026-10-16, tests/x2t-wasm.test.ts
+ *     CSV_SAMPLES): each writes a sample of its script as Python's codec
+ *     writes it, and reads back the same; UTF-8 and UTF-16 with their byte
+ *     order mark. Up to v9.4.0.129+2 emscripten's ICU had no conversion
+ *     tables and only UTF-8/16/32 were written whole (scripts/x2t/icu-data.py);
  *   - txt: UTF-8 only. x2t's txt writer (TxtFile) writes UTF-8 for every
  *     code page but its own "Unicode" (50) and "big endian" (51), which it
  *     writes as UTF-16 by a path that leaves the text out wherever wchar_t
  *     is 32 bits (the lines come out empty) - ONLYOFFICE's own as much as
- *     this build's;
- *   - every other code page of the editor's list (windows-1254, ISO-8859-9,
- *     windows-1252...) needs ICU's conversion tables, and emscripten's ICU
- *     (68.2) is built without them: x2t cannot open the converter, and what
- *     came out was the text cut to its low bytes. ISO-8859-1 opens, and has
- *     no Ş, Ğ or İ.
+ *     this build's.
  * The editor's TXT and CSV dialogs offer only these (frame/export.ts trims
  * its list).
  */
 export const TEXT_ENCODINGS: Readonly<Record<'txt' | 'csv', readonly number[]>> = {
   txt: [46],
-  csv: [46, 48, 49, 50, 51],
+  csv: Array.from({ length: 54 }, (_, i) => i),
 };
 
 /** The encodings the editor's own text dialog offers for this kind of document (its TXT or CSV one). */

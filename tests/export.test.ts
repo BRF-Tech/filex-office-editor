@@ -26,8 +26,9 @@ describe('the formats', () => {
   it('a txt or csv takes the encoding and the delimiter chosen, in the encodings x2t writes here', () => {
     const txt = exportFormat(TXT, 'word')!;
     const csv = exportFormat(CSV, 'cell')!;
-    expect(TEXT_ENCODINGS).toEqual({ txt: [46], csv: [46, 48, 49, 50, 51] });
-    expect([textEncodings('word'), textEncodings('cell'), textEncodings('slide')]).toEqual([[46], [46, 48, 49, 50, 51], null]);
+    // csv: every code page of the editor's list (x2t v9.4.0.129+3 carries ICU's tables); txt: UTF-8 (x2t's txt writer).
+    expect(TEXT_ENCODINGS).toEqual({ txt: [46], csv: Array.from({ length: 54 }, (_, i) => i) });
+    expect([textEncodings('word'), textEncodings('cell'), textEncodings('slide')]).toEqual([[46], TEXT_ENCODINGS.csv, null]);
     expect(textOptions(txt, {})).toEqual({ codepage: UTF8 });
     expect(textOptions(txt, { codepage: -1 })).toEqual({ codepage: UTF8 });
     expect(textOptions(txt, { codepage: 46, delimiter: 2 })).toEqual({ codepage: 46 });
@@ -37,8 +38,9 @@ describe('the formats', () => {
     expect(textOptions(csv, { codepage: 49, delimiter: 9, delimiterChar: '|' })).toEqual({ codepage: 49, delimiterChar: '|' });
     expect(textOptions(csv, { delimiterChar: '"' })).toEqual({ codepage: UTF8 });
     expect(textOptions(csv, { delimiterChar: 'ab' })).toEqual({ codepage: UTF8 });
-    // windows-1254, ISO-8859-9, windows-1252: ICU's tables, which the build does not carry.
-    for (const codepage of [36, 34, 44, 47, 52]) expect(textOptions(csv, { codepage })).toBeNull();
+    // windows-1254, ISO-8859-9, windows-1252, UTF-7, EUC-JP: x2t writes them (ICU's tables, v9.4.0.129+3); a number outside the list does not.
+    for (const codepage of [36, 34, 44, 47, 52]) expect(textOptions(csv, { codepage })).toEqual({ codepage });
+    for (const codepage of [54, 65001, 1254]) expect(textOptions(csv, { codepage })).toBeNull();
     expect(textOptions(exportFormat(0x0041, 'word')!, { codepage: 36 })).toBeUndefined();
   });
 
