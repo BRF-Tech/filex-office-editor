@@ -60,7 +60,7 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > Print go through filex (csv in every code page of the editor's list); the
 > editor's settings are kept; New document gets six rows; on a phone the
 > document opens in ONLYOFFICE's phone view to read, with "Edit". Its x2t
-> is this project's own build, `v9.4.0.129+3`
+> is this project's own build, `v9.4.0.129+4`
 > ([x2t, the converter](#x2t-the-converter)). Measured for 0.4.0: the unit
 > tests, x2t's round trips with the pinned build, the server's Go tests
 > with the real modules, filex 0.57's own checks of the release's files and
@@ -520,7 +520,7 @@ the other formats of Download as. Here it is the same program, from
 ONLYOFFICE core, compiled to WebAssembly and run in a worker (`src/x2t.ts`
 drives it). It is **this project's own build, from ONLYOFFICE core at the
 editor files' tag** - `v9.4.0.129`, commit `a016fc28` - released here as
-**`v9.4.0.129+3`** and pinned under `x2t` in
+**`v9.4.0.129+4`** and pinned under `x2t` in
 [`upstream/onlyoffice.json`](upstream/onlyoffice.json): how it is built,
 every source by its commit, and the SHA-256 of `x2t.js` and `x2t.wasm`.
 Release 0.1.0 carried CryptPad's build
@@ -634,6 +634,25 @@ and why:
   145 million (measured), and 375,000 now - 37 s on a server before, 19 s
   now (the page's x2t in Node 12.5 s, 10 s now; the Document Server 10.4 s),
   the same Editor.bin and pictures.
+- `09-wasm-no-network.patch` (`v9.4.0.129+4`): a download or an upload
+  ends at once, as one the converter is not allowed to make. x2t fetches
+  what a document names elsewhere - a .docx's linked picture, an HTML
+  page's `<img>` or style sheet, a picture of a pptx, xlsx, ppt or PDF -
+  on a thread of core's file transporter, and waits while that thread
+  runs, in a loop of 10 ms sleeps. WebAssembly has no threads: the thread
+  never started, nothing ended the wait, and such a document never
+  finished - on a server not in 200 s (the same .docx without the link:
+  13 ms), the page's x2t in Node not in 40 s; counted on a server, 3
+  million calls to the clock in half a second, every one from that loop.
+  Under `__EMSCRIPTEN__` the transporter runs the transfer on the
+  caller's thread and takes the branch it takes when the process
+  environment says `allowNetworkRequest` is false: nothing is fetched, the
+  caller gets a download that failed and leaves the picture out (an HTML
+  page's picture stays a link to its address, with its alternative text),
+  as a Document Server without a network does - its own x2t under
+  docker's `--network none` draws the linked .docx's thumbnail as the same
+  picture as the .docx without it, and writes an HTML page with a picture
+  elsewhere into the same document.xml as this x2t.
 
 And **ICU's conversion tables** (`v9.4.0.129+3`): emscripten's ICU port
 links ICU's empty data stub, so ICU converted only UTF-8, UTF-16, UTF-32 and
@@ -1142,6 +1161,12 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   page's x2t as in the server's - x2t's picture code stopped in WebAssembly
   until `06-svg-css-namespace.patch` ([docs/PARITY.md](docs/PARITY.md), row
   A14) - and reads the legacy code pages (ICU's conversion tables).
+- **Nothing from another server**: neither module has a socket, and since
+  x2t `v9.4.0.129+4` (`09-wasm-no-network.patch`) a document that names a
+  picture or a style sheet elsewhere - a .docx's linked picture, an HTML
+  page's `<img>` - converts and gets its thumbnail in the time the same
+  document takes without it, the picture left out as a Document Server
+  without a network leaves it ([docs/PARITY.md](docs/PARITY.md), row A15).
 - **How filex runs it** ([docs/SERVER.md](docs/SERVER.md), "How filex
   runs it"): the release attaches `engine.zip` - `x2t-server.wasm`,
   `layout-host.wasm` and the layout's scripts, 13.0 MiB - named in the

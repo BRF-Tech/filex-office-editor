@@ -88,7 +88,7 @@ the same 28 libraries linked a second time (`steps.sh x2t_server`):
   conversion that reaches an undefined function ends with `missing
   function: <name>` (`x2t.MissingFunction`).
 
-`x2t-server.wasm` of x2t `v9.4.0.129+3` is 41.4 MB (`7aacc87f...`, pinned in
+`x2t-server.wasm` of x2t `v9.4.0.129+4` is 41.4 MB (`36474a79...`, pinned in
 `upstream/onlyoffice.json` beside the page's two files), its imports 26 WASI
 functions, 13 `invoke_*`, two emscripten ones and the 87 undefined. Linking
 it again with the libraries built takes about 5-7 minutes, the whole tree
@@ -262,6 +262,41 @@ document and the windows-1254 csv as above. What had worked before gives
 the same bytes (sample.docx -> odt 369,221 B, the DS's; letter.docx's PDF
 pixel for pixel the DS's).
 - What doctrenderer does - PDF, images, HTML - is the layout's (below).
+
+### A document that names another server
+
+x2t fetches what a document names elsewhere - a .docx's linked picture
+(`TargetMode="External"`), an HTML page's `<img>` or style sheet, a picture
+of a pptx, xlsx, ppt or PDF - with core's `CFileDownloader`, and until x2t
+`v9.4.0.129+4` such a document **never finished**, in both builds: the
+downloader starts a thread and `TransferSync` waits while it runs, in a
+loop of `NSThreads::Sleep(10)`; WebAssembly has no threads, `pthread_create`
+fails, `CBaseThread::Start` does not look, and nothing ends the wait. On a
+server `nanosleep` is emscripten's busy wait on `clock_time_get`, so x2t
+spun until filex's deadline - counted with a stand-in for that WASI call,
+3,000,000 calls in half a second, every one from
+`CFileDownloader::DownloadSync` -> `NSThreads::Sleep` -> `nanosleep` ->
+`emscripten_get_now` (a build with names). Measured (2026-10-16): a .docx
+whose one picture is linked, an HTML page with an `<img>` and one with a
+`<link rel="stylesheet">` elsewhere - not done in 200 s on the server (the
+same .docx without the link 13 ms), not in 40 s in Node; in filex 0.57 the
+job ended at its 2-minute deadline, so such a document got no thumbnail
+and its conversion failed.
+
+`patches/09-wasm-no-network.patch`: under `__EMSCRIPTEN__` the transporter
+runs the transfer on the caller's thread and takes the branch it takes when
+the process environment says `allowNetworkRequest` is false - nothing is
+fetched, the download fails, the callback is told. Neither module has a
+socket anyway (WASI preview 1, filex gives no host function that could
+reach one); now nothing waits either. The callers do what they do with a
+download that failed, as a Document Server without a network does - its
+own x2t in the pinned image under docker's `--network none`: the linked
+.docx to PDF in 1.1 s and its thumbnail the same picture as the .docx's
+without the link; an HTML page with a picture elsewhere to docx, the
+picture a link to its address with its alt text, the same `document.xml`
+as this build's. After: 13 ms on the server (no `clock_time_get` call),
+49 ms in Node; documents that name nothing elsewhere give the same
+Editor.bin and the same odt parts as `+3`.
 
 ## Page layout without a browser
 

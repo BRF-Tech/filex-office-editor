@@ -120,9 +120,9 @@ there, keep 0.3.1.
 - The manifest asks for filex 0.57.0 or later (file.save's `beside`, `csv`
   and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`,
   `engines.office`, `ui.extras`).
-- **x2t is `v9.4.0.129+3`**, in the page and on the server (patches 06 to
-  08 and ICU's conversion tables, below); the release's `x2t.zip` carries
-  it.
+- **x2t is `v9.4.0.129+4`**, in the page and on the server (patches 06 to
+  09 and ICU's conversion tables, below; `+3` had all but patch 09); the
+  release's `x2t.zip` carries it.
 - **The app's bundle is larger**: 119.9 MiB zipped (2,796 files, 391.9 MiB
   unpacked), from 0.3.1's 98.3 MiB - the dictionaries of filex's interface
   languages (en_US, tr_TR, de_DE, es_ES, fr_FR, ar) and the macro editor
@@ -159,6 +159,20 @@ there, keep 0.3.1.
   went out of the module and back. A .doc with 509 pictures: 145 million
   such calls before, 375,000 now; 37 s to 19 s under wazero (the page in
   Node 12.5 s to 10 s; the Document Server 10.4 s).
+- **A document that names something on another server converts** (x2t
+  `v9.4.0.129+4`, both builds): a .docx with a linked picture, an HTML page
+  with a picture or a style sheet elsewhere. x2t's downloader waited for a
+  thread WebAssembly cannot start, in a loop of sleeps, so such a document
+  never finished - on a server its conversion and its thumbnail ran to
+  filex's deadline (measured: not done in 200 s, the same .docx without
+  the link 13 ms), and the page's x2t, which opens a document for the
+  editor, did not finish it either (in Node: not done in 40 s).
+  `scripts/x2t/patches/09-wasm-no-network.patch` ends a download at once,
+  as one the converter may not make: nothing is fetched, a linked picture
+  is left out of the pages and the thumbnail, and an HTML page's picture
+  stays a link to its address with its alternative text, as a Document
+  Server without a network leaves them (an HTML page to docx: the same
+  document.xml as its own x2t's); 13 ms on the server, 49 ms in Node.
 
 ### Security
 
