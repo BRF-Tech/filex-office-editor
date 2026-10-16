@@ -159,7 +159,14 @@ export const LIMITS = {
 
 // What this project aims for with the editor part (the x2t build and the
 // app's page come on top): the build reports against it, without refusing.
-export const BUDGET = { zipBytes: 100 * 1000 * 1000, files: 2000 };
+// 0.4.0 raised it from 100 MB and 2000 files: the spelling dictionaries of
+// filex's own interface languages travel in the bundle (about 18 MB zipped,
+// tr_TR alone 14 MB) and the macro editor is kept, so the editor part is
+// 114.7 MB in 2786 files. Every other language is an extra the administrator
+// adds from the release (ui.extras). The whole ui.zip is then about 120 MiB
+// of filex's default 128 MiB (LIMITS.zipBytes, apps.max_ui_mb): what grows
+// next goes to the extras, not the bundle.
+export const BUDGET = { zipBytes: 120 * 1000 * 1000, files: 3000 };
 
 // filex's served list (uibundle.go uiTypes): a file with another extension
 // is refused at install; a file without one is served as text.
