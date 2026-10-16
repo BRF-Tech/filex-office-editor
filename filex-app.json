@@ -424,7 +424,7 @@
   "engines": {
     "office": {
       "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/engine.zip",
-      "sha256": "7dc25d3958d80202ecee2ddc28f4ae89159f47305b13af3faf846cab850c876c",
+      "sha256": "a30fbe1ac4d7aa1c6f4e7f49e0b7cf54fa9c2ae25415614db3209d13926ef044",
       "editor": "editor"
     }
   }

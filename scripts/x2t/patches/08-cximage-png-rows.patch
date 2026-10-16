@@ -1,0 +1,183 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-16: the per-pixel loops
+of CxImage's PNG encoder and decoder for an image with an alpha channel move
+out of Encode and Decode into three helpers of their own, unchanged, kept
+out of line (DesktopEditor/cximage/CxImage/ximapng.cpp, ximapng.h).
+
+Built with emscripten (SUPPORT_LONGJMP=emscripten), every call made from a
+function that calls setjmp goes through an invoke_<sig> wrapper - in the
+page a JavaScript function with a try/catch, on a server a call out of the
+module to the host and back - and Encode and Decode call setjmp (libpng's
+error handling). So a picture of N pixels made about 2N such calls:
+BlindGetPixelColor and AlphaGet for every pixel written, AlphaSet for every
+pixel read.
+
+Measured (2026-10-16, Bug61268.doc, 509 pictures - EMF ones the editor gets
+as SVG and PNG - into the editor's format): 145,265,861 invoke_* calls
+before, 374,924 after; the server build under wazero 37-38 s before, 18.7-20
+s after; the page's x2t in Node 12.3-13 s before, 10.0-10.2 s after (the
+Document Server: 10.4 s). The Editor.bin, every PNG and every PDF of the
+measurement set come out the same as before (the PDFs but their dates).
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/DesktopEditor/cximage/CxImage/ximapng.cpp b/DesktopEditor/cximage/CxImage/ximapng.cpp
+index 72540e06..8ecbcb2b 100644
+--- a/DesktopEditor/cximage/CxImage/ximapng.cpp
++++ b/DesktopEditor/cximage/CxImage/ximapng.cpp
+@@ -35,6 +35,61 @@ void CxImagePNG::expand2to4bpp(uint8_t* prow)
+ 	}
+ }
+ ////////////////////////////////////////////////////////////////////////////////
++#if CXIMAGE_SUPPORT_ALPHA
++////////////////////////////////////////////////////////////////////////////////
++// filex-office-editor (BRF Tech, 2026-10-16): the per-pixel loops of the rows
++// with an alpha channel, moved out of Encode and Decode unchanged. Built with
++// emscripten, every call made from a function that calls setjmp goes through
++// an invoke_* wrapper (a call out of the module and back, for longjmp), and
++// Encode and Decode call setjmp: a picture of N pixels made 2N such calls.
++// Measured: a .doc with 509 pictures, 145 million of them, most of its 37 s
++// under wazero. Out here, a row is one call from Encode or Decode.
++void CxImagePNG::EncodeAlphaRow(uint8_t* row_pointers, int32_t ay, int32_t channels, bool bGrayScale)
++{
++	for (int32_t ax=head.biWidth-1; ax>=0;ax--){
++		RGBQUAD c = BlindGetPixelColor(ax,ay);
++		int32_t px = ax * channels;
++		if (!bGrayScale){
++			row_pointers[px++]=c.rgbRed;
++			row_pointers[px++]=c.rgbGreen;
++		}
++		row_pointers[px++]=c.rgbBlue;
++		row_pointers[px] = AlphaGet(ax,ay);
++	}
++}
++void CxImagePNG::DecodeAlphaRowIn(uint8_t* row_pointers, uint8_t* prow, int32_t ay, int32_t channels, int32_t pixel_offset, int32_t chan_offset)
++{
++	for(int32_t ax=0;ax<head.biWidth;ax++){
++		int32_t px = ax * pixel_offset;
++		if (channels == 2){
++			row_pointers[px] = prow[ax];
++			row_pointers[px+chan_offset]=AlphaGet(ax,ay);
++		} else {
++			int32_t qx = ax * 3;
++			row_pointers[px]              =prow[qx];
++			row_pointers[px+chan_offset]  =prow[qx+1];
++			row_pointers[px+chan_offset*2]=prow[qx+2];
++			row_pointers[px+chan_offset*3]=AlphaGet(ax,ay);
++		}
++	}
++}
++void CxImagePNG::DecodeAlphaRowOut(const uint8_t* row_pointers, uint8_t* prow, int32_t ay, int32_t channels, int32_t pixel_offset, int32_t chan_offset)
++{
++	for(int32_t ax=0;ax<head.biWidth;ax++){
++		int32_t px = ax * pixel_offset;
++		if (channels == 2){
++			prow[ax] = row_pointers[px];
++			AlphaSet(ax,ay,row_pointers[px+chan_offset]);
++		} else {
++			int32_t qx = ax * 3;
++			prow[qx]  =row_pointers[px];
++			prow[qx+1]=row_pointers[px+chan_offset];
++			prow[qx+2]=row_pointers[px+chan_offset*2];
++			AlphaSet(ax,ay,row_pointers[px+chan_offset*3]);
++		}
++	}
++}
++#endif // CXIMAGE_SUPPORT_ALPHA
+ bool CxImagePNG::Decode(CxFile *hFile)
+ {
+ 	png_struct *png_ptr;
+@@ -226,38 +281,14 @@ bool CxImagePNG::Decode(CxFile *hFile)
+ 
+ 				//recover data from previous scan
+ 				if (info_ptr->interlace_type && pass>0 && pass!=7){
+-					for(ax=0;ax<head.biWidth;ax++){
+-						int32_t px = ax * pixel_offset;
+-						if (channels == 2){
+-							row_pointers[px] = prow[ax];
+-							row_pointers[px+chan_offset]=AlphaGet(ax,ay);
+-						} else {
+-							int32_t qx = ax * 3;
+-							row_pointers[px]              =prow[qx];
+-							row_pointers[px+chan_offset]  =prow[qx+1];
+-							row_pointers[px+chan_offset*2]=prow[qx+2];
+-							row_pointers[px+chan_offset*3]=AlphaGet(ax,ay);
+-						}
+-					}
++					DecodeAlphaRowIn(row_pointers, prow, ay, channels, pixel_offset, chan_offset);
+ 				}
+ 
+ 				//read next row
+ 				png_read_row(png_ptr, row_pointers, NULL);
+ 
+ 				//RGBA -> RGB + A
+-				for(ax=0;ax<head.biWidth;ax++){
+-					int32_t px = ax * pixel_offset;
+-					if (channels == 2){
+-						prow[ax] = row_pointers[px];
+-						AlphaSet(ax,ay,row_pointers[px+chan_offset]);
+-					} else {
+-						int32_t qx = ax * 3;
+-						prow[qx]  =row_pointers[px];
+-						prow[qx+1]=row_pointers[px+chan_offset];
+-						prow[qx+2]=row_pointers[px+chan_offset*2];
+-						AlphaSet(ax,ay,row_pointers[px+chan_offset*3]);
+-					}
+-				}
++				DecodeAlphaRowOut(row_pointers, prow, ay, channels, pixel_offset, chan_offset);
+ 			} else
+ #endif // CXIMAGE_SUPPORT_ALPHA		// vho
+ 			{
+@@ -505,18 +536,8 @@ bool CxImagePNG::Encode(CxFile *hFile)
+ 		int32_t ay=head.biHeight-1;
+ 		do	{
+ #if CXIMAGE_SUPPORT_ALPHA	// <vho>
+-			RGBQUAD c;
+ 			if (AlphaIsValid()){
+-				for (int32_t ax=head.biWidth-1; ax>=0;ax--){
+-					c = BlindGetPixelColor(ax,ay);
+-					int32_t px = ax * info_ptr->channels;
+-					if (!bGrayScale){
+-						row_pointers[px++]=c.rgbRed;
+-						row_pointers[px++]=c.rgbGreen;
+-					}
+-					row_pointers[px++]=c.rgbBlue;
+-					row_pointers[px] = AlphaGet(ax,ay);
+-				}
++				EncodeAlphaRow(row_pointers, ay, info_ptr->channels, bGrayScale);
+ 				png_write_row(png_ptr, row_pointers);
+ 				ay--;
+ 			}
+diff --git a/DesktopEditor/cximage/CxImage/ximapng.h b/DesktopEditor/cximage/CxImage/ximapng.h
+index d143d29e..9112b218 100644
+--- a/DesktopEditor/cximage/CxImage/ximapng.h
++++ b/DesktopEditor/cximage/CxImage/ximapng.h
+@@ -34,6 +34,14 @@ extern "C" {
+ #endif
+ }
+ 
++// filex-office-editor (BRF Tech, 2026-10-16): kept out of line - a call made
++// from a function that calls setjmp goes through emscripten's invoke_* wrapper.
++#if defined(__GNUC__) || defined(__clang__)
++#define CXPNG_NOINLINE __attribute__((noinline))
++#else
++#define CXPNG_NOINLINE
++#endif
++
+ class CxImagePNG: public CxImage
+ {
+ public:
+@@ -63,6 +71,14 @@ public:
+ protected:
+ 	void ima_png_error(png_struct *png_ptr, char *message);
+ 	void expand2to4bpp(uint8_t* prow);
++#if CXIMAGE_SUPPORT_ALPHA
++	// filex-office-editor (BRF Tech, 2026-10-16): one row of an image with an alpha
++	// channel, between the picture and libpng's row - out of Encode and Decode, which
++	// call setjmp (scripts/x2t/patches/08-cximage-png-rows.patch).
++	CXPNG_NOINLINE void EncodeAlphaRow(uint8_t* row, int32_t ay, int32_t channels, bool gray);
++	CXPNG_NOINLINE void DecodeAlphaRowIn(uint8_t* row, uint8_t* prow, int32_t ay, int32_t channels, int32_t pixel_offset, int32_t chan_offset);
++	CXPNG_NOINLINE void DecodeAlphaRowOut(const uint8_t* row, uint8_t* prow, int32_t ay, int32_t channels, int32_t pixel_offset, int32_t chan_offset);
++#endif
+ 
+ 	static void PNGAPI user_read_data(png_structp png_ptr, png_bytep data, png_size_t length)
+ 	{

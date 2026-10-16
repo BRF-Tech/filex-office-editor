@@ -17,7 +17,7 @@
 # Dockerfile and embuild.sh of 7debf5e6): the same libraries of ONLYOFFICE
 # core in the same order, each one a qmake project built with emcc, linked
 # into one module. Its changes to the sources are patches/01, ported to
-# ONLYOFFICE core 9.4; patches/02-07 are this project's (07 carries two of
+# ONLYOFFICE core 9.4; patches/02-08 are this project's (07 carries two of
 # core's own later fixes back), and so is the ICU data linked in
 # (icu-data.py; README.md, "x2t, the converter").
 

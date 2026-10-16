@@ -71,6 +71,7 @@ func Env(ctx context.Context, rt wazero.Runtime, guest wazero.CompiledModule) ([
 		exp.ExportFunctions(b)
 	}
 	var missing []string
+	next := firstDyncallSlot
 	for _, fn := range guest.ImportedFunctions() {
 		module, name, ok := fn.Import()
 		if !ok || module != "env" {
@@ -92,7 +93,8 @@ func Env(ctx context.Context, rt wazero.Runtime, guest wazero.CompiledModule) ([
 				if _, ok := exports[dyn]; !ok {
 					return nil, fmt.Errorf("x2t: the module imports %s and does not export %s", name, dyn)
 				}
-				impl = invoke(dyn, len(fn.ResultTypes()))
+				impl = invoke(slot{idx: next, name: dyn}, len(fn.ResultTypes()))
+				next++
 			}
 		default:
 			missing = append(missing, name)
@@ -122,7 +124,7 @@ func Env(ctx context.Context, rt wazero.Runtime, guest wazero.CompiledModule) ([
 // into the module per invoke, and each call costs wazero a goroutine that
 // watches the context (WithCloseOnContextDone) - x2t goes through invoke_*
 // millions of times in a document with pictures.
-func invoke(dynCall string, nResults int) api.GoModuleFunc {
+func invoke(dynCall slot, nResults int) api.GoModuleFunc {
 	return func(ctx context.Context, mod api.Module, stack []uint64) {
 		err := exported(ctx, mod, dynCall).CallWithStack(ctx, stack)
 		if err == nil {
@@ -133,48 +135,69 @@ func invoke(dynCall string, nResults int) api.GoModuleFunc {
 			panic(err)
 		}
 		var st [2]uint64
-		mustCall(ctx, mod, "fx_unwind", st[:])
+		mustCall(ctx, mod, slotUnwind, st[:])
 		st[0], st[1] = 1, 0
-		mustCall(ctx, mod, "setThrew", st[:])
+		mustCall(ctx, mod, slotSetThrew, st[:])
 		for i := 0; i < nResults; i++ {
 			stack[i] = 0
 		}
 	}
 }
 
-func mustCall(ctx context.Context, mod api.Module, name string, stack []uint64) {
-	if err := exported(ctx, mod, name).CallWithStack(ctx, stack); err != nil {
+func mustCall(ctx context.Context, mod api.Module, s slot, stack []uint64) {
+	if err := exported(ctx, mod, s).CallWithStack(ctx, stack); err != nil {
 		panic(err)
 	}
 }
+
+// A function invoke_* or its longjmp path calls in the module, by its place
+// in an instance's callCache: the two of the longjmp path first, then each
+// fx_dyncall_<sig> in the order Env met its invoke_<sig>.
+type slot struct {
+	idx  int
+	name string
+}
+
+var (
+	slotUnwind   = slot{idx: 0, name: "fx_unwind"}
+	slotSetThrew = slot{idx: 1, name: "setThrew"}
+)
+
+const firstDyncallSlot = 2
 
 // The functions invoke_* calls, looked up once per instance: wazero makes
 // a new callable (with its own stack) at every ExportedFunction, and x2t
 // goes through invoke_* millions of times - measured, sample.docx to odt
 // took 62.7 s with a lookup per call, of it a third in that allocation.
-type callCache struct{ fns map[string]api.Function }
+// They are kept by slot, not by name: Bug61268.doc (509 pictures, EMF ones
+// turned into SVG) spent about a tenth of its 41 s conversion hashing the
+// names for a map (CPU profile, 2026-10-16).
+type callCache struct{ fns []api.Function }
 
 type callCacheKey struct{}
 
 // WithCallCache gives one instance's run a cache of the functions invoke_*
 // calls; Convert does it for every conversion.
 func WithCallCache(ctx context.Context) context.Context {
-	return context.WithValue(ctx, callCacheKey{}, &callCache{fns: map[string]api.Function{}})
+	return context.WithValue(ctx, callCacheKey{}, &callCache{fns: make([]api.Function, 16)})
 }
 
-func exported(ctx context.Context, mod api.Module, name string) api.Function {
+func exported(ctx context.Context, mod api.Module, s slot) api.Function {
 	c, _ := ctx.Value(callCacheKey{}).(*callCache)
-	if c != nil {
-		if f, ok := c.fns[name]; ok {
+	if c != nil && s.idx < len(c.fns) {
+		if f := c.fns[s.idx]; f != nil {
 			return f
 		}
 	}
-	f := mod.ExportedFunction(name)
+	f := mod.ExportedFunction(s.name)
 	if f == nil {
-		panic(fmt.Errorf("x2t: the module does not export %s", name))
+		panic(fmt.Errorf("x2t: the module does not export %s", s.name))
 	}
 	if c != nil {
-		c.fns[name] = f
+		for s.idx >= len(c.fns) {
+			c.fns = append(c.fns, nil)
+		}
+		c.fns[s.idx] = f
 	}
 	return f
 }
