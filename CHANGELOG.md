@@ -73,6 +73,26 @@ attaches the engine, and filex runs it.
 - `bash scripts/x2t/build.sh --diag`: a page build of x2t with function
   names, emscripten's assertions and checked memory access, to find where
   x2t stops (never pinned or shipped).
+- **Dictionaries with one click** (filex 0.57's `ui.extras`): the release
+  publishes the 43 languages of the Document Server's dictionaries the
+  bundle does not carry - Hunspell files and hyphenation patterns unchanged,
+  their licences beside them - and a catalog of them (`dictionaries.json`,
+  `filex-extras/1`), which the manifest pins; filex's Dictionaries section
+  installs one (`scripts/ds-dictionaries.sh`, `scripts/pack-dictionaries.mjs`).
+- **Download as csv in every code page** of the editor's list, as a
+  Document Server's dialog offers them: Arabic, Baltic, Cyrillic, Central
+  European, Chinese, Greek, Hebrew, Japanese, Korean, Thai, Turkish,
+  Vietnamese, Western European... - each measured byte for byte (x2t
+  `v9.4.0.129+3` carries ICU's tables).
+- **The language fixed for editors** (filex 0.57's `session.editor_lang`,
+  *Editor language* in filex's ONLYOFFICE settings) draws the editor, as a
+  Document Server's is; the app's own words stay in the person's language.
+- **Conflict copies**: every save asks filex for one (`conflict: 'copy'`), so
+  a file somebody changed after it was opened keeps their version and gets
+  this one beside it (`<name>.filex-conflict-<time>.<ext>`), as a Document
+  Server's save does; the app says where it went.
+- `engine.zip` and the manifest's `engines.office` for filex 0.57's office
+  engine (`scripts/pack-engine.mjs`, `scripts/engine-ds-files.sh`).
 
 ### Changed
 
@@ -106,6 +126,13 @@ attaches the engine, and filex runs it.
   (`scripts/x2t/patches/07-doc-word95-upstream.patch`). A 96-page Word 95
   document came in as one paragraph with a third of its text; now as the
   Document Server reads it.
+- **Documents with many pictures convert about twice as fast on a server**
+  (and a fifth faster in the page): CxImage's PNG writer and reader fill a
+  picture's rows outside the functions that call setjmp
+  (`scripts/x2t/patches/08-cximage-png-rows.patch`) - every call from those
+  went out of the module and back. A .doc with 509 pictures: 145 million
+  such calls before, 375,000 now; 37 s to 19 s under wazero (the page in
+  Node 12.5 s to 10 s; the Document Server 10.4 s).
 
 ### Security
 

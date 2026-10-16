@@ -80,8 +80,9 @@ sponsored by Ascensio System SIA.
        (document-templates/new/default/new.docx, .xlsx, .pptx) a .bin one;
        their content is unchanged;
      - parts the app does not use are left out (help pages, the PDF and
-       Visio editors, the embedded and forms apps, the macro editor,
-       dictionaries, asm.js fallbacks, the server's script snapshots, the
+       Visio editors, the embedded and forms apps, the macro editor, the
+       dictionaries of languages other than filex's interface ones (item 7),
+       asm.js fallbacks, the server's script snapshots, the
        per-theme thumbnails, some fonts); the lock file names each kind and
        how many files. The three editors' phone apps
        (web-apps/apps/*/mobile, ONLYOFFICE's open-source build, which opens
@@ -163,7 +164,11 @@ sponsored by Ascensio System SIA.
        and 9848afc4066a, "fix bug #82612", by Ascensio System SIA), applied
        unchanged to v9.4.0.129: the Word 97-2003 reader reads a Word 95
        document's paragraphs, and keeps its reads of a document's pages and
-       tables inside them.
+       tables inside them;
+     - 08-cximage-png-rows.patch (BRF Tech, 2026-10-16): CxImage's PNG
+       writer and reader (DesktopEditor/cximage/CxImage/ximapng.cpp, .h)
+       fill a row of a picture with an alpha channel in a function of its
+       own, the same loop moved out of the two that call setjmp.
    ICU's conversion tables are linked in too (BRF Tech, 2026-10-16):
    scripts/x2t/icu-data.py takes the converter alias table and the tables
    scripts/x2t/icu-converters.txt names, unchanged, out of the data package
@@ -181,7 +186,7 @@ sponsored by Ascensio System SIA.
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
    LLVM exception, the Unicode license). The next release carries this
    build (x2t v9.4.0.129+3); releases 0.2.0 to 0.3.1 carried it without
-   patches 06 and 07 and ICU's tables (x2t v9.4.0.129+2); release
+   patches 06 to 08 and ICU's tables (x2t v9.4.0.129+2); release
    0.1.1 carried it without 05-frame-anchor.patch either (x2t
    v9.4.0.129+1); release 0.1.0 carried CryptPad's own build of x2t
    (release v9.3.2+3) unchanged.
@@ -209,6 +214,16 @@ sponsored by Ascensio System SIA.
    qjs-wasi.wasm, or layout-host.wasm, quickjs-ng 0.17.0 built for WASI with
    server/layout/host/layout-host.c (BRF Tech) by
    server/layout/host/build.sh, which fetches its source by SHA-256.
+
+7. The dictionaries a release publishes beside the app (dict-<lang>.aff,
+   .dic and hyph_<lang>.dic, made by scripts/pack-dictionaries.mjs from
+   scripts/ds-dictionaries.sh's copy) are the spell-checking and
+   hyphenation dictionaries ONLYOFFICE's Document Server image ships
+   (https://github.com/ONLYOFFICE/dictionaries; each language's from its own
+   project, mostly LibreOffice's), unchanged, each under its own licence:
+   the licence and notice files the image carries with it travel beside it,
+   one after another, unchanged (dict-<lang>.LICENSE.txt). An administrator
+   installs them through filex; the app's package does not carry them.
 
 ONLYOFFICE's additional terms (section 7, as rewritten in May 2026) ask that
 a modified version:

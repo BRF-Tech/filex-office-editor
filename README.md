@@ -578,6 +578,15 @@ and why:
   places: a 96-page Word 95 document came out as one paragraph with a third
   of its text. With them it comes in as the Document Server reads it - 3,123
   of its 3,124 paragraphs, the same 515,791 characters (measured).
+- `08-cximage-png-rows.patch`: the per-pixel loops of CxImage's PNG writer
+  and reader for a picture with an alpha channel move, unchanged, out of the
+  two functions that call setjmp. Built with emscripten, every call made
+  from such a function goes through an `invoke_*` wrapper (a JavaScript
+  try/catch in the page, a call out to the host and back on a server), so a
+  picture of N pixels made about 2N of them: a .doc with 509 pictures made
+  145 million (measured), and 375,000 now - 37 s on a server before, 19 s
+  now (the page's x2t in Node 12.5 s, 10 s now; the Document Server 10.4 s),
+  the same Editor.bin and pictures.
 
 And **ICU's conversion tables** (`v9.4.0.129+3`): emscripten's ICU port
 links ICU's empty data stub, so ICU converted only UTF-8, UTF-16, UTF-32 and
@@ -626,12 +635,14 @@ machine, `--cpus 6 --memory 7g`): two builds from empty trees gave the
 same `x2t.js` (133,782 bytes, SHA-256 `9f2f65ac...`, the same as
 `v9.4.0.129+1`'s: only the module changed) and `x2t.wasm` (38,763,027
 bytes, `cabaa6e3...`), the sums pinned; 18.6 and 17.4 minutes.
-`v9.4.0.129+3` (patches 06 and 07, the ICU data; 2026-10-16, an x86-64
-Linux machine under other builds' load, `--cpus 8 --memory 12g --server`):
-a build from an empty tree gave the same three files as the tree the fix
-was made in, resumed from its stamps - `x2t.js` (133,782 bytes, unchanged),
-`x2t.wasm` (39,972,412 bytes, `3d2b46ae...`) and `x2t-server.wasm`
-(41,427,638 bytes, `ef492165...`), the sums pinned; 31.5 minutes.
+`v9.4.0.129+3` (patches 06 to 08, the ICU data; 2026-10-16, an x86-64
+Linux machine, `--cpus 8 --memory 12g --server`): a build from an empty
+tree gave the same three files as the tree the fixes were made in, resumed
+from its stamps - `x2t.js` (133,983 bytes, `f6551a61...`: patch 08 leaves
+the module fewer `invoke_*` imports, so the glue changes too), `x2t.wasm`
+(39,972,378 bytes, `a4add9f6...`) and `x2t-server.wasm` (41,427,723 bytes,
+`7aacc87f...`), the sums pinned; 45.6 minutes (patches 06 and 07
+alone gave `3d2b46ae...` and `ef492165...` from an empty tree too).
 
 ### txt and csv
 
@@ -658,13 +669,15 @@ lists only what x2t writes right here, measured code page by code page
 
 | | Offered | Not offered, measured |
 |---|---|---|
-| csv | UTF-8, UTF-16, UTF-16 big endian (each with its byte order mark), UTF-32 and UTF-32 big endian (without one) | every other code page, for now: up to `v9.4.0.129+2` x2t had no conversion tables (emscripten's ICU port carries none) and wrote `^ehir` for "Şehir" in windows-1254; `+3` carries them and writes the Turkish workbook in windows-1254 whole (measured), but the dialog does not offer them yet ([docs/PARITY.md](docs/PARITY.md) A5) |
+| csv | every code page of the editor's list, as a Document Server's dialog offers them: the Arabic, Baltic, Celtic, Cyrillic, Central European, Chinese, Greek, Hebrew, Japanese, Korean, Nordic, Thai, Turkish, Western European and Vietnamese ones, UTF-7, UTF-8 and UTF-16 (with a byte order mark), UTF-32 (without one) - each measured writing its own script byte for byte | - (up to x2t `v9.4.0.129+2` only the Unicode ones: emscripten's ICU port carries no conversion tables, and windows-1254 came out `^ehir`) |
 | txt | UTF-8 | x2t's txt writer writes UTF-8 for any code page but its "Unicode" (50) and "big endian" (51), and those as UTF-16 with the text left out wherever `wchar_t` is 32 bits - ONLYOFFICE's own, not this build's |
 
 An encoding outside the list that reaches the app anyway is refused, and
 the person is told. `tests/x2t-wasm.test.ts` writes the Turkish document as
-txt and the workbook as csv in each encoding offered and with each
-delimiter: red on CryptPad's build, green on this one.
+txt and the workbook as csv in each Unicode encoding and with each
+delimiter (red on CryptPad's build), and a workbook with a sample of each
+code page's own script as csv in that code page, compared byte for byte with
+what Python's codec writes (`CSV_SAMPLES`; red up to `v9.4.0.129+2`).
 
 ### The round trips
 
@@ -796,9 +809,30 @@ docker run --rm -v "$PWD:/src" -w /src <the Node image above> node scripts/pack-
 
 `pack-engine.mjs` writes `dist/engine.zip` the way the bundle is written
 (the same bytes in the pinned Node image and under Node 22.22 elsewhere,
-measured: 13,614,237 bytes) and, with `--manifest`, its SHA-256 into
+measured: 13,615,254 bytes) and, with `--manifest`, its SHA-256 into
 `filex-app.json` (`engines.office.sha256`; the url names the release by
 `{tag}`).
+
+And the **dictionaries** of every language the bundle does not carry (43 of
+the image's 49, 174 MB), for filex 0.57 to install with one click
+(`ui.extras` in `filex-app.json`; filex's docs/APP-PLUGINS-API.md, "Files an
+administrator adds to an app"):
+
+```bash
+bash scripts/ds-dictionaries.sh             # dist/ds-dictionaries/, the image's dictionaries/ by its digest
+node scripts/pack-dictionaries.mjs --manifest
+```
+
+`pack-dictionaries.mjs` writes `dist/dictionaries/`: each language's
+Hunspell files and hyphenation patterns unchanged (`dict-pl_PL.aff`,
+`dict-pl_PL.dic`, `dict-hyph_pl_PL.dic`), its licence and notice files one
+after another (`dict-pl_PL.LICENSE.txt`), and `dictionaries.json`, the
+catalog (`filex-extras/1`: one item a language, each file with the path the
+editor reads it from under the package's `extra/dictionaries/`, its address
+beside the catalog, size and SHA-256). The release attaches all of them;
+`--manifest` writes the catalog's SHA-256 into `ui.extras.dictionaries`.
+The same image gives the same files and catalog (no dates, no compression;
+measured: `1fce1671...`, 37,522 bytes).
 
 Measured for 0.3.1 (2026-10-10, an x86-64 Linux machine), the same way as
 0.2.0: the same `ui.zip` from both builds - 103,098,008 bytes, 2,633

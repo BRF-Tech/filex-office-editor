@@ -88,7 +88,7 @@ the same 28 libraries linked a second time (`steps.sh x2t_server`):
   conversion that reaches an undefined function ends with `missing
   function: <name>` (`x2t.MissingFunction`).
 
-`x2t-server.wasm` of x2t `v9.4.0.129+3` is 41.4 MB (`ef492165...`, pinned in
+`x2t-server.wasm` of x2t `v9.4.0.129+3` is 41.4 MB (`7aacc87f...`, pinned in
 `upstream/onlyoffice.json` beside the page's two files), its imports 26 WASI
 functions, 13 `invoke_*`, two emscripten ones and the 87 undefined. Linking
 it again with the libraries built takes about 5-7 minutes, the whole tree
@@ -106,6 +106,17 @@ about an hour.
   be stopped by ending its process - which is how F3 runs it.
 - A warm worker's stdin is an OS pipe: with an `io.Pipe` wazero read the
   first job and never the second.
+- **`invoke_*` is the cost of setjmp**: every call made from a C function
+  that calls setjmp leaves the module for the host and comes back. A .doc
+  with 509 pictures made 145,265,861 of them, nearly all from CxImage's PNG
+  writer and reader (`CxImage::BlindGetPixelColor`, `AlphaGet`, `AlphaSet`
+  called per pixel inside the functions that call setjmp; counted by table
+  index on a build that keeps the names, 2026-10-16): 37-38 s, against 12.5 s
+  for the page's x2t in V8. `patches/08-cximage-png-rows.patch` fills a
+  row outside them: 374,924 calls, 18.7-20 s. The CPU profile of what
+  remains is mostly the module's own code (wazero's compiler against V8's)
+  and the rest of the round trips; the functions an instance calls are kept
+  by slot, not looked up by name each time (`env.go`; about 3 %).
 - **Random numbers and clocks from the system** (`internal/wasmsys`): a
   wazero module configuration answers WASI's `random_get` from a
   deterministic source unless it is given one. x2t reads it (as
@@ -147,7 +158,7 @@ Into the editor's format (`-format-to` the editor's type), with the watch:
 | SampleDoc.doc, Lists.doc (Word 97-2003) | 27 KB | 0.11-0.14 s | 284 MiB | |
 | Bug46220.doc (four PNG pictures) | 1.1 MB | 0.13 s | 320 MiB | without the watch |
 | picture.doc, Bug47731.doc (EMF/WMF pictures) | 1.4 / 0.9 MB | 1.6 / 0.57 s | 306-334 MiB | without the watch, x2t `+3` (until `+2` x2t stopped, the page's too: below); 7,766 / 80,533 B, the DS's sizes before its base64; the DS: 0.49 / 0.5 s |
-| Bug61268.doc (509 pictures, EMF among them) | 6.2 MB | 39.7 s | 397 MiB | without the watch, x2t `+3`, at a load of 12-20 (the page's x2t in Node: 14.4 s); 6,899,264 B, the DS's; the DS: 10.4 s |
+| Bug61268.doc (509 pictures, EMF among them) | 6.2 MB | 18.7-20.1 s | 397 MiB | without the watch, x2t `+3`, an idle machine (the page's x2t in Node: 10.0-10.2 s); 6,899,264 B, the DS's; the DS: 10.4 s. 37-38 s before `08-cximage-png-rows.patch` (below) |
 | Bug50955.doc (Word 95, code page 1251, 96 pages) | 603 KB | 1.4 s (to docx) | 303 MiB | without the watch, x2t `+3`: 3,123 of the DS's 3,124 paragraphs, the same 515,791 characters (until `+2`: 2 KB, the text lost; below) |
 | notes.odt | 43 KB | 0.38 s | 284 MiB | |
 | tr.xlsx / sample.xlsx | 2.5 / 77 KB | 0.87 / 2.8 s | 287 MiB | |
