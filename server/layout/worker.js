@@ -228,6 +228,11 @@ function layout(j) {
     // api's constructor fills Asc.editor only while it is empty.
     globalThis.Asc.editor = undefined;
     globalThis.editor = undefined;
+    // The spreadsheet api makes its collaborative-editing object only while
+    // AscCommon.CollaborativeEditing is empty (initCollaborativeEditing), so
+    // the next sheet's api had none ("SetLogicDocument of null", measured).
+    // The text and slide editors make theirs when sdkjs loads: kept.
+    if (KIND === 'cell' && globalThis.AscCommon) globalThis.AscCommon.CollaborativeEditing = undefined;
     globalThis.NativeOpenFileData(data, version, undefined, opts);
     var api = globalThis.Asc.editor;
     lap('open');
