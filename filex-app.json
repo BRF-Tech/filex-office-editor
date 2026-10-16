@@ -68,6 +68,10 @@
       "en": "For Print in the editor: the document goes to filex as a PDF, and filex opens your browser's print dialog for it.",
       "tr": "Düzenleyicideki Yazdır için: belge filex'e PDF olarak gider, filex onun için tarayıcınızın yazdırma penceresini açar."
     },
+    "office-engine": {
+      "en": "So filex can convert office documents and draw their thumbnails on the server without a Document Server: the app brings ONLYOFFICE's converter and page layout compiled to WebAssembly, and filex runs them in a process of their own, with the documents it hands them and nothing else.",
+      "tr": "filex ofis belgelerini Document Server olmadan sunucuda dönüştürebilsin ve küçük resimlerini çizebilsin diye: uygulama, WebAssembly'ye derlenmiş ONLYOFFICE dönüştürücüsünü ve sayfa düzenini getirir; filex onları kendi süreçlerinde, yalnızca onlara verdiği belgelerle çalıştırır."
+    },
     "ui-viewer:.docx": {
       "en": "So a .docx document opens in the editor.",
       "tr": "Bir .docx belgesi düzenleyicide açılsın diye."
@@ -408,5 +412,12 @@
       },
       "view": "editor"
     }
-  ]
+  ],
+  "engines": {
+    "office": {
+      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/engine.zip",
+      "sha256": "7dc25d3958d80202ecee2ddc28f4ae89159f47305b13af3faf846cab850c876c",
+      "editor": "editor"
+    }
+  }
 }

@@ -64,7 +64,7 @@ describe('the manifest and the locked editor files', () => {
     // (`encrypted_folders`, the derived files:e2e-plaintext) and editing
     // together (the `co_edit` block, the derived files:co-edit), so the
     // manifest asks for filex 0.56 (0.55 would refuse either block).
-    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'co_edit', 'ui', 'encrypted_folders', 'views', 'new_documents'];
+    const fields = ['manifest_version', 'name', 'version', 'filex', 'label', 'description', 'homepage', 'permissions', 'permission_reasons', 'languages', 'co_edit', 'ui', 'encrypted_folders', 'views', 'new_documents', 'engines'];
     expect(Object.keys(manifest).filter((k) => !fields.includes(k))).toEqual([]);
     expect(Object.keys(manifest.ui).filter((k) => !['bundle', 'csp', 'package_fetch', 'frame_package', 'connect_blob', 'download', 'print'].includes(k))).toEqual([]);
     // files:e2e-plaintext and files:co-edit are derived from their blocks:
@@ -81,6 +81,16 @@ describe('the manifest and the locked editor files', () => {
     for (const [p, why] of Object.entries(manifest.permission_reasons as Record<string, Record<string, string>>)) {
       for (const lang of manifest.languages) expect(why[lang], `${p} ${lang}`).toBeTruthy();
     }
+    // filex 0.57's engines.office: the engine.zip the release attaches,
+    // pinned (scripts/pack-engine.mjs), the editor's sdkjs/ and fonts/ read
+    // from the bundle's editor/. Its permission, office-engine, is derived:
+    // filex refuses it written into `permissions`.
+    expect(Object.keys(manifest.engines)).toEqual(['office']);
+    expect(manifest.engines.office.url).toBe('https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/engine.zip');
+    expect(manifest.engines.office.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.engines.office.editor).toBe('editor');
+    expect(manifest.permissions).not.toContain('office-engine');
+    for (const lang of ['en', 'tr']) expect(manifest.permission_reasons['office-engine']?.[lang], lang).toBeTruthy();
   });
 
   it('asks to edit documents of encrypted folders (filex 0.56), and says what that means in both languages', () => {
