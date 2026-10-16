@@ -1,0 +1,423 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-10-16: two of ONLYOFFICE
+core's own later fixes to its Word 97-2003 reader, taken back to v9.4.0.129
+unchanged - commits 507f0ae06b67c2c6002db653418afd00beba74c0 ("fix bug
+#82318", 2026-07-14) and 9848afc4066a1e5c1ff6d640ed11f764303e2f88 ("fix bug
+#82612", 2026-07-29) of https://github.com/ONLYOFFICE/core, both after the
+v9.4.0.129 tag (AGPL-3.0, Ascensio System SIA).
+
+Measured (2026-10-16): a Word 95 document (nFib 104, saved "complex")
+lost its paragraphs - core read its paragraph bin table as Word 97's (32-bit
+page numbers) whenever the file says fComplex, so the paragraph pages came
+from the wrong offsets and from memory never cleared, and the 3,124
+paragraphs of a 96-page document came out as one, with a third of the
+text. With ICU's conversion tables (scripts/x2t/icu-data.py) the text itself
+decodes; with these fixes the document comes in as the Document Server
+reads it: 3,123 paragraphs and the same 515,791 characters. What they
+change: the Word 6/95 bin table and paragraph pages whatever fComplex says,
+an FKP cleared before it is read and every read of it kept inside its 512
+bytes, the character pages checked the same way, and the font table's
+names and the string tables read inside their records.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/MsBinaryFile/DocFile/FontFamilyName.cpp b/MsBinaryFile/DocFile/FontFamilyName.cpp
+index 815a7f18..e22d41c5 100644
+--- a/MsBinaryFile/DocFile/FontFamilyName.cpp
++++ b/MsBinaryFile/DocFile/FontFamilyName.cpp
+@@ -62,9 +62,12 @@ namespace DocFileFormat
+ 
+ 	ByteStructure* FontFamilyName::ConstructObject( VirtualStreamReader* reader, int length )
+ 	{
++		if (length < 1) return NULL;
++
+ 		FontFamilyName *newObject = new FontFamilyName();
+ 
+-		long startPos = reader->GetPosition();
++		long startObjectPos = reader->GetPosition();
++		long endObjectPos = reader->GetPosition() + length;
+ 
+ 		//FFID
+ 		int ffid = (int)reader->ReadByte();
+@@ -103,18 +106,20 @@ namespace DocFileFormat
+ 		}
+ 	//read the next \0 terminated string
+ 		long strStart	= reader->GetPosition();
+-		long strEnd		= searchTerminationZero( reader );	
+-
++		long strEnd		= searchTerminationZero( reader, endObjectPos - strStart);
+ 
+ 		unsigned char *bytes = reader->ReadBytes( (int)( strEnd - strStart ), true );
+ 
+-		if (reader->nWordVersion > 0)
+-		{
+-			FormatUtils::GetWStringFromBytes(newObject->xszFtn, bytes, (int)( strEnd - strStart ), ENCODING_WINDOWS_1250 );
+-		}
+-		else
++		if (bytes)
+ 		{
+-			newObject->xszFtn = NSFile::CUtf8Converter::GetWStringFromUTF16((unsigned short*)(bytes), (strEnd - strStart) / 2);
++			if (reader->nWordVersion > 0)
++			{
++				FormatUtils::GetWStringFromBytes(newObject->xszFtn, bytes, (int)( strEnd - strStart ), ENCODING_WINDOWS_1250 );
++			}
++			else
++			{
++				newObject->xszFtn = NSFile::CUtf8Converter::GetWStringFromUTF16((unsigned short*)(bytes), (strEnd - strStart) / 2);
++			}
+ 		}
+ 
+ 		if (newObject->xszFtn.length() > 0)
+@@ -132,23 +137,26 @@ namespace DocFileFormat
+ 
+ 		RELEASEARRAYOBJECTS( bytes );
+ 
+-		long readBytes = reader->GetPosition() - startPos;
++		long readBytes = reader->GetPosition() - startObjectPos;
+ 
+ 		if( readBytes < length && szAlt > 0)
+ 		{
+ 	//read the next \0 terminated string		
+ 			strStart	= reader->GetPosition();
+-			strEnd		= searchTerminationZero( reader );
++			strEnd		= searchTerminationZero( reader, endObjectPos - strStart);
+ 
+ 			bytes = reader->ReadBytes( (int)( strEnd - strStart ), true );
+ 
+-			if (reader->nWordVersion > 0)
+-			{
+-				FormatUtils::GetWStringFromBytes( newObject->xszAlt, bytes, (int)( strEnd - strStart ), ENCODING_WINDOWS_1250);
+-			}
+-			else
++			if (bytes)
+ 			{
+-				newObject->xszAlt = NSFile::CUtf8Converter::GetWStringFromUTF16((unsigned short*)(bytes), (strEnd - strStart) / 2);
++				if (reader->nWordVersion > 0)
++				{
++					FormatUtils::GetWStringFromBytes( newObject->xszAlt, bytes, (int)( strEnd - strStart ), ENCODING_WINDOWS_1250);
++				}
++				else
++				{
++					newObject->xszAlt = NSFile::CUtf8Converter::GetWStringFromUTF16((unsigned short*)(bytes), (strEnd - strStart) / 2);
++				}
+ 			}
+ 			RELEASEARRAYOBJECTS( bytes );
+ 		 }
+@@ -158,29 +166,24 @@ namespace DocFileFormat
+ 
+ 	/*========================================================================================================*/
+ 
+-	long FontFamilyName::searchTerminationZero( VirtualStreamReader *reader )
++	long FontFamilyName::searchTerminationZero( VirtualStreamReader *reader, long length)
+     {
+-	  long strStart = reader->GetPosition();
+-      
+-	  if (reader->nWordVersion > 0)
+-	  {//ansi string only
+-		  while ( reader->ReadByte() != 0 )
+-		  {
+-			;
+-		  }
+-	  }
+-	  else
+-	  {//unicode string
+-		  while ( reader->ReadInt16() != 0 )
+-		  {
+-			;
+-		  }
++	  long strStart	= (long)reader->GetPosition();
++	  long pos = strStart;
++
++	  const long charSize = (reader->nWordVersion > 0) ? 1 : 2; //ansi string only for the old versions
++
++	  while (pos + charSize <= strStart + length)
++	  {
++		  bool bTerminated = (charSize == 1) ? (reader->ReadByte() == 0) : (reader->ReadInt16() == 0);
++
++		  pos = (long)reader->GetPosition();
++
++		  if (bTerminated) break;
+ 	  }
+-      
+-	  long pos = reader->GetPosition();
+-	  
++
+       reader->Seek( (int)strStart, 0 /*STREAM_SEEK_SET*/ );
+-      
++
+ 	  return pos;
+     }
+ }
+diff --git a/MsBinaryFile/DocFile/FontFamilyName.h b/MsBinaryFile/DocFile/FontFamilyName.h
+index 635e6f37..8b558f50 100644
+--- a/MsBinaryFile/DocFile/FontFamilyName.h
++++ b/MsBinaryFile/DocFile/FontFamilyName.h
+@@ -70,7 +70,7 @@ namespace DocFileFormat
+ 	  unsigned int panoseSize;	// Panose size     
+       FontSignature fs;			// Font sinature
+ 	  
+-	  long searchTerminationZero( VirtualStreamReader *reader );
++	  long searchTerminationZero( VirtualStreamReader *reader, long length );
+     public:
+ 	  FontFamilyName();
+ 	  virtual ~FontFamilyName();
+diff --git a/MsBinaryFile/DocFile/FormattedDiskPageCHPX.cpp b/MsBinaryFile/DocFile/FormattedDiskPageCHPX.cpp
+index 2b0a031b..b60d4ec0 100644
+--- a/MsBinaryFile/DocFile/FormattedDiskPageCHPX.cpp
++++ b/MsBinaryFile/DocFile/FormattedDiskPageCHPX.cpp
+@@ -64,6 +64,7 @@ namespace DocFileFormat
+ 		//read the 512 bytes (FKP)
+ 		unsigned char* bytes = NULL;
+ 		bytes = new unsigned char[512];
++		memset(bytes, 0, 512);
+ 
+ 		WordStream->seek(offset);
+ 		WordStream->read(bytes, 512);
+@@ -87,6 +88,11 @@ namespace DocFileFormat
+ 		rgb = new unsigned char[crun];
+ 		grpchpx = new CharacterPropertyExceptions * [grpchpxSize];
+ 
++		for (unsigned int i = 0; i < grpchpxSize; i++)
++		{
++			grpchpx[i] = NULL;
++		}
++
+ 		j = 4 * (crun + 1);
+ 
+ 		unsigned char* chpx = NULL;
+@@ -94,6 +100,8 @@ namespace DocFileFormat
+ 		for (int i = 0; i < crun; i++)
+ 		{
+ 			//fill the rgb array
++			if (j > 511)
++				break;
+ 			unsigned char wordOffset = bytes[j];
+ 			rgb[i] = wordOffset;
+ 			j++;
+@@ -104,6 +112,9 @@ namespace DocFileFormat
+ 				//it's the count of bytes
+ 				unsigned char cb = bytes[wordOffset * 2];
+ 
++				int cbMax = 512 - (wordOffset * 2 + 1);
++				if (cb > cbMax) cb = (unsigned char)cbMax;
++
+ 				//read the bytes of chpx
+ 				chpx = new unsigned char[cb];
+ 				memcpy(chpx, (bytes + (wordOffset * 2) + 1), cb);
+diff --git a/MsBinaryFile/DocFile/FormattedDiskPagePAPX.cpp b/MsBinaryFile/DocFile/FormattedDiskPagePAPX.cpp
+index e06bdf34..5cb61a6a 100644
+--- a/MsBinaryFile/DocFile/FormattedDiskPagePAPX.cpp
++++ b/MsBinaryFile/DocFile/FormattedDiskPagePAPX.cpp
+@@ -64,13 +64,18 @@ namespace DocFileFormat
+ 		//read the 512 bytes (FKP)
+ 		unsigned char* bytes = NULL;
+ 		bytes = new unsigned char[512];
++		memset(bytes, 0, 512);
+ 
+ 		WordStream->seek(offset);
+ 		WordStream->read(bytes, 512);
+ 
+ 		//get the count
+ 		crun = bytes[511];
+-
++		if (crun < 1)
++		{
++			RELEASEARRAYOBJECTS(bytes);
++			return;
++		}
+ 		//create and fill the array with the adresses
+ 		rgfcSize = crun + 1;
+ 		rgfc = new int[rgfcSize];
+@@ -97,13 +102,16 @@ namespace DocFileFormat
+ 
+ 		for (unsigned char i = 0; i < crun; i++)
+ 		{
++			if (j > 511)
++				break;
+ 			BX bx;
+ 			bx.wordOffset = bytes[j];
+ 			j++;
+ 
+-			if (fComplex || nWordVersion == 0)
++			if (/*fComplex ||*/ nWordVersion == 0)
+ 			{
+-				memcpy(phe, (bytes + j), 12);
++				if (j + 12 <= 512)	memcpy(phe, (bytes + j), 12);
++				else				memset(phe, 0, 12);
+ 
+ 				//fill the rgbx array
+ 				bx.phe = ParagraphHeight(phe, 12, false);
+@@ -112,14 +120,18 @@ namespace DocFileFormat
+ 			}
+ 			else if (nWordVersion == 2)
+ 			{
+-				memcpy(phe, (bytes + bx.wordOffset * 2 + j + 1), 6);
++				int phePos = bx.wordOffset * 2 + j + 1;
++
++				if (phePos + 6 <= 512)	memcpy(phe, (bytes + phePos), 6);
++				else					memset(phe, 0, 6);
+ 
+ 				//fill the rgbx array
+ 				bx.phe = ParagraphHeight(phe, 6, false);
+ 			}
+ 			else
+ 			{
+-				memcpy(phe, (bytes + j), 6);
++				if (j + 6 <= 512)	memcpy(phe, (bytes + j), 6);
++				else				memset(phe, 0, 6);
+ 
+ 				//fill the rgbx array
+ 				bx.phe = ParagraphHeight(phe, 6, false);
+@@ -141,14 +153,21 @@ namespace DocFileFormat
+ 				if (cw != 0)
+ 				{
+ 					int sz = cw * 2;
+-					//read the bytes for papx
+-					unsigned char* papx = new unsigned char[sz];
+-					memcpy(papx, (bytes + (bx.wordOffset * 2) + padbyte + 1), sz);
+ 
+-					//parse PAPX and fill grppapx
+-					grppapx[i] = new ParagraphPropertyExceptions(papx, sz, dataStream, nWordVersion);
++					int szMax = 512 - (bx.wordOffset * 2 + padbyte + 1);
++					if (sz > szMax) sz = szMax;
+ 
+-					RELEASEARRAYOBJECTS(papx);
++					if (sz > 0)
++					{
++						//read the bytes for papx
++						unsigned char* papx = new unsigned char[sz];
++						memcpy(papx, (bytes + (bx.wordOffset * 2) + padbyte + 1), sz);
++
++						//parse PAPX and fill grppapx
++						grppapx[i] = new ParagraphPropertyExceptions(papx, sz, dataStream, nWordVersion);
++
++						RELEASEARRAYOBJECTS(papx);
++					}
+ 				}
+ 
+ 			}
+@@ -182,7 +201,7 @@ namespace DocFileFormat
+ 
+ 		//there are n offsets and n-1 fkp's in the bin table
+ 
+-		if (fib->m_nWordVersion > 0 && fib->m_FibBase.fComplex == false)
++		if (fib->m_nWordVersion > 0/* && fib->m_FibBase.fComplex == false*/)
+ 		{
+ 			int	n = (((int)fib->m_FibWord97.lcbPlcfBtePapx - 8) / 6) + 1;
+ 
+@@ -228,7 +247,6 @@ namespace DocFileFormat
+ 				//so starts at:
+ 				int offset = fkpnr * 512;
+ 
+-				//parse the FKP and add it to the list
+ 				PAPXlist->push_back(new FormattedDiskPagePAPX(wordStream, offset, dataStream, fib->m_nWordVersion, fib->m_FibBase.fComplex));
+ 			}
+ 
+diff --git a/MsBinaryFile/DocFile/MainDocumentMapping.cpp b/MsBinaryFile/DocFile/MainDocumentMapping.cpp
+index 5fbd47f3..909e299a 100644
+--- a/MsBinaryFile/DocFile/MainDocumentMapping.cpp
++++ b/MsBinaryFile/DocFile/MainDocumentMapping.cpp
+@@ -111,9 +111,16 @@ namespace DocFileFormat
+ 
+ // Convert the document
+ 		_lastValidPapx = NULL;
+-		if (m_document->AllPapxFkps->empty() == false)
++		if (m_document->AllPapxFkps && m_document->AllPapxFkps->empty() == false)
+ 		{
+-			_lastValidPapx = (*(m_document->AllPapxFkps->begin()))->grppapx[0];
++			for (auto papx : *m_document->AllPapxFkps)
++			{
++				if ((papx) && (papx->grppapx))
++				{
++					_lastValidPapx = *papx->grppapx;
++					break;
++				}
++			}
+ 		}
+ 
+ 		int cp = 0;
+@@ -157,8 +164,8 @@ namespace DocFileFormat
+ 			else
+ 			{
+ 				//There are no paragraphs, only text
+-				int fc						=	m_document->FindFileCharPos(cp);
+-				int fcEnd					=	m_document->FindFileCharPos(countTextRel);
++				int fc =	m_document->FindFileCharPos(cp);
++				int fcEnd =	m_document->FindFileCharPos(countTextRel);
+ 
+ 				//if (fc < 0 || fcEnd < 0) break;
+ 				//
+diff --git a/MsBinaryFile/DocFile/StringTable.h b/MsBinaryFile/DocFile/StringTable.h
+index ede4129b..a30b9482 100644
+--- a/MsBinaryFile/DocFile/StringTable.h
++++ b/MsBinaryFile/DocFile/StringTable.h
+@@ -160,6 +160,12 @@ namespace DocFileFormat
+ 				if (Data.size() == count_elements && count_elements > 0)
+ 					break; //1997 and newer
+ 
++				if (lcb > 0 && reader->GetPosition() >= fc + lcb)
++					break;
++
++				if (reader->GetPosition() >= reader->GetSize())
++					break;
++
+ 				int cchData = 0;
+ 				int cbData = 0;
+         
+@@ -175,8 +181,13 @@ namespace DocFileFormat
+ 				}
+ 
+ 				long posBeforeType = reader->GetPosition();
++				
++				ByteStructure* object = T().ConstructObject(reader, cbData);
+ 
+-				Data.push_back( T().ConstructObject( reader, cbData ) );
++				if (!object)
++					break;
++
++				Data.push_back(object);
+ 
+ 				reader->Seek( (int)( posBeforeType + cbData ), 0/*STREAM_SEEK_SET */);
+ 	        
+@@ -263,6 +274,9 @@ namespace DocFileFormat
+ 				if (cchData > 0)
+ 				{
+ 					ByteStructure* object = T().ConstructObject(reader, cchData);
++
++					if (!object) break;
++
+ 					StringTable<T>::Data.push_back(object);
+ 
+ 					if (bReadExta)
+@@ -278,6 +292,9 @@ namespace DocFileFormat
+ 				else
+ 				{
+ 					ByteStructure* object = T().ConstructObject(reader, StringTable<T>::cbExtra);
++
++					if (!object) break;
++
+ 					StringTable<T>::Data.push_back(object);
+ 				}
+ 			}
+diff --git a/MsBinaryFile/DocFile/WordDocument.cpp b/MsBinaryFile/DocFile/WordDocument.cpp
+index 9f6e6a6e..61fbd66e 100644
+--- a/MsBinaryFile/DocFile/WordDocument.cpp
++++ b/MsBinaryFile/DocFile/WordDocument.cpp
+@@ -552,11 +552,14 @@ namespace DocFileFormat
+ 		for (size_t i = 0; i < AllPapxFkps->size(); ++i)
+ 		{
+ 			FormattedDiskPagePAPX*& iter = AllPapxFkps->at(i);
+-			for (unsigned int j = 0; j < (iter)->grppapxSize; ++j)
++			for (unsigned int j = 0; iter && j < iter->grppapxSize; ++j)
+ 			{
+-				int nVal = (iter)->rgfc[j];
+-				AllPapx->insert( std::pair<int, ParagraphPropertyExceptions*>( nVal, (iter)->grppapx[j] ) );
+-				AllPapxVector->push_back(nVal);
++				if (iter->rgfc)
++				{
++					int nVal = iter->rgfc[j];
++					AllPapx->insert(std::pair<int, ParagraphPropertyExceptions*>(nVal, iter->grppapx[j]));
++					AllPapxVector->push_back(nVal);
++				}
+ 			}
+ 		}
+ 

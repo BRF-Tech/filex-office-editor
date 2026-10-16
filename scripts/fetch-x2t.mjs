@@ -39,6 +39,8 @@ import { PIN_FILE } from './upstream-watch.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const X2T_DEFAULT_DIR = path.join(here, '..', 'dist', 'x2t');
 export const X2T_FILES = ['x2t.js', 'x2t.wasm'];
+/** The server build (scripts/x2t/build.sh --server), pinned beside them; this script does not fetch it. */
+export const X2T_SERVER_FILE = 'x2t-server.wasm';
 // x2t zipped is about 17 MB; anything far larger is not it.
 const MAX_ZIP = 64 * 1024 * 1024;
 
@@ -53,6 +55,9 @@ export function validateX2tPin(x2t) {
   if (!/^v\d+(\.\d+){2,3}(\+\d+)?$/.test(String(x2t.release ?? ''))) problems.push('x2t.release must be vX.Y.Z[.N] or vX.Y.Z[.N]+B');
   for (const f of X2T_FILES) {
     if (!HEX64.test(String(x2t.files?.[f] ?? ''))) problems.push(`x2t.files["${f}"] must be a SHA-256`);
+  }
+  if (x2t.files?.[X2T_SERVER_FILE] !== undefined && !HEX64.test(String(x2t.files[X2T_SERVER_FILE]))) {
+    problems.push(`x2t.files["${X2T_SERVER_FILE}"] must be a SHA-256`);
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x2t.pinned ?? ''))) problems.push('x2t.pinned must be YYYY-MM-DD');
   // How it is built (scripts/x2t/): the toolchain by digest, every source by commit.

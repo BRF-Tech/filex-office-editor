@@ -5,7 +5,8 @@
 // rather than kept as binary files: a Word document, a workbook and a
 // presentation, each with Turkish text (the letters outside Latin-1 - ğ Ğ
 // ı İ ş Ş - as well as ç ö ü), bold and italic runs, a table, a number, a
-// formula, a sheet named in Turkish. Readers below take the same things
+// formula, a sheet named in Turkish; a Word document with an EMF picture,
+// and csv lines in legacy code pages. Readers below take the same things
 // back out of what x2t returns.
 
 import { readZip, writeZip } from '../../scripts/lib/zip.mjs';
@@ -229,6 +230,78 @@ export function ofdPackage(): Uint8Array {
     'Doc_0/Pages/Page_0/Content.xml': `${X}<ofd:Page ${NS}><ofd:Content/></ofd:Page>`,
   });
 }
+
+// ---- pictures and legacy encodings (docs/PARITY.md A14 and A3) ---------
+
+/**
+ * A small EMF picture, 132 bytes: its header (100 x 70 device units, a
+ * frame of 26.46 x 18.52 mm), one rectangle, the end of the file. Opening it
+ * goes through ONLYOFFICE's metafile code, which x2t uses for every EMF, WMF
+ * and SVG picture (it writes an EMF as SVG for the editor).
+ */
+export function emfPicture(): Uint8Array {
+  const b = Buffer.alloc(132);
+  let o = 0;
+  const u32 = (...v: number[]) => v.forEach((x) => (o = b.writeUInt32LE(x, o)));
+  const i32 = (...v: number[]) => v.forEach((x) => (o = b.writeInt32LE(x, o)));
+  const u16 = (...v: number[]) => v.forEach((x) => (o = b.writeUInt16LE(x, o)));
+  // EMR_HEADER: type, size, bounds, frame (0.01 mm), " EMF", version, bytes, records, handles, reserved,
+  // description (length, offset), palette entries, the device in pixels and in millimetres.
+  u32(1, 88);
+  i32(0, 0, 100, 70, 0, 0, 2646, 1852);
+  u32(0x464d4520, 0x10000, 132, 3);
+  u16(1, 0);
+  u32(0, 0, 0);
+  i32(1024, 768, 270, 203);
+  u32(43, 24); // EMR_RECTANGLE
+  i32(10, 10, 90, 60);
+  u32(14, 20, 0, 16, 20); // EMR_EOF
+  return new Uint8Array(b);
+}
+
+/** A Word document with a line of Turkish text and one picture, inline, as word/media/image1.<ext>. */
+export function docxWithPicture(picture: Uint8Array, ext: string, contentType: string): Uint8Array {
+  const NS_WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+  const NS_PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+  const size = 'cx="952500" cy="666750"';
+  const doc = `${XML}<w:document xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}"><w:body>
+<w:p><w:r><w:t xml:space="preserve">${esc(TR.title)}</w:t></w:r></w:p>
+<w:p><w:r><w:drawing><wp:inline><wp:extent ${size}/><wp:docPr id="1" name="Resim 1"/><a:graphic><a:graphicData uri="${NS_PIC}"><pic:pic>
+<pic:nvPicPr><pic:cNvPr id="1" name="image1.${ext}"/><pic:cNvPicPr/></pic:nvPicPr>
+<pic:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>
+<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext ${size}/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>
+</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+</w:body></w:document>`;
+  const xml: Record<string, string> = {
+    '[Content_Types].xml': types([['/word/document.xml', `${CT}.wordprocessingml.document.main+xml`]]).replace(
+      '<Default Extension="xml"',
+      `<Default Extension="${ext}" ContentType="${contentType}"/><Default Extension="xml"`,
+    ),
+    '_rels/.rels': rels([['rId1', 'officeDocument', 'word/document.xml']]),
+    'word/_rels/document.xml.rels': rels([['rId2', 'image', `media/image1.${ext}`]]),
+    'word/document.xml': doc,
+  };
+  const entries = Object.entries(xml).map(([name, s]) => ({ name, data: Buffer.from(s, 'utf8') }));
+  entries.push({ name: `word/media/image1.${ext}`, data: Buffer.from(picture) });
+  return new Uint8Array(writeZip(entries));
+}
+
+/**
+ * Two cells of a csv line in a code page other than Unicode - the bytes
+ * and the text they hold - by x2t's number for the encoding
+ * (m_nCsvTxtEncoding, core's UnicodeConverter_Encodings.h). The multi-byte
+ * ones each need a table that extends another (ICU's windows-936-2000 is
+ * ibm-1386's, and so on): scripts/x2t/icu-converters.txt carries both.
+ */
+export const LEGACY_CSV: ReadonlyArray<{ codepage: number; name: string; bytes: readonly number[]; cells: readonly [string, string] }> = [
+  { codepage: 36, name: 'windows-1254', bytes: [0xde, 0x65, 0x68, 0x69, 0x72, 0x3b, 0x49, 0xf0, 0x64, 0xfd, 0x72], cells: ['Şehir', 'Iğdır'] },
+  { codepage: 14, name: 'windows-1251', bytes: [0xc3, 0xee, 0xf0, 0xee, 0xe4, 0x3b, 0xcc, 0xee, 0xf1, 0xea, 0xe2, 0xe0], cells: ['Город', 'Москва'] },
+  { codepage: 44, name: 'windows-1252', bytes: [0x43, 0x61, 0x66, 0xe9, 0x3b, 0x47, 0x72, 0xf6, 0xdf, 0x65], cells: ['Café', 'Größe'] },
+  { codepage: 27, name: 'Shift_JIS', bytes: [0x93, 0x8c, 0x8b, 0x9e, 0x3b, 0x91, 0xe5, 0x8d, 0xe3], cells: ['東京', '大阪'] },
+  { codepage: 18, name: 'GBK', bytes: [0xb1, 0xb1, 0xbe, 0xa9, 0x3b, 0xc9, 0xcf, 0xba, 0xa3], cells: ['北京', '上海'] },
+  { codepage: 17, name: 'Big5', bytes: [0xbb, 0x4f, 0xa5, 0x5f, 0x3b, 0xb0, 0xaa, 0xb6, 0xaf], cells: ['臺北', '高雄'] },
+  { codepage: 28, name: 'KS_C_5601-1987', bytes: [0xbc, 0xad, 0xbf, 0xef, 0x3b, 0xba, 0xce, 0xbb, 0xea], cells: ['서울', '부산'] },
+];
 
 // ---- reading what comes back -------------------------------------------
 

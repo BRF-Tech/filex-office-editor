@@ -20,13 +20,31 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { Worker } from 'node:worker_threads';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CSV, EXPORT_FORMATS, PDF, TEXT_ENCODINGS, TXT, type DocumentKind } from '../src/formats';
+import { CANVAS } from '../src/kinds';
 import { X2tError, stopsX2t, x2tConvert, x2tExport, x2tStopReason, type X2tFormat, type X2tModule } from '../src/x2t';
 import { writeZip } from '../scripts/lib/zip.mjs';
-import { FORMULA, TR, docx, docxParagraphs, docxRuns, formulaLines, odtWithFormula, ofdPackage, parts, pptx, texts, xlsx } from './fixtures/office';
+import {
+  FORMULA,
+  LEGACY_CSV,
+  TR,
+  docx,
+  docxParagraphs,
+  docxRuns,
+  docxWithPicture,
+  emfPicture,
+  formulaLines,
+  odtWithFormula,
+  ofdPackage,
+  parts,
+  pptx,
+  texts,
+  xlsx,
+} from './fixtures/office';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIR = process.env.X2T_DIR ? path.resolve(process.env.X2T_DIR) : path.join(here, '..', 'dist', 'x2t');
@@ -303,6 +321,30 @@ describe.skipIf(!present)('x2t (WebAssembly) round trips with src/x2t.ts', () =>
     measured.push(`csv: ${rows.length} rows, first ${JSON.stringify(rows[0])}`);
   });
 
+  // ⚠ emscripten's ICU port carries no conversion tables: before x2t
+  // v9.4.0.129+3 every code page but UTF-8/16/32 and ISO-8859-1 was lost - a
+  // windows-1254 csv opened as an empty sheet, a Word 95 document without
+  // its text. +3 links the tables core's UnicodeConverter reaches
+  // (scripts/x2t/icu-data.py, icu-converters.txt). Red on +2.
+  it('csv in a legacy code page: the text comes in whole, single-byte and multi-byte (ICU conversion tables)', () => {
+    const done: string[] = [];
+    for (const c of LEGACY_CSV) {
+      const bytes = new Uint8Array([...c.bytes, 0x0d, 0x0a]);
+      const bin = x2tConvert(m, { bytes, format: 'csv' }, 'bin', { formatTo: CANVAS.cell, text: { codepage: c.codepage, delimiter: 2 } });
+      const p = parts(fromBin(bin, 'xlsx'));
+      const sheetName = [...p.keys()].find((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k));
+      const got = [...texts(p.get('xl/sharedStrings.xml') ?? '', 't'), ...texts(p.get(sheetName ?? '') ?? '', 't')];
+      for (const t of c.cells) expect(got, `${c.name} (x2t's ${c.codepage}): ${t}`).toContain(t);
+      done.push(c.name);
+    }
+    // And written: the workbook's Turkish cells as windows-1254, read back with Node's decoder.
+    const bin = toBin(xlsx(), 'xlsx');
+    const out = x2tExport(m, { bin: bin.bytes, media: bin.media, formatTo: CSV, ext: 'csv', text: { codepage: 36 } });
+    const text = new TextDecoder('windows-1254').decode(out);
+    for (const t of TR.cells) expect(text, `windows-1254 written: ${t}`).toContain(t);
+    measured.push(`csv in ${done.join(', ')}: the cells whole; written as windows-1254 ${out.length} B`);
+  });
+
   // ⚠ CryptPad's 9.3.2+3 does not link ONLYOFFICE's StarMath converter, and
   // the ODF reader converts every LibreOffice formula with it: such an odt
   // stopped the module ("Aborted(missing function:
@@ -359,4 +401,95 @@ describe.skipIf(!present)('x2t (WebAssembly) stopping on a document', () => {
     expect(aborts.map(x2tStopReason)).toEqual(['missing function: COFDFile::COFDFile']);
     expect(x2tStopReason(thrown)).toBe('missing function: COFDFile::COFDFile');
   }, 180_000);
+});
+
+/**
+ * HTML to md with x2t in a worker thread of its own, ended after `ms`: where
+ * x2t loops on it (v9.4.0.129+2 did), the test fails instead of holding the
+ * run. x2t's md type is AVS_OFFICESTUDIO_FILE_DOCUMENT_MD (92).
+ */
+function mdInWorker(html: string, ms: number): Promise<string> {
+  const code = [
+    "const { parentPort, workerData } = require('node:worker_threads');",
+    "const fs = require('node:fs');",
+    "const path = require('node:path');",
+    "const vm = require('node:vm');",
+    "const { createRequire } = require('node:module');",
+    "const NL = String.fromCharCode(10);",
+    "const file = path.join(workerData.dir, 'x2t.js');",
+    "const src = '(function (module, exports, require, __dirname, __filename) {' + NL + fs.readFileSync(file, 'utf8') + NL + '})';",
+    'const mod = { exports: {} };',
+    'vm.runInThisContext(src, { filename: file })(mod, mod.exports, createRequire(file), workerData.dir, file);',
+    'const x = mod.exports;',
+    'x.onRuntimeInitialized = () => {',
+    '  try {',
+    "    for (const d of ['/working', '/working/media']) { try { x.FS.mkdir(d); } catch (e) {} }",
+    "    x.FS.writeFile('/working/input.html', workerData.html);",
+    "    x.FS.writeFile('/working/params.xml', '<?xml version=\"1.0\" encoding=\"utf-8\"?><TaskQueueDataConvert><m_sFileFrom>/working/input.html</m_sFileFrom>' +",
+    "      '<m_sFileTo>/working/output.md</m_sFileTo><m_nFormatTo>92</m_nFormatTo><m_bIsNoBase64>true</m_bIsNoBase64></TaskQueueDataConvert>');",
+    "    const rc = x.ccall('main1', 'number', ['string'], ['/working/params.xml']);",
+    "    parentPort.postMessage({ rc, md: rc === 0 ? Buffer.from(x.FS.readFile('/working/output.md')).toString('utf8') : null });",
+    '  } catch (e) {',
+    '    parentPort.postMessage({ error: String(e) });',
+    '  }',
+    '};',
+  ].join('\n');
+  return new Promise((resolve, reject) => {
+    const w = new Worker(code, { eval: true, workerData: { dir: DIR, html } });
+    const t = setTimeout(() => {
+      void w.terminate();
+      reject(new Error(`HTML to md did not finish in ${ms / 1000} s`));
+    }, ms);
+    w.on('message', (r: { rc?: number; md?: string | null; error?: string }) => {
+      clearTimeout(t);
+      void w.terminate();
+      if (r.error) reject(new Error(`x2t stopped: ${r.error}`));
+      else if (r.rc !== 0 || r.md == null) reject(new Error(`x2t: HTML to md failed (${r.rc})`));
+      else resolve(r.md);
+    });
+    w.on('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
+  });
+}
+
+// ⚠ docs/PARITY.md A14: before x2t v9.4.0.129+3 the SVG engine of
+// ONLYOFFICE's graphics library ran HtmlFile2's copy of the CSS calculator,
+// built for another layout of the same classes, and HtmlFile2 ran the SVG
+// engine's std::vector<NSCSS::CNode> code
+// (scripts/x2t/patches/06-svg-css-namespace.patch): every metafile x2t
+// opened wrote past its block. A Word document with one small EMF picture
+// stopped the module ("null function or function signature mismatch",
+// measured on +2), as did a PDF of a document with SVG pictures; HTML to md
+// stopped or looped on any HTML. Red on +2; each in a module of its own.
+describe.skipIf(!present)('x2t (WebAssembly) with pictures and HTML (docs/PARITY.md A14)', () => {
+  it("a Word document with an EMF picture: into the editor's format with the picture as SVG beside it, and back", async () => {
+    const m = await loadX2t();
+    const input = docxWithPicture(emfPicture(), 'emf', 'image/x-emf');
+    const bin = x2tConvert(m, { bytes: input, format: 'docx' }, 'bin');
+    expect(head(bin.bytes, 6)).toBe('DOCY;v');
+    const names = Object.keys(bin.media);
+    const svg = names.find((n) => n.endsWith('.svg'));
+    expect(svg, `media: ${names.join(', ')}`).toBeDefined();
+    expect(Buffer.from(bin.media[svg!]).toString('utf8')).toMatch(/<svg[\s>]/);
+    expect(names.some((n) => n.endsWith('.emf'))).toBe(true);
+    const back = parts(x2tConvert(m, { bytes: bin.bytes, format: 'bin', media: bin.media }, 'docx').bytes);
+    expect(docxParagraphs(back.get('word/document.xml') ?? '')).toContain(TR.title);
+    expect([...back.keys()].some((k) => /^word\/media\/[^/]+\.emf$/.test(k))).toBe(true);
+    // The same module, ten more times: the heap stays whole.
+    for (let i = 0; i < 10; i++) expect(head(x2tConvert(m, { bytes: input, format: 'docx' }, 'bin').bytes, 6)).toBe('DOCY;v');
+  }, 180_000);
+
+  it('HTML to md: the text, bold and the table come out as md', async () => {
+    const html =
+      `<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head><body>` +
+      `<p><b>${TR.bold}</b></p><p>${TR.body}</p>` +
+      `<table><tr><td>${TR.cells[0]}</td><td>${TR.cells[1]}</td></tr><tr><td>${TR.cells[2]}</td><td>${TR.cells[3]}</td></tr></table>` +
+      `</body></html>`;
+    const md = await mdInWorker(html, 60_000);
+    expect(md).toContain(`**${TR.bold}**`);
+    expect(md).toContain(TR.body);
+    expect(md).toMatch(new RegExp(`\\|\\s*${TR.cells[0]}\\s*\\|\\s*${TR.cells[1]}\\s*\\|`));
+  }, 120_000);
 });

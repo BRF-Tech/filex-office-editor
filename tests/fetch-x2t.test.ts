@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { X2T_FILES, checkX2tFiles, extractX2t, packX2t, readX2tPin, validateX2tPin } from '../scripts/fetch-x2t.mjs';
+import { X2T_FILES, X2T_SERVER_FILE, checkX2tFiles, extractX2t, packX2t, readX2tPin, validateX2tPin } from '../scripts/fetch-x2t.mjs';
 import { writeZip } from '../scripts/lib/zip.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,7 +30,8 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     expect(core.tag).toBe(PIN.source_tag);
     expect(x2t.build.sources.build_tools.tag).toBe(PIN.source_tag);
     expect(x2t.release.startsWith(`${PIN.source_tag}+`)).toBe(true);
-    expect(Object.keys(x2t.files).sort()).toEqual([...X2T_FILES].sort());
+    // The page's two files and the server build (build.sh --server), from the same tree.
+    expect(Object.keys(x2t.files).sort()).toEqual([...X2T_FILES, X2T_SERVER_FILE].sort());
     expect(x2t.build.toolchain.image).toBe(`docker.io/emscripten/emsdk:${x2t.build.toolchain.emsdk}`);
   });
 
@@ -61,6 +62,7 @@ describe('the x2t pin (upstream/onlyoffice.json "x2t")', () => {
     const sources = good.build.sources;
     expect(() => validateX2tPin({ ...good, release: 'v9.4' })).toThrow(/release/);
     expect(() => validateX2tPin({ ...good, files: { 'x2t.js': good.files['x2t.js'] } })).toThrow(/x2t\.wasm/);
+    expect(() => validateX2tPin({ ...good, files: { ...good.files, [X2T_SERVER_FILE]: 'latest' } })).toThrow(/x2t-server\.wasm/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, core: { ...sources.core, commit: 'v9.4.0.129' } } } })).toThrow(/core\.commit/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, toolchain: { ...good.build.toolchain, digest: 'latest' } } })).toThrow(/digest/);
     expect(() => validateX2tPin({ ...good, build: { ...good.build, sources: { ...sources, boost: { ...sources.boost, sha256: '' } } } })).toThrow(/boost\.sha256/);

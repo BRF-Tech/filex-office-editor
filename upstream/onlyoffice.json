@@ -10,9 +10,9 @@
   "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
   "pinned": "2026-10-08",
   "x2t": {
-    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the two files against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; releases 0.2.0 to 0.3.1 attach v9.4.0.129+2, release 0.1.1 attached v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
-    "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/; built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
-    "release": "v9.4.0.129+2",
+    "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the page's two files, and with --server the server build (x2t-server.wasm, docs/SERVER.md), against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; releases 0.2.0 to 0.3.1 attach v9.4.0.129+2, release 0.1.1 attached v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
+    "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/, and ICU 68.2's conversion tables (scripts/x2t/icu-data.py); built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
+    "release": "v9.4.0.129+3",
     "build": {
       "recipe": {
         "about": "Where scripts/x2t comes from: CryptPad's Dockerfile and embuild.sh at the release commit, and its changes to ONLYOFFICE core (its core/ at the changes commit, against core v9.3.0.140, the commit that core/ was pulled from), ported to source_tag in scripts/x2t/patches/01-cryptpad-wasm.patch.",
@@ -56,10 +56,18 @@
     },
     "files": {
       "x2t.js": "9f2f65ac557470b2895beaa0f9678ee1a998545d49c8b93d67306ff3e7d7fe4b",
-      "x2t.wasm": "cabaa6e33574f61703c53463d714e33529949d17d388b4e198994199e29c368b"
+      "x2t.wasm": "3d2b46ae35fefa21c70315092c5c520929e678e07cb63b120ef64085e7390dbf",
+      "x2t-server.wasm": "ef492165fe7bf60c64f8291215fc0fba8254ab47ad648681e8906c364ecb958d"
     },
-    "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.3.1/x2t.zip",
-    "sha512": "9bc03d7508b231d691e3cef7878c4572c737d2e0d84b320f458e587e387f20ae8c2a15e29199103b3a80a04b574ff9b7be12b59b57748178a13db2d746a7fb5c",
-    "pinned": "2026-10-10"
+    "pinned": "2026-10-16"
+  },
+  "engine": {
+    "about": "The office engine a release attaches as engine.zip, which filex runs on the server (its engines.office; docs/SERVER.md): scripts/pack-engine.mjs writes it from x2t-server.wasm (pinned under x2t), layout-host.wasm (server/layout/host/build.sh, quickjs-ng and wasi-sdk by their sums), server/layout/worker.js and two scripts of the Document Server image pinned above, copied out unchanged by scripts/engine-ds-files.sh. Change it only together with the files that give the new sums; the zip's own SHA-256 goes into filex-app.json.",
+    "files": {
+      "layout-host.wasm": "6406cd013f234b091cfc75e1532e08f2c992c560757e9f6ba5114a065f597c8b",
+      "layout/fonts_ie.js": "e8a880c5579c48a7a7e473d9f12e0673e57afb6dab6e87cb64493841e0eebdb6",
+      "layout/xregexp-all-min.js": "ad8b04fd8e59beabc616851cd6a820784884c68bb1ea75993e694b21344bd136"
+    },
+    "pinned": "2026-10-16"
   }
 }
