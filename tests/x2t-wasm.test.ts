@@ -36,6 +36,7 @@ import {
   docx,
   docxParagraphs,
   docxRuns,
+  docxWithLinkedPicture,
   docxWithPicture,
   emfPicture,
   formulaLines,
@@ -430,11 +431,17 @@ describe.skipIf(!present)('x2t (WebAssembly) stopping on a document', () => {
 });
 
 /**
- * HTML to md with x2t in a worker thread of its own, ended after `ms`: where
- * x2t loops on it (v9.4.0.129+2 did), the test fails instead of holding the
- * run. x2t's md type is AVS_OFFICESTUDIO_FILE_DOCUMENT_MD (92).
+ * One conversion with x2t in a worker thread of its own, ended after `ms`:
+ * where x2t loops on a document (v9.4.0.129+2 on any HTML to md, +3 on a
+ * document naming another server), the test fails instead of holding the
+ * run. `from` and `to` are the input's and the output's file names in x2t's
+ * /working; the answer is the output and the names x2t wrote to media/.
  */
-function mdInWorker(html: string, ms: number): Promise<string> {
+function inWorker(
+  input: { from: string; bytes: Uint8Array; to: string; formatTo: number },
+  what: string,
+  ms: number,
+): Promise<{ bytes: Uint8Array; media: string[] }> {
   const code = [
     "const { parentPort, workerData } = require('node:worker_threads');",
     "const fs = require('node:fs');",
@@ -450,34 +457,41 @@ function mdInWorker(html: string, ms: number): Promise<string> {
     'x.onRuntimeInitialized = () => {',
     '  try {',
     "    for (const d of ['/working', '/working/media']) { try { x.FS.mkdir(d); } catch (e) {} }",
-    "    x.FS.writeFile('/working/input.html', workerData.html);",
-    "    x.FS.writeFile('/working/params.xml', '<?xml version=\"1.0\" encoding=\"utf-8\"?><TaskQueueDataConvert><m_sFileFrom>/working/input.html</m_sFileFrom>' +",
-    "      '<m_sFileTo>/working/output.md</m_sFileTo><m_nFormatTo>92</m_nFormatTo><m_bIsNoBase64>true</m_bIsNoBase64></TaskQueueDataConvert>');",
+    "    x.FS.writeFile('/working/' + workerData.from, workerData.bytes);",
+    "    x.FS.writeFile('/working/params.xml', '<?xml version=\"1.0\" encoding=\"utf-8\"?><TaskQueueDataConvert><m_sFileFrom>/working/' + workerData.from + '</m_sFileFrom>' +",
+    "      '<m_sFileTo>/working/' + workerData.to + '</m_sFileTo><m_nFormatTo>' + workerData.formatTo + '</m_nFormatTo><m_bIsNoBase64>true</m_bIsNoBase64></TaskQueueDataConvert>');",
     "    const rc = x.ccall('main1', 'number', ['string'], ['/working/params.xml']);",
-    "    parentPort.postMessage({ rc, md: rc === 0 ? Buffer.from(x.FS.readFile('/working/output.md')).toString('utf8') : null });",
+    "    const media = x.FS.readdir('/working/media').filter((n) => n !== '.' && n !== '..');",
+    "    parentPort.postMessage({ rc, media, bytes: rc === 0 ? x.FS.readFile('/working/' + workerData.to) : null });",
     '  } catch (e) {',
     '    parentPort.postMessage({ error: String(e) });',
     '  }',
     '};',
   ].join('\n');
   return new Promise((resolve, reject) => {
-    const w = new Worker(code, { eval: true, workerData: { dir: DIR, html } });
+    const w = new Worker(code, { eval: true, workerData: { dir: DIR, ...input } });
     const t = setTimeout(() => {
       void w.terminate();
-      reject(new Error(`HTML to md did not finish in ${ms / 1000} s`));
+      reject(new Error(`${what} did not finish in ${ms / 1000} s`));
     }, ms);
-    w.on('message', (r: { rc?: number; md?: string | null; error?: string }) => {
+    w.on('message', (r: { rc?: number; media?: string[]; bytes?: Uint8Array | null; error?: string }) => {
       clearTimeout(t);
       void w.terminate();
       if (r.error) reject(new Error(`x2t stopped: ${r.error}`));
-      else if (r.rc !== 0 || r.md == null) reject(new Error(`x2t: HTML to md failed (${r.rc})`));
-      else resolve(r.md);
+      else if (r.rc !== 0 || r.bytes == null) reject(new Error(`x2t: ${what} failed (${r.rc})`));
+      else resolve({ bytes: r.bytes, media: r.media ?? [] });
     });
     w.on('error', (e) => {
       clearTimeout(t);
       reject(e);
     });
   });
+}
+
+/** HTML to md in a worker (inWorker); x2t's md type is AVS_OFFICESTUDIO_FILE_DOCUMENT_MD (92). */
+async function mdInWorker(html: string, ms: number): Promise<string> {
+  const r = await inWorker({ from: 'input.html', bytes: Buffer.from(html, 'utf8'), to: 'output.md', formatTo: 92 }, 'HTML to md', ms);
+  return Buffer.from(r.bytes).toString('utf8');
 }
 
 // ⚠ docs/PARITY.md A14: before x2t v9.4.0.129+3 the SVG engine of
@@ -517,5 +531,48 @@ describe.skipIf(!present)('x2t (WebAssembly) with pictures and HTML (docs/PARITY
     expect(md).toContain(`**${TR.bold}**`);
     expect(md).toContain(TR.body);
     expect(md).toMatch(new RegExp(`\\|\\s*${TR.cells[0]}\\s*\\|\\s*${TR.cells[1]}\\s*\\|`));
+  }, 120_000);
+});
+
+// ⚠ scripts/x2t/patches/09-wasm-no-network.patch: before x2t v9.4.0.129+4 a
+// document that names something on another server never finished. x2t's
+// downloader waits while a thread fetches the address, and WebAssembly
+// starts none (measured in Node: a docx with a linked picture and an HTML
+// page with a picture elsewhere, neither done in 40 s; the same docx
+// without the link 46 ms). Now the download fails at once, as with a
+// Document Server that has no network, and nothing is fetched. Each in a
+// worker of its own, ended after a minute.
+describe.skipIf(!present)('x2t (WebAssembly) and a document naming another server (patches/09)', () => {
+  const FAR = 'http://127.0.0.1:9/far.png';
+
+  it("a docx with a linked picture comes into the editor's format, the picture left out", async () => {
+    const r = await inWorker(
+      { from: 'input.docx', bytes: docxWithLinkedPicture(FAR), to: 'Editor.bin', formatTo: CANVAS.word },
+      'a docx with a linked picture',
+      60_000,
+    );
+    expect(head(r.bytes, 6)).toBe('DOCY;v');
+    expect(r.media).toEqual([]);
+  }, 120_000);
+
+  it('an HTML page with a picture and a style sheet elsewhere comes in, the picture a link with its alt text', async () => {
+    const html =
+      `<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />` +
+      `<link rel="stylesheet" href="http://127.0.0.1:9/page.css"></head>` +
+      `<body><p>${TR.body}</p><p><img src="${FAR}" alt="${TR.title}"></p></body></html>`;
+    const r = await inWorker(
+      { from: 'input.html', bytes: Buffer.from(html, 'utf8'), to: 'output.docx', formatTo: 0x0041 },
+      'an HTML page with a picture elsewhere',
+      60_000,
+    );
+    const p = parts(r.bytes);
+    const doc = p.get('word/document.xml') ?? '';
+    expect(docxParagraphs(doc).join('\n')).toContain(TR.body);
+    // What the Document Server's own x2t writes with no network (measured
+    // 2026-10-16, the same document.xml): the picture stays a link to its
+    // address, described by its alt text.
+    expect(doc).toContain(`descr="${TR.title}"`);
+    expect(p.get('word/_rels/document.xml.rels')).toContain(`Target="${FAR}" TargetMode="External"`);
+    expect([...p.keys()].some((k) => k.startsWith('word/media/'))).toBe(false);
   }, 120_000);
 });

@@ -11,9 +11,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -345,5 +348,64 @@ func TestConvert_ACsvInALegacyCodePageComesInWhole(t *testing.T) {
 				t.Errorf("%s: no %q in\n%.400s", c.name, cell, s)
 			}
 		}
+	}
+}
+
+// scripts/x2t/patches/09-wasm-no-network.patch: before x2t v9.4.0.129+4 a
+// document that names something on another server never finished. x2t's
+// downloader waits while a thread fetches the address, WebAssembly starts
+// none, and x2t slept in a loop (measured: a docx with a linked picture not
+// done in 200 s, the same docx without the link 13 ms). Now the download
+// fails at once, as with a Document Server that has no network: the linked
+// picture is left out, an HTML page's picture stays a link with its alt
+// text, and the server the addresses name - here one that counts - is
+// asked for nothing. The context ends the old loop: the test fails rather
+// than hangs.
+func TestConvert_ADocumentNamingAnotherServerFinishesAndFetchesNothing(t *testing.T) {
+	e := engine(t)
+	var hits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "image/png")
+		io.WriteString(w, "\x89PNG\r\n\x1a\n")
+	}))
+	defer srv.Close()
+	far := srv.URL + "/far.png"
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	linked := zipOf(t, map[string]string{
+		"[Content_Types].xml":          `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+		"_rels/.rels":                  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+		"word/_rels/document.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="` + far + `" TargetMode="External"/></Relationships>`,
+		"word/document.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>` +
+			`<w:p><w:r><w:t>` + tr + `</w:t></w:r></w:p>` +
+			`<w:p><w:r><w:drawing><wp:inline><wp:extent cx="914400" cy="914400"/><wp:docPr id="1" name="far"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>` +
+			`<pic:nvPicPr><pic:cNvPr id="1" name="far"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:link="rId2"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+			`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>` +
+			`</w:body></w:document>`,
+	})
+	bin, err := e.Convert(ctx, Job{From: "docx", To: "bin", Input: linked})
+	if err != nil {
+		t.Fatalf("a docx with a linked picture: %v", err)
+	}
+	if !bytes.HasPrefix(bin.Output, []byte("DOCY;v")) || len(bin.Media) != 0 {
+		t.Fatalf("not an Editor.bin without the picture: %q, %d media", bin.Output[:min(16, len(bin.Output))], len(bin.Media))
+	}
+
+	html := `<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><link rel="stylesheet" href="` + srv.URL + `/page.css"></head>` +
+		`<body><p>` + tr + `</p><p><img src="` + far + `" alt="far picture"></p></body></html>`
+	out, err := e.Convert(ctx, Job{From: "html", To: "docx", Input: []byte(html)})
+	if err != nil {
+		t.Fatalf("an HTML page with a picture elsewhere: %v", err)
+	}
+	if d := part(t, out.Output, "word/document.xml"); !strings.Contains(d, tr) || !strings.Contains(d, `descr="far picture"`) {
+		t.Fatalf("the text and the picture's alt text:\n%.800s", d)
+	}
+	if r := part(t, out.Output, "word/_rels/document.xml.rels"); !strings.Contains(r, `Target="`+far+`" TargetMode="External"`) {
+		t.Fatalf("the picture is not a link to its address:\n%.800s", r)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("x2t asked the server %d times", n)
 	}
 }

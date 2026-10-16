@@ -287,6 +287,31 @@ export function docxWithPicture(picture: Uint8Array, ext: string, contentType: s
 }
 
 /**
+ * A Word document with a line of Turkish text and one picture it only links
+ * to, at `url` (a relationship with TargetMode="External", `r:link`): Word
+ * writes one for Insert Picture > Link to File.
+ */
+export function docxWithLinkedPicture(url: string): Uint8Array {
+  const NS_WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+  const NS_PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+  const size = 'cx="952500" cy="666750"';
+  const doc = `${XML}<w:document xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}"><w:body>
+<w:p><w:r><w:t xml:space="preserve">${esc(TR.title)}</w:t></w:r></w:p>
+<w:p><w:r><w:drawing><wp:inline><wp:extent ${size}/><wp:docPr id="1" name="Resim 1"/><a:graphic><a:graphicData uri="${NS_PIC}"><pic:pic>
+<pic:nvPicPr><pic:cNvPr id="1" name="far.png"/><pic:cNvPicPr/></pic:nvPicPr>
+<pic:blipFill><a:blip r:link="rId2"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>
+<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext ${size}/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>
+</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+</w:body></w:document>`;
+  return zip({
+    '[Content_Types].xml': types([['/word/document.xml', `${CT}.wordprocessingml.document.main+xml`]]),
+    '_rels/.rels': rels([['rId1', 'officeDocument', 'word/document.xml']]),
+    'word/_rels/document.xml.rels': `${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="${REL}/image" Target="${esc(url)}" TargetMode="External"/></Relationships>`,
+    'word/document.xml': doc,
+  });
+}
+
+/**
  * Two cells of a csv line in a code page other than Unicode - the bytes
  * and the text they hold - by x2t's number for the encoding
  * (m_nCsvTxtEncoding, core's UnicodeConverter_Encodings.h). The multi-byte
