@@ -47,7 +47,7 @@ export const APPS = ['main', 'mobile'];
  * is part of the build's input, not the clock, so two builds agree: change
  * it together with html.mjs, storage.js or the rules below.
  */
-export const CHANGES_DATED = '2026-10-08';
+export const CHANGES_DATED = '2026-10-16';
 
 /**
  * Rules, first match wins. `drop` leaves a file out (`why` is counted in the
