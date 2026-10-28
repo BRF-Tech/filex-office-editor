@@ -9,7 +9,7 @@ update.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-16
+## [0.4.0] - 2026-10-28
 
 For filex 0.57.0 or later, where an administrator can delete the Document
 Server container: the app does on the server what a Document Server did

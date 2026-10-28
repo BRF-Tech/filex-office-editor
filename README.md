@@ -66,9 +66,13 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > with the real modules, filex 0.57's own checks of the release's files and
 > its test of the office engine with them
 > ([Building a release](#building-a-release),
-> [The app on a server](#the-app-on-a-server)); the browser run
-> ([Measured in the browsers](#measured-in-the-browsers)) and the
-> measurement in a real filex ([Measured in filex 0.56](#measured-in-filex-056))
+> [The app on a server](#the-app-on-a-server)), and the release in a real
+> filex 0.57.6, installed over 0.3.1 as an update - the engine prepared,
+> office thumbnails drawn and a conversion made with no Document Server, a
+> csv and a docx edited and saved in Chromium
+> ([Measured in filex 0.57](#measured-in-filex-057)); the run in three
+> browsers ([Measured in the browsers](#measured-in-the-browsers)) and in
+> encrypted folders ([Measured in filex 0.56](#measured-in-filex-056))
 > are 0.3.1's. On filex 0.56, install 0.3.1; on filex 0.55, 0.1.1: each
 > refuses the manifests after its own.
 
@@ -925,6 +929,12 @@ checks then passed on them (`wasmplugin.ParseManifest` and `Validate`, the
 bundle's index, `checkEngineZip`, the catalog's rules, every dictionary
 file at its size and SHA-256): 64 permissions, `office-engine` among them.
 
+Measured again for 0.4.0 on the day of the release (2026-10-28, the same
+PC, a fresh clone of the release commit and an empty x2t build tree, 30
+minutes for x2t's two builds, 33 from the clone to the last file): the same
+three x2t files, the same `ui.zip`, `x2t.zip`, `engine.zip` and
+dictionaries catalog, byte for byte - the files the release attaches.
+
 Measured for 0.3.1 (2026-10-10, an x86-64 Linux machine), the same way as
 0.2.0: the same `ui.zip` from both builds - 103,098,008 bytes, 2,633
 files, SHA-256
@@ -1498,6 +1508,25 @@ filex's side, seen here: its pages tell an app's interface no name yet
 while the names of the others, which the relay knows, are right. The fix
 belongs to filex.
 
+## Measured in filex 0.57
+
+2026-10-28, in filex **0.57.6** (the released image,
+`ghcr.io/brf-tech/filex:v0.57.6`): a throwaway container on the loopback,
+SQLite, a local storage, no Document Server, reached by Playwright's
+Chromium on Windows. 0.3.1 installed from its GitHub release, then 0.4.0
+over it from this release's own files (**Upload files**: `filex-app.json`,
+`ui.zip`, `engine.zip`), as an update.
+
+| 0.4.0 in filex 0.57.6 | |
+|---|---|
+| The update's review: `compat` ok for `>=0.57.0`; added `office-engine`, the 39 kinds 0.3.1 did not open (`.doc`, `.xls`, `.ppt`, `.rtf`, `.csv`, the templates...) and the three OpenDocument rows of New document; the File types question offered each new kind with the app first | yes |
+| The office engine prepared in the background - **Default apps → Office engine** "Being prepared", then "Ready" (WSL2, 12 cores; the cache 207.5 MB in the data directory) | 82 s |
+| Office thumbnails drawn by the app's engine for `letter.docx`, `report.xlsx`, `slides.pptx`, `notes.odt` and `budget.ods`, from the engine being ready; `password.docx` marked as protected | 11 to 36 s |
+| The Convert app (0.2.0, `engines:office`): `report.xlsx` to PDF, the job running on the app's engine | 5 s, a PDF |
+| A csv in `;`, CRLF and UTF-8 with Turkish letters (`Şehir;Sıcaklık;Nem`, `18,5`) opened in the spreadsheet editor, one cell changed, Ctrl+S: on disk still `;`, CRLF, the Turkish letters and `18,5` as they were, the changed cell new | yes |
+| `letter.docx` opened (2.1 s from the double click to the document in the editor), a line typed, Ctrl+S: the line in the file's `document.xml` | yes |
+| New document: six rows under Apps - a document, a spreadsheet and a presentation, as OOXML and as OpenDocument | yes |
+
 ## Keeping up with ONLYOFFICE
 
 The editor files come from one ONLYOFFICE Docs release, written down in
@@ -1533,7 +1562,7 @@ put the new release in `upstream/onlyoffice.json`, run
 **0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
 for filex 0.55.0 or later, **0.2.0** (2026-10-10, encrypted folders)
 and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
-0.56.0 or later, and **0.4.0** (2026-10-16, the app on a server), for
+0.56.0 or later, and **0.4.0** (2026-10-28, the app on a server), for
 filex 0.57.0 or later, are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
