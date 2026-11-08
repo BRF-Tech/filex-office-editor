@@ -7,9 +7,10 @@
 // document out into pages - run by QuickJS compiled to WebAssembly, under
 // wazero, with no browser and no native code of ONLYOFFICE's.
 //
-// This file plays doctrenderer's part (core v9.4.0.129,
+// This file plays doctrenderer's part (core v10.0.0.169,
 // DesktopEditor/doctrenderer): the same scripts in the same order
-// (editors.cpp GetAllScript), `native` and CreateEmbedObject answered as its
+// (editors.cpp GetAllScript; 10.0 adds ChartStyles.js and
+// path-boolean-min.js after sdk-all.js), `native` and CreateEmbedObject answered as its
 // embedded objects answer them (embed/NativeControlEmbed.cpp), and
 // fonts_ie.js - FreeType and HarfBuzz compiled to asm.js, which doctrenderer
 // loads when it has no native shaper - in place of the native text
@@ -199,6 +200,8 @@ function load() {
   run(BASE + '/layout/fonts_ie.js');
   timeFontEngine();
   run(BASE + '/sdkjs/' + KIND + '/sdk-all.js');
+  run(BASE + '/sdkjs/common/Charts/ChartStyles.js');
+  run(BASE + '/sdkjs/common/Drawings/Format/path-boolean-min.js');
   if (KIND === 'cell') std.evalScript('$.ready();');
   run(BASE + '/sdkjs/common/AllFonts.js');
   std.evalScript('window.InitNativeEditors();');

@@ -15,12 +15,13 @@
 
 set -euo pipefail
 
-QJS_VERSION=0.17.0
-QJS_SHA256=559bc4c420475e55c7ab4510adbc562f55d7524d75e8e89d79ce4bb02f5687d9
-# wasi-sdk 25's own image, by its digest (built 2024-12-12): two builds give
-# the same layout-host.wasm (measured, 2026-10-15 and 2026-10-16), whose
-# SHA-256 upstream/onlyoffice.json pins under "engine".
-WASI_SDK_IMAGE=ghcr.io/webassembly/wasi-sdk:wasi-sdk-25@sha256:fdebde86990902087ecc470bf993ffec4d646e8fbd2e68c290a44120437622d0
+QJS_VERSION=0.18.0
+QJS_SHA256=28bcd89aa3683fd2a946537e5ce3f11cc46b5cbf3383c7561aaef3df5ff9f1dd
+# wasi-sdk's own image, by its digest: two builds give the same
+# layout-host.wasm, whose SHA-256 upstream/onlyoffice.json pins under
+# "engine" (wasi-sdk 25, built 2024-12-12, measured 2026-10-15 and
+# 2026-10-16; wasi-sdk 34, built 2026-08-25, from 0.5.0).
+WASI_SDK_IMAGE=ghcr.io/webassembly/wasi-sdk:wasi-sdk-34@sha256:52595085a0ffbaf574d8d678a9aa81305f0b3af81c639291f15bc7713e42848e
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 out=${here}/../../../dist/layout
