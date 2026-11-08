@@ -16,6 +16,14 @@
 // it (its "forceSaveStart" reaches the bridge), and asked again when the
 // editor is free: at the end of each hand-over (the bridge's unSaveLock),
 // and on a short timer, a few times at most.
+//
+// 10.0's sdkjs exports asc_Save as one more key for its renamed method and
+// calls the renamed one itself (Ctrl+S, the toolbar's Save: measured
+// 2026-11-08, Save lost again with only asc_Save wrapped), so the wrapper is
+// put on the API under every key the function is under (sdk.ts keysOf). Its
+// canSave is renamed too: then the editor's own check is the only one.
+
+import { keysOf } from './sdk';
 
 interface SaveApi {
   canSave?: boolean;
@@ -33,15 +41,16 @@ export class SaveRetry {
   private api: SaveApi | null = null;
   private original: SaveApi['asc_Save'] | null = null;
 
-  /** Wrap the editor API's asc_Save (the name the editor's interface calls it by). Once. */
+  /** Wrap the editor API's asc_Save, under each key it has (asc_Save and, in 10.0, its renamed one). Once. */
   attach(api: SaveApi | null): void {
     if (!api || api.__filexSave || typeof api.asc_Save !== 'function') return;
     const original = api.asc_Save;
     const self = this;
-    api.asc_Save = function (this: SaveApi, isAutoSave?: boolean, ...rest: unknown[]) {
+    const wrapped = function (this: SaveApi, isAutoSave?: boolean, ...rest: unknown[]) {
       if (!isAutoSave) self.want();
       return original.call(this, isAutoSave, ...rest);
     };
+    for (const k of new Set(['asc_Save', ...keysOf(api, original)])) (api as Record<string, unknown>)[k] = wrapped;
     api.__filexSave = true;
     this.api = api;
     this.original = original;

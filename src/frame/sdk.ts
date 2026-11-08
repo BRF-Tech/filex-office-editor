@@ -5,7 +5,7 @@
 // sdkjs's own objects, found by what they are when their names are gone.
 //
 // ONLYOFFICE Docs 10.0 ships sdkjs compiled with property renaming: what it
-// exports by a quoted name stays (the asc_* API, sync_EndAction,
+// exports by a quoted name stays (the asc_* API, sync_EndAction in word,
 // SetThemesPath, the Asc.c_oAsc* enums, AscFonts.getFontStream, window.editor
 // and Asc.editor), everything else gets a short name that changes from build
 // to build. Measured on 10.0.0.169 (2026-11-08): AscCommon.baseEditorsApi,
@@ -29,7 +29,7 @@ export function chainOf(o: unknown): AnyObject[] {
 }
 
 /** An own property's value without calling a getter; undefined for an accessor. */
-function ownValue(o: object, k: string): unknown {
+export function ownValue(o: object, k: string): unknown {
   const d = Object.getOwnPropertyDescriptor(o, k);
   return d && 'value' in d ? d.value : undefined;
 }
@@ -44,8 +44,12 @@ function sourceOf(f: unknown): string {
 
 /** downloadAs builds the server command: {c: "save"} with these keys (sdkjs apiBase.js). */
 const SAVE_COMMAND = /\bc\s*:\s*["']save["']|\[\s*["']c["']\s*\]\s*=\s*["']save["']/;
-/** Its last statement: the server step, called with downloadAs's five values. */
-const LAST_CALL = /this\.([\w$]+)\(\s*[\w$]+(?:\s*,\s*[\w$]+){4}\s*\)\s*;?\s*\}\s*$/;
+/**
+ * Its last statement: the server step, called with downloadAs's five values
+ * - at the end of the method (cell, slide) or of the block it runs in (word
+ * 10.0: `if(!this.dze(q,v)){...this.w7f(q,v,y,x,u)}}`).
+ */
+const LAST_CALL = /this\.([\w$]+)\(\s*[\w$]+(?:\s*,\s*[\w$]+){4}\s*\)\s*;?\s*(?:\}\s*)+$/;
 
 /**
  * The editor's last step of "Download as" and Print - the one that posts to
@@ -67,6 +71,42 @@ export function findDownloadStep(api: unknown): { owner: AnyObject; name: string
       const m = LAST_CALL.exec(s);
       const owner = m ? owning(m[1]) : null;
       if (owner && m) return { owner, name: m[1] };
+    }
+  }
+  return null;
+}
+
+/**
+ * Every key a function is under on an object and its prototypes. 10.0's
+ * sdkjs exports a method by its quoted name as one more key for the same
+ * function and calls it, inside, by its renamed key (asc_Save: Ctrl+S and
+ * the toolbar's Save reach the renamed one).
+ */
+export function keysOf(o: unknown, f: unknown): string[] {
+  const out = new Set<string>();
+  if (typeof f !== 'function') return [];
+  for (const p of chainOf(o)) {
+    for (const k of Object.getOwnPropertyNames(p)) if (ownValue(p, k) === f) out.add(k);
+  }
+  return [...out];
+}
+
+/** sync_EndAction sends this event, and nothing else in sdkjs does (one occurrence in each of 10.0's three bundles). */
+const END_ACTION_EVENT = /["']asc_onEndAction["']/;
+
+/**
+ * The key of the editor's sync_EndAction, which ends a wait the editor shows
+ * (a Download as, a Print): by its name where the build exports it (word),
+ * else (cell, slide in 10.0) the method whose source sends asc_onEndAction.
+ * Called through the API (api[key]), so a more derived override under the
+ * same renamed key is the one that runs. Null: not there.
+ */
+export function findEndAction(api: unknown): string | null {
+  const chain = chainOf(api);
+  if (chain.some((p) => typeof ownValue(p, 'sync_EndAction') === 'function')) return 'sync_EndAction';
+  for (const p of chain) {
+    for (const k of Object.getOwnPropertyNames(p)) {
+      if (END_ACTION_EVENT.test(sourceOf(ownValue(p, k)))) return k;
     }
   }
   return null;

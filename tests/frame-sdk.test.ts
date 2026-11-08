@@ -9,37 +9,44 @@
 // answered at its upload request (src/frame/requests.ts, images.ts). The
 // shapes below are 10.0.0.169's, minified as it ships them (read
 // 2026-11-08); the browsers run the whole of it (e2e/run.mjs).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { PDF, TXT } from '../src/formats';
 import { loadedFonts, takeOverDownloads, trimDownloadFormats, type ExportJob } from '../src/frame/export';
 import { uploadAnswer } from '../src/frame/images';
 import { LoadedFonts, plainFont, watchRequests } from '../src/frame/requests';
-import { findDocumentUrls, findDownloadStep, findEncodings } from '../src/frame/sdk';
+import { SaveRetry } from '../src/frame/save-retry';
+import { findDocumentUrls, findDownloadStep, findEncodings, findEndAction, keysOf } from '../src/frame/sdk';
+
+/** downloadAs's body, minified as each 10.0 bundle ships it (cell, slide: the method; word: inside `if(!this.dze(q,v)){...}`). */
+const DOWNLOAD_AS =
+  'var x={data:null,Bca:null,index:0,count:0};var y={c:"save"};y.id=this.K2;y.outputformat=v.bca;y.nobase64=!0;3===q&&(y.withoutPassword=!0,y.inline=1);var u="";this.v7f(q,v,y,x,u)||this.w7f(q,v,y,x,u)';
 
 /**
  * sdkjs 10.0's base API, minified as it ships: downloadAs builds the server
  * command and ends with `this.v7f(...)||this.w7f(...)` (_downloadAs,
- * _downloadAsUsingServer), and the API keeps sync_EndAction by its name.
+ * _downloadAsUsingServer). The word build keeps sync_EndAction by its name;
+ * cell and slide do not (`named: false`): only its source says what it is.
  */
-function minifiedApi() {
+function minifiedApi({ word = true, named = true } = {}) {
   // A function's source is what the search reads, so downloadAs is written
   // the way the minified file has it (new Function adds the closing brace).
   const base: Record<string, unknown> = {};
   base.X3a = new Function('q', 'v', 'return q+v');
-  base.Q9 = new Function(
-    'q',
-    'v',
-    'var x={data:null,Bca:null,index:0,count:0};var y={c:"save"};y.id=this.K2;y.outputformat=v.bca;y.nobase64=!0;3===q&&(y.withoutPassword=!0,y.inline=1);var u="";this.v7f(q,v,y,x,u)||this.w7f(q,v,y,x,u)',
-  );
+  base.Q9 = new Function('q', 'v', word ? `if(!this.dze(q,v)){${DOWNLOAD_AS}}` : DOWNLOAD_AS);
+  base.dze = () => false;
   base.v7f = () => false;
   base.w7f = () => {
     throw new Error('the server step must not run');
   };
+  base.Mq = new Function('a', 'b', 'this.Ox("asc_onEndAction",a,b);this.Pz(a)');
+  base.Ox = () => {};
+  base.Pz = () => {};
   const proto: Record<string, unknown> = Object.create(base);
   const ended: [number, number][] = [];
-  proto.Wo = (t: number, id: number) => ended.push([t, id]);
-  proto.sync_EndAction = proto.Wo;
+  // The editor's own sync_EndAction (a derived one, under the same renamed key).
+  proto.Mq = (t: number, id: number) => ended.push([t, id]);
+  if (named) proto.sync_EndAction = proto.Mq;
   const api = Object.create(proto) as Record<string, unknown>;
   api.Lna = 'Rapor.docx';
   return { base, proto, api, ended };
@@ -51,6 +58,11 @@ describe('the server step of Download as, renamed (10.0)', () => {
     const step = findDownloadStep(api);
     expect(step?.name).toBe('w7f');
     expect(step?.owner).toBe(base);
+  });
+
+  it('is found the same way at the end of the block word runs it in, or of the method (cell, slide)', () => {
+    expect(findDownloadStep(minifiedApi({ word: false }).api)?.name).toBe('w7f');
+    expect(findDownloadStep(minifiedApi({ word: true }).api)?.name).toBe('w7f');
   });
 
   it("9.4's name wins where it is", () => {
@@ -82,6 +94,55 @@ describe('the server step of Download as, renamed (10.0)', () => {
       [1, 6],
     ]);
     expect(takeOverDownloads(win, 'word', () => {}, () => {})).toBe(true);
+  });
+
+  it("ends the editor's wait through its renamed sync_EndAction where the build does not export it (cell, slide)", () => {
+    const { api, ended } = minifiedApi({ word: false, named: false });
+    expect(findEndAction(api)).toBe('Mq');
+    expect(findEndAction(minifiedApi().api)).toBe('sync_EndAction');
+    expect(findEndAction({ a() {} })).toBeNull();
+    const jobs: { job: ExportJob; done: () => void }[] = [];
+    const win: Record<string, unknown> = { Asc: { editor: api, c_oAscAsyncActionType: { BlockInteraction: 1 } } };
+    expect(takeOverDownloads(win, 'cell', (job, done) => jobs.push({ job, done }), () => {})).toBe(true);
+    (api.w7f as (...a: unknown[]) => void).call(api, 6, { bca: 0x0103 }, { c: 'save', outputformat: 0x0103, title: 'Tablo.ods' }, { data: null }, 'asc_onDownloadUrl');
+    expect(jobs.map((j) => j.job.format.ext)).toEqual(['ods']);
+    expect(ended).toEqual([]);
+    jobs[0].done();
+    // The derived method under the renamed key ran, not the base one.
+    expect(ended).toEqual([[1, 6]]);
+  });
+});
+
+describe('Save, kept while the editor is busy, under each key 10.0 has it', () => {
+  it('wraps the renamed key the editor calls itself as well as asc_Save', () => {
+    vi.useFakeTimers();
+    try {
+      const calls: (boolean | undefined)[] = [];
+      const proto: Record<string, unknown> = {};
+      proto.g7 = function (isAutoSave?: boolean) {
+        calls.push(isAutoSave);
+      };
+      proto.asc_Save = proto.g7;
+      const api = Object.create(proto) as Record<string, unknown> & { asc_Save: (a?: boolean) => void; g7: (a?: boolean) => void };
+      expect(keysOf(api, proto.g7).sort()).toEqual(['asc_Save', 'g7']);
+      const r = new SaveRetry();
+      r.attach(api);
+      // Ctrl+S inside sdkjs: the renamed key; dropped by a busy editor, made again.
+      api.g7();
+      vi.advanceTimersByTime(800);
+      expect(calls).toEqual([undefined, undefined]);
+      r.sent('forceSaveStart');
+      vi.advanceTimersByTime(5000);
+      expect(calls.length).toBe(2);
+      // An autosave through either key keeps nothing.
+      api.g7(true);
+      api.asc_Save(true);
+      vi.advanceTimersByTime(5000);
+      expect(calls).toEqual([undefined, undefined, true, true]);
+      expect(proto.g7).not.toBe(api.g7);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -22,7 +22,7 @@
 import { exportFormat, isPdf, textEncodings, textOptions, type DocumentKind, type ExportFormat, type TextOptions } from '../formats';
 import { MEDIA_NAME, type MediaFile } from '../frame-protocol';
 import { plainFont, type LoadedFonts } from './requests';
-import { findDownloadStep, findEncodings } from './sdk';
+import { findDownloadStep, findEncodings, findEndAction } from './sdk';
 
 type AnyWindow = Record<string, unknown>;
 
@@ -160,8 +160,8 @@ async function readPackageFile(url: string): Promise<ArrayBuffer | null> {
 }
 
 interface EditorApi {
-  /** Kept by its name in 10.0 too (the API exports it). */
-  sync_EndAction?: (type: number, id: number) => void;
+  /** sync_EndAction: its name in 9.4 and in 10.0's word, renamed in 10.0's cell and slide (sdk.ts findEndAction). */
+  [key: string]: unknown;
   /** 9.4 only (renamed in 10.0, where the command's title is used). */
   documentTitle?: string;
 }
@@ -191,12 +191,13 @@ export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: 
   const PRINT = asc?.c_oAscAsyncAction?.Print ?? 7;
   owner[name] = function (this: EditorApi, actionType: number, options: Record<string, unknown> | null, additional: Record<string, unknown> | null, container: { data?: unknown } | null, downloadType: unknown) {
     const end = () => {
-      if (actionType) {
-        try {
-          this.sync_EndAction?.(BLOCK, actionType);
-        } catch {
-          // The editor went away meanwhile.
-        }
+      if (!actionType) return;
+      try {
+        const key = findEndAction(this);
+        const fn = key ? this[key] : undefined;
+        if (typeof fn === 'function') fn.call(this, BLOCK, actionType);
+      } catch {
+        // The editor went away meanwhile.
       }
     };
     // options.fileType and options.callback are renamed in 10.0; the
