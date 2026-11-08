@@ -2,9 +2,10 @@
 // Copyright (C) 2026 BRF Tech. Part of filex-office-editor, the office editor
 // app for filex (see README.md and NOTICE).
 //
-// filex's `coedit.*` (filex 0.56), as the app page calls it. The SDK the app
-// builds against (@brftech/filex-app-ui 0.53) predates them, so this is a
-// thin client over its raw request and its event listener: the method and
+// filex's `coedit.*` (filex 0.56), as the app page calls it. It was written
+// when the SDK the app built against (@brftech/filex-app-ui 0.53) predated
+// them, and stays (0.59's `fx.coedit` makes the same requests): a thin
+// client over the SDK's raw request and its event listener - the method and
 // event names and the shapes are filex's protocol (filex
 // docs/APP-PLUGINS-API.md → Editing together), nothing more.
 
