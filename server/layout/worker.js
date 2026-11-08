@@ -108,10 +108,16 @@ function imageSize(b) {
 // The package's web fonts are the Document Server's: their first 32 bytes
 // are XORed with this GUID (sdkjs CFontFileLoader.LoadFontArrayBuffer).
 var ODTTF = [0xa0, 0x66, 0xd6, 0x20, 0x14, 0x96, 0x47, 0xfa, 0x95, 0x69, 0xb8, 0x50, 0xb0, 0x41, 0x49, 0x48];
+// The font files sdkjs has read through native.GetFontBinary, by id, in
+// the order it read them: the worker's, as sdkjs keeps a font it loaded for
+// the next document (what AscFonts.g_font_files listed in 9.4; renamed in
+// 10.0's build, the native call is not).
+var loadedFonts = [];
 function fontBinary(id) {
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(String(id))) throw new Error('bad font id');
   var b = readBin(BASE + '/fonts/' + id);
   for (var i = 0; i < Math.min(32, b.length); i++) b[i] ^= ODTTF[i % 16];
+  if (loadedFonts.indexOf(String(id)) < 0) loadedFonts.push(String(id));
   return b;
 }
 
@@ -264,11 +270,9 @@ function layout(j) {
     if (!out) throw new Error('no drawing');
     if (saveLen > 0 && saveLen < out.length) out = out.subarray(0, saveLen);
     writeBin(j.out, out);
-    var fonts = [];
-    (globalThis.AscFonts.g_font_files || []).forEach(function (f) {
-      if (!f || f.Status !== 0) return;
-      fonts.push(String(f.Id));
-      if (j.fonts) writeBin(j.fonts + '/' + f.Id + '.ttf', fontBinary(f.Id));
+    var fonts = loadedFonts.slice();
+    fonts.forEach(function (id) {
+      if (j.fonts) writeBin(j.fonts + '/' + id + '.ttf', fontBinary(id));
     });
     lap('save');
     return { ok: true, pages: pages, bytes: out.length, fonts: fonts, ms: ms, font_engine: { ms: fontEngine.ms, calls: fontEngine.calls } };
