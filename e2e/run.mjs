@@ -94,8 +94,15 @@ const TEXT_DOWNLOAD = {
   docx: { id: 0x0045, ext: 'txt' },
   xlsx: { id: 0x0104, ext: 'csv' },
 };
-/** The encodings that dialog offers: the ones x2t writes a txt or a csv in here (src/formats.ts TEXT_ENCODINGS). */
-const TEXT_ENCODINGS = { txt: [46], csv: [46, 48, 49, 50, 51] };
+/**
+ * The encodings that dialog offers: the ones x2t writes a txt or a csv in
+ * here (src/formats.ts TEXT_ENCODINGS) - for a txt UTF-8 alone, for a csv
+ * (from x2t v9.4.0.129+3, which carries ICU's conversion tables) the
+ * editor's whole list, in its own order (ONLYOFFICE 10.0.0.169's: 53 code
+ * pages, 52 after 27). This list said [46, 48, 49, 50, 51] until 0.5.0:
+ * 0.4.0's release was not run in the browsers.
+ */
+const TEXT_ENCODINGS = { txt: [46], csv: [...Array.from({ length: 28 }, (_, i) => i), 52, ...Array.from({ length: 24 }, (_, i) => 28 + i)] };
 /** The OpenDocument kin of each, and its type: the copy the measurement downloads. */
 const ODF = {
   docx: { id: 0x0043, ext: 'odt', mime: 'application/vnd.oasis.opendocument.text' },
@@ -189,7 +196,8 @@ async function people(page, ext) {
  * is in view mode and ONLYOFFICE's live viewer. ONLYOFFICE 10.0's sdkjs
  * renames its internals (CDocument, isViewMode, isLiveViewer: src/frame/
  * sdk.ts), so the document is read through its document builder API (the
- * one macros and plugins use, which keeps its names) and the two modes from
+ * one macros and plugins use, which keeps its names: on the editor's API in
+ * 9.4, AscBuilder.Word.Api in 10.0) and the two modes from
  * what web-apps set the editor to (Main's appOptions and its co-editing
  * setting: asc_setViewMode, asc_SetFastCollaborative).
  */
@@ -197,17 +205,24 @@ async function viewerFacts(page) {
   return editorFrame(page).evaluate(() => {
     const api = (window.Asc && window.Asc.editor) || window.editor;
     let text = '';
+    let error;
     try {
-      const doc = api && typeof api.GetDocument === 'function' ? api.GetDocument() : null;
+      // The builder API: the editor's own in 9.4, AscBuilder.Word.Api in 10.0.
+      const word = window.AscBuilder && window.AscBuilder.Word && window.AscBuilder.Word.Api;
+      const builder = word && typeof word.GetDocument === 'function' ? word : api;
+      const doc = builder && typeof builder.GetDocument === 'function' ? builder.GetDocument() : null;
       if (doc) text = doc.GetAllParagraphs().map((p) => String(p.GetText())).join('\n');
-    } catch {
+      else error = 'no builder API';
+    } catch (e) {
       text = '';
+      error = String(e && e.message ? e.message : e).slice(0, 200);
     }
     const main = window.DE && window.DE.getController('Main');
     const opts = (main && main.appOptions) || {};
     const fast = window.Common && window.Common.Utils.InternalSettings.get('de-settings-coauthmode');
     return {
       text,
+      error,
       viewMode: !opts.isEdit && !opts.isRestrictedEdit && !!main,
       liveViewer: !!opts.canLiveView && !!fast,
     };
@@ -883,7 +898,8 @@ async function formulaRun(browser, server, engine, doc) {
     if (end !== 'ready') throw new Error(end);
     const seen = await editorFrame(page).evaluate(() => {
       const api = (window.Asc && window.Asc.editor) || window.editor;
-      const doc = api.GetDocument();
+      const word = window.AscBuilder && window.AscBuilder.Word && window.AscBuilder.Word.Api;
+      const doc = (word && typeof word.GetDocument === 'function' ? word : api).GetDocument();
       const kinds = new Set();
       const lines = doc
         .GetAllParagraphs()
@@ -1090,10 +1106,15 @@ async function togetherRun(browser, server, engine, o) {
     // What Zeynep's editor shows, read from its own document (not the
     // bridge's count): ONLYOFFICE's live viewer (liveViewerSupport) puts the
     // changes in as they land, before anybody saves.
+    let lastSeen = null;
     const shown = await until("Zeynep's viewer to show what Ayşe typed", async () => {
       const v = await viewerFacts(w.page);
+      lastSeen = v;
       return v.text.includes(TYPED) ? v : false;
-    }, 30_000);
+    }, 30_000).catch(async (e) => {
+      const has = async (x) => (await viewerFacts(x.page)).text.includes(TYPED);
+      throw new Error(`${e?.message ?? e}; her viewer read ${JSON.stringify(lastSeen).slice(0, 300)} (Ayşe's editor holds the text: ${await has(a)}, Mehmet's: ${await has(b)})`);
+    });
     step('Zeynep sees it', { viewMode: shown.viewMode, liveViewer: shown.liveViewer });
     r.watcher = { viewMode: shown.viewMode, liveViewer: shown.liveViewer, afterTypedMs: r.steps.at(-1).ms - r.steps.find((s) => s.name === 'Ayşe typed').ms };
     if (!shown.viewMode) r.problems.push("Zeynep's editor is not in view mode");
