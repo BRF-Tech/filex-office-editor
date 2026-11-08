@@ -10,7 +10,7 @@
 //
 // The wasm build is pinned in upstream/onlyoffice.json ("x2t"): this
 // project's own build from ONLYOFFICE core at the same tag as the editor
-// files (core v9.4.0.129 for Docs 9.4), made by scripts/x2t/build.sh and
+// files (core v10.0.0.169 for Docs 10.0; v9.4.0.129 up to 0.4.0), made by scripts/x2t/build.sh and
 // checked by its SHA-256 (release 0.1.0 carried CryptPad's v9.3.2+3). It is
 // loaded into a Worker; this file drives a loaded module. The calling
 // convention (an in-memory file system under /working, a params.xml, main1)

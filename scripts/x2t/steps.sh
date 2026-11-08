@@ -17,9 +17,10 @@
 # Dockerfile and embuild.sh of 7debf5e6): the same libraries of ONLYOFFICE
 # core in the same order, each one a qmake project built with emcc, linked
 # into one module. Its changes to the sources are patches/01, ported to
-# ONLYOFFICE core 9.4; patches/02-08 are this project's (07 carries two of
-# core's own later fixes back), and so is the ICU data linked in
-# (icu-data.py; README.md, "x2t, the converter").
+# ONLYOFFICE core 9.4 and then 10.0; patches/02-06 and 08-12 are this
+# project's (07, two of core's own later fixes carried back to 9.4, is in
+# core from 10.0), and so is the ICU data linked in (icu-data.py; README.md,
+# "x2t, the converter").
 
 set -euo pipefail
 
@@ -52,7 +53,7 @@ for k in sys.argv[1].split("."):
 print(v)' "$1"
 }
 
-# The version x2t writes into the documents it makes ("ONLYOFFICE/9.4.0.129"
+# The version x2t writes into the documents it makes ("ONLYOFFICE/10.0.0.169"
 # as the application), as ONLYOFFICE's build sets it: from the core tag.
 core_tag=$(pin sources.core.tag)
 export PRODUCT_VERSION=${core_tag#v}

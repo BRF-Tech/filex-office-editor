@@ -195,7 +195,7 @@ export function isPhone(o: { width: number; coarsePointer: boolean; touchPoints:
  * it shows "Using the free Community version, you can open documents for
  * viewing only. To access mobile web editors, a commercial license is
  * required." and stays read-only (all three phone apps of 9.4.0.129, read
- * 2026-10-08). So the app opens it in view mode, and the person edits on
+ * 2026-10-08, and of 10.0.0.169, read 2026-11-08). So the app opens it in view mode, and the person edits on
  * the phone with the editor, folded (narrowLayout): the app page's "Edit"
  * switches over with the document, "Reading view" switches back (main.ts).
  *

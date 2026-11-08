@@ -12,7 +12,8 @@
 // their app loads its scripts itself, one after the other, each appended to
 // <body> once the one before has loaded - xregexp, this script (at
 // socket.io's address), then sdkjs (AllFonts.js, sdk-all-min.js) - and
-// creates the editor when the last one has (9.4.0.129, read 2026-10-08).
+// creates the editor when the last one has (9.4.0.129, read 2026-10-08;
+// 10.0.0.169 the same, read 2026-11-08).
 // Holding sdkjs's scripts back until `ready` holds that start the same way.
 // The scripts and the editor's code stay as they ship; the page's own
 // appendChild is put back as soon as `ready` settles.

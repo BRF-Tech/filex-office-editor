@@ -6,7 +6,7 @@
 //
 // The ONLYOFFICE editor talks to its Document Server over socket.io. Here the
 // socket is the shim (shim.ts) and the server is this class: it answers the
-// editor's messages the way DocsCoServer.js (Docs 9.4) does, but everything
+// editor's messages the way DocsCoServer.js (Docs 9.4 and 10.0) does, but everything
 // that has to reach the other editors goes into the session's log instead of
 // a database - sealed by the filex page, ordered by the relay - and comes back
 // as entries, in the same order for everybody. Every bridge applies the same

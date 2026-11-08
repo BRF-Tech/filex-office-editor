@@ -3,7 +3,7 @@
 // app for filex (see README.md and NOTICE).
 //
 // The messages between the ONLYOFFICE editor (sdkjs common/docscoapi.js) and
-// a Document Server (server DocService/sources/DocsCoServer.js, 9.4), as far
+// a Document Server (server DocService/sources/DocsCoServer.js, 9.4 and 10.0), as far
 // as the bridge has to speak them. Names and numbers are the editor's: the
 // bridge answers in the Document Server's words so the editor needs no
 // change at all.

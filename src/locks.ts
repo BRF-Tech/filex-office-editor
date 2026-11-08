@@ -4,7 +4,8 @@
 // Portions Copyright (C) Ascensio System SIA (ONLYOFFICE Docs).
 //
 // The Document Server's lock rules, carried over from ONLYOFFICE Docs 9.4
-// (server DocService/sources/DocsCoServer.js: getLock, _checkLockExcel,
+// and unchanged in 10.0 (compared 2026-11-08; server
+// DocService/sources/DocsCoServer.js: getLock, _checkLockExcel,
 // _checkLockPresentation, compareExcelBlock, comparePresentationBlock,
 // _recalcLockArray, _addRecalcIndex, CRecalcIndex; the in-memory
 // editorData's addLocksNX).

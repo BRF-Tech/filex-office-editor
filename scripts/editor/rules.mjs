@@ -34,7 +34,7 @@ export const EDITORS = ['documenteditor', 'spreadsheeteditor', 'presentationedit
  * ⚠ The phone app in ONLYOFFICE's Document Server image is the open-source
  * build: it opens documents to READ only. Its editing controller is a stub
  * (`isSupportEditFeature()` returns false in all three bundles of 9.4.0.129,
- * read 2026-10-08), and in edit mode it says so ("Using the free Community
+ * read 2026-10-08, and of 10.0.0.169, read 2026-11-08), and in edit mode it says so ("Using the free Community
  * version, you can open documents for viewing only. To access mobile web
  * editors, a commercial license is required."). The app opens it in view
  * mode, and a phone edits with "main", folded (src/app/config.ts).
