@@ -1,0 +1,25 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-11-08: <cfloat> in the
+spreadsheet reader's SheetData.cpp.
+
+OOXML/XlsxFormat/Worksheets/SheetData.cpp compares a cell's value with
+DBL_MAX and does not include <cfloat>. With glibc's and libstdc++'s headers
+another header brings it in; at v10.0.0.169, with emscripten's libc++, none
+does, and DocxFormatLib stops: "use of undeclared identifier 'DBL_MAX'"
+(measured). The include is added; nothing else changes. (Not in
+OOXML/XlsxFormat/Common.cpp, which defines a DBL_MAX of its own, a number of
+digits.)
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/OOXML/XlsxFormat/Worksheets/SheetData.cpp b/OOXML/XlsxFormat/Worksheets/SheetData.cpp
+index 9a8142ad..5f80e4b6 100644
+--- a/OOXML/XlsxFormat/Worksheets/SheetData.cpp
++++ b/OOXML/XlsxFormat/Worksheets/SheetData.cpp
+@@ -33,6 +33,7 @@
+  * SPDX-License-Identifier: AGPL-3.0-only
+  */
+ 
++#include <cfloat>
+ #include "../Workbook/Workbook.h"
+ 
+ #include "../Common.h"
