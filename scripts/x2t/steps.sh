@@ -314,7 +314,16 @@ libs() {
 }
 
 ICU_DATA=$W/b/icu-data/icudata.o
-PAGE_LFLAGS="-looxmlsignature -L$BOOST/lib --pre-js /x2t/pre-js.js -sEXPORTED_RUNTIME_METHODS=ccall,FS -sEXPORTED_FUNCTIONS=_main1"
+# binaryen inlines a function with one caller whatever its size (-Os's
+# default), and on 10.0's module (165,000 functions, 41 MB of code) the
+# re-optimization after that took hours: the page link's wasm-opt -Os ran
+# more than 2.5 hours on an x86-64 PC and had not finished (measured
+# 2026-11-08; 9.4's took minutes). Capped at 1000 the same wasm-opt takes
+# about 2 minutes, and the module's size hardly moves with the cap (59.30,
+# 59.16, 59.09 MB at 50, 200, 1000). Every x2t link (page, server, diag)
+# passes it, through emscripten's own setting.
+INLINE_CAP="-sBINARYEN_EXTRA_PASSES=--one-caller-inline-max-function-size=1000"
+PAGE_LFLAGS="-looxmlsignature -L$BOOST/lib --pre-js /x2t/pre-js.js -sEXPORTED_RUNTIME_METHODS=ccall,FS -sEXPORTED_FUNCTIONS=_main1 $INLINE_CAP"
 
 x2t() {
   qbuild X2tConverter X2tConverter/build/Qt/X2tConverter.pro "$JOBS" \
@@ -388,7 +397,7 @@ x2t_server() {
   local shim=$W/b/server-shim bin=$CORE/build/bin/linux_64
   local em
   em=$(dirname "$(command -v emcc)")
-  local lflags="-looxmlsignature -L$BOOST/lib -sEXPORTED_FUNCTIONS=_setThrew,_emscripten_stack_get_current,__emscripten_stack_restore"
+  local lflags="-looxmlsignature -L$BOOST/lib -sEXPORTED_FUNCTIONS=_setThrew,_emscripten_stack_get_current,__emscripten_stack_restore $INLINE_CAP"
   rm -rf "$shim"
   mkdir -p "$shim"
   emcc -Os -I"$em/system/lib/libc/musl/arch/emscripten" -c /x2t/server/wasi-fs.c -o "$shim/wasi-fs.o"
