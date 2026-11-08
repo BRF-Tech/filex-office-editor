@@ -15,6 +15,7 @@ import { PDF, TXT } from '../src/formats';
 import { loadedFonts, takeOverDownloads, trimDownloadFormats, type ExportJob } from '../src/frame/export';
 import { uploadAnswer } from '../src/frame/images';
 import { LoadedFonts, plainFont, watchRequests } from '../src/frame/requests';
+import { keepLiveViewing, webAppsChoseFast } from '../src/frame/live-viewer';
 import { SaveRetry } from '../src/frame/save-retry';
 import { findDocumentUrls, findDownloadStep, findEncodings, findEndAction, keysOf } from '../src/frame/sdk';
 
@@ -143,6 +144,44 @@ describe('Save, kept while the editor is busy, under each key 10.0 has it', () =
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("the live viewer and 10.0's view mode (live-viewer.ts)", () => {
+  it("makes web-apps' fast co-editing again after the editor's own asc_setViewMode(true), under its renamed key", () => {
+    const fast: boolean[] = [];
+    const modes: boolean[] = [];
+    const proto: Record<string, unknown> = {};
+    // 10.0's asc_setViewMode: view mode, and (in the text editor) fast co-editing off.
+    proto.NLb = function (v: boolean) {
+      modes.push(v);
+      if (v) fast.push(false);
+    };
+    proto.asc_setViewMode = proto.NLb;
+    proto.asc_SetFastCollaborative = (on: boolean) => fast.push(on);
+    const api = Object.create(proto) as Record<string, unknown> & { NLb: (v: boolean) => void; asc_setViewMode: (v: boolean) => void };
+    let chosen = true;
+    keepLiveViewing(api, () => chosen);
+    api.NLb(true);
+    expect(modes).toEqual([true]);
+    expect(fast).toEqual([false, true]);
+    // A reader web-apps did not make a live viewer, and the editors: left as they are.
+    chosen = false;
+    api.asc_setViewMode(true);
+    api.NLb(false);
+    expect(fast).toEqual([false, true, false]);
+    keepLiveViewing(api, () => true);
+    api.NLb(false);
+    expect(fast).toEqual([false, true, false]);
+  });
+
+  it("reads web-apps' choice per editor, and none where web-apps keeps no such setting", () => {
+    const settings: Record<string, unknown> = { 'de-settings-coauthmode': true, 'sse-settings-coauthmode': false };
+    const win = { Common: { Utils: { InternalSettings: { get: (k: string) => settings[k] } } } };
+    expect(webAppsChoseFast(win, 'word')).toBe(true);
+    expect(webAppsChoseFast(win, 'cell')).toBe(false);
+    expect(webAppsChoseFast(win, 'slide')).toBe(false);
+    expect(webAppsChoseFast({}, 'word')).toBe(false);
   });
 });
 

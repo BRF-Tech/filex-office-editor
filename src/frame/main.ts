@@ -42,6 +42,7 @@ import { BridgeSocketPort, createSocketIo, installSocketIo } from '../shim';
 import { loadedFonts, retry, takeOverDownloads, trimDownloadFormats, type ExportJob } from './export';
 import { holdScripts } from './hold';
 import { keepImagesInPage, uploadAnswer } from './images';
+import { keepLiveViewing, webAppsChoseFast } from './live-viewer';
 import { LoadedFonts, watchRequests } from './requests';
 import { SaveRetry } from './save-retry';
 import { KeptStorage } from './storage';
@@ -156,6 +157,7 @@ const socketPort = new BridgeSocketPort(() => ({
   connect: () => {
     phase('socket');
     saveRetry.attach(editorApi());
+    keepLiveViewing(editorApi(), () => webAppsChoseFast(win as Record<string, unknown>, kind));
     keepImagesInPage(win.AscCommon as Parameters<typeof keepImagesInPage>[0], imageInserted);
     connected = true;
     if (bridge) bridge.connect();
