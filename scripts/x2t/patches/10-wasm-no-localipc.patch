@@ -1,0 +1,33 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-11-08: the local IPC
+ONLYOFFICE core 10.0 adds to kernel_network (Common/Network/network.pro,
+WebSocket/src/localipc) is left out of the WebAssembly build.
+
+It is a loopback request-response channel over asio sockets and
+std::thread; nothing in core links against it but network.pro itself (read
+at v10.0.0.169), x2t does not call it, and WebAssembly here has neither the
+sockets nor the threads. Building it needs asio's headers from
+socket.io-client-cpp, which core's tree does not carry (build_tools fetches
+it for the desktop and server builds). Under CONFIG core_wasm, which
+scripts/x2t/steps.sh sets, the block is skipped; every other build of core
+is unchanged.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/Common/Network/network.pro b/Common/Network/network.pro
+index f61846f1..7a56ab28 100644
+--- a/Common/Network/network.pro
++++ b/Common/Network/network.pro
+@@ -52,10 +52,13 @@ support_web_socket {
+ }
+ 
+ # LOCAL IPC (loopback request-response).
++# filex-office-editor: not in WebAssembly (no sockets, no threads; nothing in x2t calls it).
++!core_wasm {
+ INCLUDEPATH += $$PWD/../3dParty/socketio/socket.io-client-cpp/lib/asio/asio/include
+ HEADERS += $$PWD/WebSocket/include/localipc.h
+ SOURCES += $$PWD/WebSocket/src/localipc/localipc.cpp
+ core_linux:LIBS += -lpthread   # asio/std::thread (idempotent if websocket also added it)
++}
+ 
+ # DOWNLOAD/UPLOAD
+ include(./FileTransporter/filetransporter.pri)

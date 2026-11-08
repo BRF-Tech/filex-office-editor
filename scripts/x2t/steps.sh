@@ -103,6 +103,9 @@ third_party() {
     "$d/html/katana-parser/src/katana.lex.c"
   (cd "$d/md" && python fetch.py)
   (cd "$d/apple" && python fetch.py)
+  # libxml2: in core's tree up to 9.4, fetched by its own script from 10.0
+  # (GNOME's libxml2 at the commit it names, with core's changes).
+  (cd "$d/libxml" && python fetch.py)
   (cd "$d/harfbuzz" && python make.py)
   (cd "$d/brotli" && python make.py)
   fetch_commit "$d/hyphen/hyphen" "$(pin sources.hyphen.repository)" "$(pin sources.hyphen.commit)"
