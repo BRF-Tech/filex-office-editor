@@ -1,10 +1,11 @@
 filex-office-editor (scripts/x2t): CryptPad's changes to ONLYOFFICE core
 for WebAssembly, ported to ONLYOFFICE core v9.4.0.129 by BRF Tech on
-2026-10-10.
+2026-10-10 and to v10.0.0.169 on 2026-11-08.
 
 From https://github.com/cryptpad/onlyoffice-x2t-wasm (AGPL-3.0-or-later):
 its core/ at tag v9.3.0+0 compared with ONLYOFFICE core v9.3.0.140 (the
-commit that tag's core/ was pulled from), applied to v9.4.0.129 three-way.
+commit that tag's core/ was pulled from), applied to v9.4.0.129 three-way,
+and the result applied to v10.0.0.169 three-way.
 
 Kept, as CryptPad has them:
   - the build files of the libraries x2t links: no ICU of core's own
@@ -32,10 +33,19 @@ definition agree), boost_regex unlinked in boost.pri (steps.sh builds it),
 a blank line in CCssCalculator_Private.cpp, a list of headers in
 OdfFormatLib.pro, a test file renamed.
 
+What 10.0 changed where this patch changes core, and how it was carried
+over: doctrenderer.pri's drawingfile block (10.0 adds the PDF editor's
+drawingfile.cpp and OFDFile to it) is commented out as the rest of the
+JavaScript engine's part is; x2t's memory limit (10.0 falls back to the
+default limit when the variable cannot be read) is commented out as 9.4's
+was; and X2tConverter.pri keeps the block 10.0 adds at its end for macOS
+and iOS (core_mac and core_ios are not set here), where the 9.4 port only
+dropped the file's last empty line.
+
 git apply reads from the first "diff --git" line on.
 
 diff --git a/Common/3dParty/html/css/CssCalculator.pri b/Common/3dParty/html/css/CssCalculator.pri
-index abf541985..893fe7fc4 100644
+index abf54198..893fe7fc 100644
 --- a/Common/3dParty/html/css/CssCalculator.pri
 +++ b/Common/3dParty/html/css/CssCalculator.pri
 @@ -1,3 +1,5 @@
@@ -45,11 +55,11 @@ index abf541985..893fe7fc4 100644
  DEPENDPATH += $$PWD
  
 diff --git a/Common/3dParty/html/css/src/CCssCalculator_Private.h b/Common/3dParty/html/css/src/CCssCalculator_Private.h
-index 21bb22778..0453c5c58 100644
+index 40c67d86..ee951672 100644
 --- a/Common/3dParty/html/css/src/CCssCalculator_Private.h
 +++ b/Common/3dParty/html/css/src/CCssCalculator_Private.h
-@@ -6,7 +6,7 @@
- #include <set>
+@@ -7,7 +7,7 @@
+ #include <unordered_map>
  #include "CElement.h"
  #include "StyleProperties.h"
 -#include "../../katana-parser/src/katana.h"
@@ -58,7 +68,7 @@ index 21bb22778..0453c5c58 100644
  #ifdef CSS_CALCULATOR_WITH_XHTML
  #include "CCompiledStyle.h"
 diff --git a/Common/3dParty/icu/icu.pri b/Common/3dParty/icu/icu.pri
-index 187c8ce04..59523ecb0 100644
+index 187c8ce0..59523ecb 100644
 --- a/Common/3dParty/icu/icu.pri
 +++ b/Common/3dParty/icu/icu.pri
 @@ -21,8 +21,9 @@ core_windows {
@@ -74,10 +84,10 @@ index 187c8ce04..59523ecb0 100644
  
  core_mac {
 diff --git a/Common/kernel.pro b/Common/kernel.pro
-index afd5663d7..7b74d5e5d 100644
+index b3d61a6d..f2be778b 100644
 --- a/Common/kernel.pro
 +++ b/Common/kernel.pro
-@@ -50,13 +50,15 @@ CORE_ROOT_DIR = $$PWD/..
+@@ -50,12 +50,14 @@ CORE_ROOT_DIR = $$PWD/..
  PWD_ROOT_DIR = $$PWD
  include(../Common/base.pri)
  
@@ -86,8 +96,7 @@ index afd5663d7..7b74d5e5d 100644
 +# CONFIG += build_all_zlib build_zlib_as_sources
  include(../OfficeUtils/OfficeUtils.pri)
  
- CONFIG += core_static_link_xml_full
- include(../DesktopEditor/xml/build/qt/libxml2.pri)
+ include(../DesktopEditor/xml/xml.pri)
  
 -ADD_DEPENDENCY(UnicodeConverter)
 +# CryptPad: UnicodeConverter is linked in a later step. Do not link here.
@@ -97,7 +106,7 @@ index afd5663d7..7b74d5e5d 100644
  HEADERS += ./kernel_config.h
 diff --git a/DesktopEditor/doctrenderer/docbuilder_empty.cpp b/DesktopEditor/doctrenderer/docbuilder_empty.cpp
 new file mode 100644
-index 000000000..7ffd75281
+index 00000000..7ffd7528
 --- /dev/null
 +++ b/DesktopEditor/doctrenderer/docbuilder_empty.cpp
 @@ -0,0 +1,44 @@
@@ -147,7 +156,7 @@ index 000000000..7ffd75281
 +}
 diff --git a/DesktopEditor/doctrenderer/docbuilder_p_empty.cpp b/DesktopEditor/doctrenderer/docbuilder_p_empty.cpp
 new file mode 100644
-index 000000000..0ca8e0545
+index 00000000..0ca8e054
 --- /dev/null
 +++ b/DesktopEditor/doctrenderer/docbuilder_p_empty.cpp
 @@ -0,0 +1,16 @@
@@ -168,10 +177,10 @@ index 000000000..0ca8e0545
 +	}
 +}
 diff --git a/DesktopEditor/doctrenderer/doctrenderer.pri b/DesktopEditor/doctrenderer/doctrenderer.pri
-index 492ddfb6e..325e6493f 100644
+index 7411ea69..a8e922f7 100644
 --- a/DesktopEditor/doctrenderer/doctrenderer.pri
 +++ b/DesktopEditor/doctrenderer/doctrenderer.pri
-@@ -70,94 +70,94 @@ SOURCES += \
+@@ -71,96 +71,96 @@ SOURCES += \
  	$$PWD_CUR/graphics.cpp \
  	$$PWD_CUR/hash.cpp
  
@@ -301,13 +310,15 @@ index 492ddfb6e..325e6493f 100644
 -CONFIG += drawingfile_support
 -drawingfile_support {
 -	DEFINES += WASM_SERIALIZER_USE_ALLOCATOR
--	ADD_DEPENDENCY(PdfFile, XpsFile, DjVuFile, DocxRenderer)
+-	DEFINES += DOCBUILDER_PDF_EDITOR
+-	ADD_DEPENDENCY(PdfFile, XpsFile, DjVuFile, OFDFile, DocxRenderer)
 -
 -	HEADERS += \
 -		$$PWD_CUR/drawingfile.h \
 -		$$PWD_CUR/embed/DrawingFileEmbed.h
 -
 -	SOURCES += \
+-		$$PWD_CUR/drawingfile.cpp \
 -		$$PWD_CUR/../graphics/pro/js/wasm/src/HTMLRendererText.cpp \
 -		$$PWD_CUR/embed/DrawingFileEmbed.cpp
 -
@@ -342,13 +353,15 @@ index 492ddfb6e..325e6493f 100644
 +# CONFIG += drawingfile_support
 +# drawingfile_support {
 +# 	DEFINES += WASM_SERIALIZER_USE_ALLOCATOR
-+# 	ADD_DEPENDENCY(PdfFile, XpsFile, DjVuFile, DocxRenderer)
++# 	DEFINES += DOCBUILDER_PDF_EDITOR
++# 	ADD_DEPENDENCY(PdfFile, XpsFile, DjVuFile, OFDFile, DocxRenderer)
 +
 +# 	HEADERS += \
 +# 		$$PWD_CUR/drawingfile.h \
 +# 		$$PWD_CUR/embed/DrawingFileEmbed.h
 +
 +# 	SOURCES += \
++# 		$$PWD_CUR/drawingfile.cpp \
 +# 		$$PWD_CUR/../graphics/pro/js/wasm/src/HTMLRendererText.cpp \
 +# 		$$PWD_CUR/embed/DrawingFileEmbed.cpp
 +
@@ -356,7 +369,7 @@ index 492ddfb6e..325e6493f 100644
 +# }
 diff --git a/DesktopEditor/doctrenderer/doctrenderer_empty.cpp b/DesktopEditor/doctrenderer/doctrenderer_empty.cpp
 new file mode 100644
-index 000000000..99b1e6f19
+index 00000000..99b1e6f1
 --- /dev/null
 +++ b/DesktopEditor/doctrenderer/doctrenderer_empty.cpp
 @@ -0,0 +1,827 @@
@@ -1188,7 +1201,7 @@ index 000000000..99b1e6f19
 +	return NSDoctRenderer::CDoctRenderer_Private::Doct_renderer_SaveFile(&oParams, pNative, context, args, strError, js_objectApi);
 +}
 diff --git a/DesktopEditor/doctrenderer/editors.h b/DesktopEditor/doctrenderer/editors.h
-index 5585bdde4..d2ed75590 100644
+index 5585bdde..d2ed7559 100644
 --- a/DesktopEditor/doctrenderer/editors.h
 +++ b/DesktopEditor/doctrenderer/editors.h
 @@ -36,7 +36,7 @@
@@ -1201,7 +1214,7 @@ index 5585bdde4..d2ed75590 100644
  #ifdef CreateFile
  #undef CreateFile
 diff --git a/DesktopEditor/doctrenderer/js_internal/js_base.pri b/DesktopEditor/doctrenderer/js_internal/js_base.pri
-index 3f7eff90e..aed4f0a9f 100644
+index 3f7eff90..aed4f0a9 100644
 --- a/DesktopEditor/doctrenderer/js_internal/js_base.pri
 +++ b/DesktopEditor/doctrenderer/js_internal/js_base.pri
 @@ -44,71 +44,74 @@ HEADERS += $$PWD/js_base_p.h
@@ -1348,7 +1361,7 @@ index 3f7eff90e..aed4f0a9f 100644
 +
 +
 diff --git a/DesktopEditor/graphics/pro/freetype.pri b/DesktopEditor/graphics/pro/freetype.pri
-index 3b88a4207..b565e3d86 100644
+index 3b88a420..b565e3d8 100644
 --- a/DesktopEditor/graphics/pro/freetype.pri
 +++ b/DesktopEditor/graphics/pro/freetype.pri
 @@ -14,18 +14,19 @@ INCLUDEPATH += \
@@ -1384,10 +1397,10 @@ index 3b88a4207..b565e3d86 100644
      CONFIG += config_zlip_image
  }
 diff --git a/DesktopEditor/graphics/pro/raster.pri b/DesktopEditor/graphics/pro/raster.pri
-index 13dbc4a7a..87a234377 100644
+index d76bcb6e..425e48e7 100644
 --- a/DesktopEditor/graphics/pro/raster.pri
 +++ b/DesktopEditor/graphics/pro/raster.pri
-@@ -390,18 +390,19 @@ disable_cximage_all:DEFINES += CXIMAGE_DISABLE_SUPPORT_ADDITIONS
+@@ -391,18 +391,19 @@ disable_cximage_all:DEFINES += CXIMAGE_DISABLE_SUPPORT_ADDITIONS
  		$$OFFICEUTILS_PATH/src/zlib-1.2.11 \
  		$$OFFICEUTILS_PATH/src
  
@@ -1420,7 +1433,7 @@ index 13dbc4a7a..87a234377 100644
  	CONFIG += config_zlip_image
  }
 diff --git a/DesktopEditor/graphics/pro/textshaper.pri b/DesktopEditor/graphics/pro/textshaper.pri
-index d70e05255..e7aa16692 100644
+index d70e0525..e7aa1669 100644
 --- a/DesktopEditor/graphics/pro/textshaper.pri
 +++ b/DesktopEditor/graphics/pro/textshaper.pri
 @@ -42,7 +42,8 @@ core_windows {
@@ -1434,7 +1447,7 @@ index d70e05255..e7aa16692 100644
  
  enable_support_shaper {
 diff --git a/Fb2File/Fb2File.pro b/Fb2File/Fb2File.pro
-index 78282b472..a9d19de83 100644
+index 78282b47..a9d19de8 100644
 --- a/Fb2File/Fb2File.pro
 +++ b/Fb2File/Fb2File.pro
 @@ -49,7 +49,9 @@ include($$CORE_ROOT_DIR/Common/base.pri)
@@ -1449,7 +1462,7 @@ index 78282b472..a9d19de83 100644
  CONFIG += core_boost_regex
  include($$CORE_ROOT_DIR/Common/3dParty/boost/boost.pri)
 diff --git a/HtmlFile2/htmlfile2.cpp b/HtmlFile2/htmlfile2.cpp
-index 89cb1b289..974d13b32 100644
+index 80d14843..990188ff 100644
 --- a/HtmlFile2/htmlfile2.cpp
 +++ b/HtmlFile2/htmlfile2.cpp
 @@ -287,7 +287,7 @@ struct CTc
@@ -1521,7 +1534,7 @@ index 89cb1b289..974d13b32 100644
  {
  	size_t pos = s.find(s1);
  	size_t l = s2.length();
-@@ -1558,18 +1558,18 @@ bool ElementInHeader(const std::vector<NSCSS::CNode> arSelsectors)
+@@ -1558,18 +1558,18 @@ bool ElementInHeader(const std::vector<NSCSS::CNode>& arSelsectors)
  	return false;
  }
  
@@ -1549,7 +1562,7 @@ index 89cb1b289..974d13b32 100644
  
  	return sRes;
  }
-@@ -1663,7 +1663,7 @@ private:
+@@ -1665,7 +1665,7 @@ private:
  	NSFonts::IApplicationFonts*          m_pFonts;     // Required for font handling optimization
  public:
  
@@ -1558,7 +1571,7 @@ index 89cb1b289..974d13b32 100644
  		: m_nFootnoteId(1), m_nHyperlinkId(1), m_nNumberingId(1), m_nId(1), m_nShapeId(1), m_pFonts(NULL)
  	{
  		m_oPageData.SetWidth (DEFAULT_PAGE_WIDTH,  NSCSS::UnitMeasure::Twips, 0, true);
-@@ -1794,31 +1794,31 @@ public:
+@@ -1796,31 +1796,31 @@ public:
  			if(!oParams->m_sBookTitle.empty())
  			{
  				sCore += L"<dc:title>";
@@ -1595,7 +1608,7 @@ index 89cb1b289..974d13b32 100644
  				sCore += L"</dc:description>";
  			}
  			if (!oParams->m_sLanguage.empty())
-@@ -1949,7 +1949,7 @@ public:
+@@ -1951,7 +1951,7 @@ public:
  		m_oDocXml.WriteString(L"w:header=\"" + std::to_wstring(m_oPageData.GetHeader().ToInt(NSCSS::Twips)) + L"\" ");
  		m_oDocXml.WriteString(L"w:footer=\"" + std::to_wstring(m_oPageData.GetFooter().ToInt(NSCSS::Twips)) + L"\" ");
  		m_oDocXml.WriteString(L"w:gutter=\"0\"/><w:cols w:space=\"720\"/><w:docGrid w:linePitch=\"360\"/></w:sectPr></w:body></w:document>");
@@ -1604,7 +1617,7 @@ index 89cb1b289..974d13b32 100644
  		NSFile::CFileBinary oDocumentWriter;
  		if (oDocumentWriter.CreateFileW(m_sDst + L"/word/document.xml"))
  		{
-@@ -2465,7 +2465,7 @@ private:
+@@ -2467,7 +2467,7 @@ private:
  		{
  			std::wstring sName  = m_oLightReader.GetName();
  			if(sName == L"class")
@@ -1613,7 +1626,7 @@ index 89cb1b289..974d13b32 100644
  			else if(sName == L"id")
  			{
  				oNode.m_wsId = EncodeXmlString(m_oLightReader.GetText());
-@@ -2520,9 +2520,9 @@ private:
+@@ -2522,9 +2522,9 @@ private:
  	void readBody()
  	{
  		std::vector<NSCSS::CNode> sSelectors;
@@ -1625,7 +1638,7 @@ index 89cb1b289..974d13b32 100644
  		GetSubClass(&m_oDocXml, sSelectors);
  
  		if (!sSelectors.back().m_mAttributes.empty())
-@@ -3696,7 +3696,7 @@ private:
+@@ -3698,7 +3698,7 @@ private:
  			pColgroup->AddCol(pCol);
  		}
  	}
@@ -1634,7 +1647,7 @@ index 89cb1b289..974d13b32 100644
  	struct TRowspanElement
  	{
  		UINT  m_unRowSpan;
-@@ -3756,7 +3756,7 @@ private:
+@@ -3758,7 +3758,7 @@ private:
  					else if(m_oLightReader.GetName() == L"rowspan")
  					{
  						pCell->SetRowspan(NSStringFinder::ToInt(m_oLightReader.GetText(), 1));
@@ -1643,7 +1656,7 @@ index 89cb1b289..974d13b32 100644
  						if (1 != pCell->GetRowspan())
  							arRowspanElements.push_back({pCell->GetRowspan(), unColumnIndex, pCell});
  					}
-@@ -4042,7 +4042,7 @@ private:
+@@ -4044,7 +4044,7 @@ private:
  		//------
  
  		int nDeath = m_oLightReader.GetDepth();
@@ -1653,10 +1666,10 @@ index 89cb1b289..974d13b32 100644
  			const std::wstring sName = m_oLightReader.GetName();
  			GetSubClass(oXml, sSelectors);
 diff --git a/OOXML/Projects/Linux/DocxFormatLib/DocxFormatLib.pro b/OOXML/Projects/Linux/DocxFormatLib/DocxFormatLib.pro
-index 688a523ba..d11011130 100644
+index 52dbb49a..b6509bcb 100644
 --- a/OOXML/Projects/Linux/DocxFormatLib/DocxFormatLib.pro
 +++ b/OOXML/Projects/Linux/DocxFormatLib/DocxFormatLib.pro
-@@ -235,6 +235,9 @@ SOURCES += \
+@@ -233,6 +233,9 @@ SOURCES += \
  	../../../Base/unicode_util.cpp \
  	../../../Base/Unit.cpp \
  	../../../Base/WinColor.cpp \
@@ -1667,7 +1680,7 @@ index 688a523ba..d11011130 100644
  	docx_format.cpp
  
 diff --git a/OfficeUtils/OfficeUtils.pri b/OfficeUtils/OfficeUtils.pri
-index 40f3eb8f1..413b635a5 100644
+index 40f3eb8f..413b635a 100644
 --- a/OfficeUtils/OfficeUtils.pri
 +++ b/OfficeUtils/OfficeUtils.pri
 @@ -48,14 +48,13 @@ INCLUDEPATH += \
@@ -1687,7 +1700,7 @@ index 40f3eb8f1..413b635a5 100644
      $$PWD/src/zlib-1.2.11/contrib/minizip/unzip.c \
      $$PWD/src/zlib-1.2.11/contrib/minizip/zip.c \
 diff --git a/PdfFile/PdfFile.pro b/PdfFile/PdfFile.pro
-index 41e072977..26b318269 100644
+index a6fa8547..feda6bb5 100644
 --- a/PdfFile/PdfFile.pro
 +++ b/PdfFile/PdfFile.pro
 @@ -47,7 +47,8 @@ include($$CORE_ROOT_DIR/Common/base.pri)
@@ -1700,7 +1713,7 @@ index 41e072977..26b318269 100644
  
  #CONFIG += use_openssl_hash
  use_openssl_hash {
-@@ -144,7 +145,9 @@ use_external_jpeg2000 {
+@@ -145,7 +146,9 @@ use_external_jpeg2000 {
  # PdfWriter
  DEFINES += CRYPTOPP_DISABLE_ASM \
             NOMINMAX
@@ -1712,7 +1725,7 @@ index 41e072977..26b318269 100644
  core_linux {
      DEFINES += HAVE_UNISTD_H \
 diff --git a/X2tConverter/build/Qt/X2tConverter.pri b/X2tConverter/build/Qt/X2tConverter.pri
-index 2a655e82a..e3a11812e 100644
+index 95911c65..e3a6cf6d 100644
 --- a/X2tConverter/build/Qt/X2tConverter.pri
 +++ b/X2tConverter/build/Qt/X2tConverter.pri
 @@ -160,7 +160,8 @@ LIBS += -L$$CORE_BUILDS_LIBRARIES_PATH -lCryptoPPLib
@@ -1725,13 +1738,8 @@ index 2a655e82a..e3a11812e 100644
  
  #####################################################
  # внешнее подключение сторонних библиотек
-@@ -173,4 +174,3 @@ core_windows {
-     LIBS += -lAdvapi32
- }
- ########################################################
--
 diff --git a/X2tConverter/src/lib/html.h b/X2tConverter/src/lib/html.h
-index f017d2396..5ff5f47d9 100644
+index a4614d9b..17124a6f 100644
 --- a/X2tConverter/src/lib/html.h
 +++ b/X2tConverter/src/lib/html.h
 @@ -36,7 +36,7 @@
@@ -1763,7 +1771,7 @@ index f017d2396..5ff5f47d9 100644
  	}
  
  	// doct_bin => html
-@@ -179,7 +181,7 @@ namespace NExtractTools
+@@ -181,7 +183,7 @@ namespace NExtractTools
  
  		std::wstring sResult;
  		oDoctRenderer.Execute(sXml, sResult);
@@ -1772,7 +1780,7 @@ index f017d2396..5ff5f47d9 100644
  		if (sResult.find(L"error") != std::wstring::npos)
  		{
  			std::wcerr << L"DoctRenderer:" << sResult << std::endl;
-@@ -220,18 +222,19 @@ namespace NExtractTools
+@@ -222,18 +224,19 @@ namespace NExtractTools
  	// doct_bin -> fb2
  	_UINT32 doct_bin2fb(const std::wstring& sFrom, const std::wstring& sTo, InputParams& params, ConvertParams& convertParams)
  	{
@@ -1802,10 +1810,10 @@ index f017d2396..5ff5f47d9 100644
  	// doct_bin -> html
  	_UINT32 doct_bin2html(const std::wstring& sFrom, const std::wstring& sTo, InputParams& params, ConvertParams& convertParams)
 diff --git a/X2tConverter/src/lib/pdf_image.h b/X2tConverter/src/lib/pdf_image.h
-index 50838276b..f83ada2a1 100644
+index a41730f2..9f1ecaa0 100644
 --- a/X2tConverter/src/lib/pdf_image.h
 +++ b/X2tConverter/src/lib/pdf_image.h
-@@ -353,7 +353,7 @@ namespace NExtractTools
+@@ -352,7 +352,7 @@ namespace NExtractTools
  
  		std::wstring sFileDir         = NSDirectory::GetFolderPath(sFrom);
  		std::wstring sImagesDirectory = combinePath(sFileDir, L"media");
@@ -1813,9 +1821,9 @@ index 50838276b..f83ada2a1 100644
 +		std::wstring sPdfBinFile      = combinePath(sFileDir, L"pdf.bin");  // CryptPad: Load pdf.bin from from the workdir instead of tmp dir
  
  		NSDoctRenderer::CDoctrenderer oDoctRenderer(NULL != params.m_sAllFontsPath ? *params.m_sAllFontsPath : L"");
- 		std::wstring sXml = getDoctXml(eFromType, eToType, sFrom, sPdfBinFile, sImagesDirectory, convertParams.m_sThemesDir, -1, L"", params);
+ 		convertParams.InitDoctRenderer(&oDoctRenderer);
 diff --git a/X2tConverter/src/main.cpp b/X2tConverter/src/main.cpp
-index c531a09f8..4d600a6be 100644
+index c12323ab..58033d8d 100644
 --- a/X2tConverter/src/main.cpp
 +++ b/X2tConverter/src/main.cpp
 @@ -33,7 +33,7 @@
@@ -1827,18 +1835,32 @@ index c531a09f8..4d600a6be 100644
  #include "../../DesktopEditor/common/StringExt.h"
  #include "../../DesktopEditor/common/SystemUtils.h"
  #include "ASCConverters.h"
-@@ -102,11 +102,11 @@ int wmain_lib(int argc, wchar_t *argv[])
+@@ -102,18 +102,18 @@ int wmain_lib(int argc, wchar_t *argv[])
  	if (sMemoryLimit.empty())
  		sMemoryLimit = NSSystemUtils::gc_EnvMemoryLimitDefault;
  
 -#if !defined(_DEBUG) && !defined(__ANDROID__) && !defined(_IOS)
--	long long nMemoryLimit;
--	if (NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit) && nMemoryLimit > 0)
+-	long long nMemoryLimit = 0;
+-	if (!NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit) || nMemoryLimit <= 0)
+-	{
+-		// an unparsable value must not leave the process without any limit
+-		std::cerr << "Invalid memory limit \"" << U_TO_UTF8(sMemoryLimit) << "\", falling back to the default" << std::endl;
+-		sMemoryLimit = NSSystemUtils::gc_EnvMemoryLimitDefault;
+-		NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit);
+-	}
+-	if (nMemoryLimit > 0)
 -		limit_memory((size_t)nMemoryLimit);
 -#endif
 +// #if !defined(_DEBUG) && !defined(__ANDROID__) && !defined(_IOS) CryptPad: disabled for WASM build
-+// 	long long nMemoryLimit;
-+// 	if (NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit) && nMemoryLimit > 0)
++// 	long long nMemoryLimit = 0;
++// 	if (!NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit) || nMemoryLimit <= 0)
++// 	{
++// 		// an unparsable value must not leave the process without any limit
++// 		std::cerr << "Invalid memory limit \"" << U_TO_UTF8(sMemoryLimit) << "\", falling back to the default" << std::endl;
++// 		sMemoryLimit = NSSystemUtils::gc_EnvMemoryLimitDefault;
++// 		NSStringExt::FromHumanReadableByteCount(sMemoryLimit, nMemoryLimit);
++// 	}
++// 	if (nMemoryLimit > 0)
 +// 		limit_memory((size_t)nMemoryLimit);
 +// #endif
  	std::wstring sArg1, sArg2;

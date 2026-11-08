@@ -1,18 +1,18 @@
 {
   "about": "The ONLYOFFICE Docs release this app takes its editor files from. scripts/upstream-watch.mjs compares it with the newest one every week; change it only together with the bundle built from it.",
   "product": "ONLYOFFICE Docs Community Edition (Document Server)",
-  "version": "9.4.0",
-  "build": "9.4.0.129",
+  "version": "10.0.0",
+  "build": "10.0.0.169",
   "image": "docker.io/onlyoffice/documentserver",
-  "tag": "9.4.0.1",
-  "digest": "sha256:3ab6ebc7c605e5a32b7ae3ff19daed4925090245acc8100ce2230bd766c88212",
-  "source_tag": "v9.4.0.129",
-  "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v9.4.0",
-  "pinned": "2026-10-08",
+  "tag": "10.0.0.1",
+  "digest": "sha256:ca17889f10b11141cc6441836aebdd2835cf3e1b49681b2fd6e155c94b7850b3",
+  "source_tag": "v10.0.0.169",
+  "release": "https://github.com/ONLYOFFICE/DocumentServer/releases/tag/v10.0.0",
+  "pinned": "2026-11-08",
   "x2t": {
     "about": "The converter, x2t, built to WebAssembly by this project from ONLYOFFICE core at the editor files' tag (source_tag): scripts/x2t/build.sh builds it in docker from what \"build\" names - the toolchain by its digest and one day's Ubuntu snapshot, every source by its commit - and checks the page's two files, and with --server the server build (x2t-server.wasm, docs/SERVER.md), against \"files\"; two builds give the same bytes. scripts/fetch-x2t.mjs downloads the zip a release attaches (url, sha512: pinned by the release that attaches it, made by fetch-x2t.mjs --pack in the pinned Node image; release 0.4.0 attaches v9.4.0.129+4, releases 0.2.0 to 0.3.1 attached v9.4.0.129+2, release 0.1.1 v9.4.0.129+1) or takes a build made elsewhere, and checks it the same way. Change it only together with a build that gives the new sums.",
     "from": "ONLYOFFICE core v9.4.0.129 (AGPL-3.0), with CryptPad's changes for WebAssembly (github.com/cryptpad/onlyoffice-x2t-wasm, AGPL-3.0-or-later) ported to it and this project's own, all in scripts/x2t/patches/, and ICU 68.2's conversion tables (scripts/x2t/icu-data.py); built the way CryptPad builds its own (emscripten, one qmake project at a time). Release 0.1.0 carried CryptPad's build, v9.3.2+3.",
-    "release": "v9.4.0.129+4",
+    "release": "v10.0.0.169+1",
     "build": {
       "recipe": {
         "about": "Where scripts/x2t comes from: CryptPad's Dockerfile and embuild.sh at the release commit, and its changes to ONLYOFFICE core (its core/ at the changes commit, against core v9.3.0.140, the commit that core/ was pulled from), ported to source_tag in scripts/x2t/patches/01-cryptpad-wasm.patch.",
@@ -31,13 +31,13 @@
       "sources": {
         "core": {
           "repository": "https://github.com/ONLYOFFICE/core.git",
-          "tag": "v9.4.0.129",
-          "commit": "a016fc2868b9f99f59dd30aa2088e68bbe5104af"
+          "tag": "v10.0.0.169",
+          "commit": "76af764fcb777291098c73728044249b6893af6a"
         },
         "build_tools": {
           "repository": "https://github.com/ONLYOFFICE/build_tools.git",
-          "tag": "v9.4.0.129",
-          "commit": "cf4cac0846d03e2e00a6fec5d1ecd4e9463086d5"
+          "tag": "v10.0.0.169",
+          "commit": "3d60b4cc5a9c776a35e7c28fb5ddb73b24960725"
         },
         "hyphen": {
           "repository": "https://github.com/hunspell/hyphen.git",
