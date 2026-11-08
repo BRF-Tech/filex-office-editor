@@ -15,7 +15,8 @@
 //   node scripts/release-pins.mjs check  VERSION [--dist DIR]
 //       every file in DIR against the pins; exit 1 and every mismatch said
 //   node scripts/release-pins.mjs assets VERSION [--dist DIR]
-//       the release's assets, one a line: name, local path, SHA-256
+//       the release's assets, one a line: name, path (from the
+//       repository's root), SHA-256
 //   node scripts/release-pins.mjs notes  VERSION
 //       the release's notes: VERSION's section of CHANGELOG.md
 //
@@ -177,7 +178,7 @@ function main() {
     return;
   }
   if (cmd === 'assets') {
-    for (const [name, p] of releaseAssets(dist, manifest)) console.log(`${name}\t${p}\t${sha('sha256', readFileSync(p))}`);
+    for (const [name, p] of releaseAssets(dist, manifest)) console.log(`${name}\t${path.relative(ROOT, p)}\t${sha('sha256', readFileSync(p))}`);
     return;
   }
   throw new Error('usage: node scripts/release-pins.mjs write|check|assets|notes VERSION [--dist DIR]');

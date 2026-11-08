@@ -236,8 +236,10 @@ release_id=$(gh_api POST "/repos/$REPO_SLUG/releases" "$body" | pyj 'print(d["id
 echo "== draft release $release_id"
 
 i=0
-while IFS=$'\t' read -r name file sum; do
+while IFS=$'\t' read -r name rel sum; do
   i=$((i + 1))
+  file=$src/$rel
+  [ -f "$file" ] || die "no $file"
   code=$(curl -sS -X POST -H @"$secret/auth" -H 'Content-Type: application/octet-stream' --data-binary @"$file" \
     -o "$secret/up" -w '%{http_code}' "$UPLOADS/repos/$REPO_SLUG/releases/$release_id/assets?name=$name") || die "upload $name: curl failed"
   [ "$code" = 201 ] || die "upload $name: HTTP $code $(head -c 300 "$secret/up")"
@@ -255,7 +257,7 @@ while :; do
   page=$((page + 1))
 done
 bad=0
-while IFS=$'\t' read -r name file sum; do
+while IFS=$'\t' read -r name _rel sum; do
   line=$(awk -F'\t' -v n="$name" '$1 == n' "$secret/remote.tsv")
   [ -n "$line" ] || { echo "MISMATCH $name: not in the release" >&2; bad=1; continue; }
   digest=$(echo "$line" | cut -f2)
