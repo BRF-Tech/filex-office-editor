@@ -18,8 +18,13 @@
 // hook hands it to the session (relay-session.ts imageInserted), which keeps
 // it with filex before the change that shows it goes out. Its name is the
 // one the change carries (`image_fx<16 hex>.<ext>`, coedit.ts INSERTED_IMAGE).
+//
+// In 10.0 UploadImageFiles is renamed (sdk.ts); the request it makes is not:
+// uploadAnswer answers that POST (requests.ts) with the Document Server's
+// answer, and the editor registers the image itself.
 
 import { MEDIA_NAME } from '../frame-protocol';
+import type { UploadAnswer } from './requests';
 
 /** c_oAscError.ID values the upload answers with (sdkjs common/errorCodes.js). */
 const ERR_NO = 0;
@@ -90,5 +95,24 @@ export function keepImagesInPage(common: Common | undefined, inserted?: ImageIns
     }
     common.g_oDocumentUrls?.addUrls?.(urls);
     callback(ERR_NO, out);
+  };
+}
+
+/**
+ * The upload request's answer (10.0; requests.ts): as the Document Server
+ * answers it, `{"media/<name>": address}` - the image kept in the page under
+ * a new name - or 415 for a type the editor may not take, 413 over the
+ * limit, which the editor tells the person as it tells a server's.
+ */
+export function uploadAnswer(inserted?: ImageInserted): (file: Blob) => UploadAnswer {
+  return (f) => {
+    const ext = imageExt(f as Blob & { name?: string });
+    if (!ext) return { status: 415 };
+    if (f.size > MAX_BYTES) return { status: 413 };
+    const name = randomName(ext);
+    if (!MEDIA_NAME.test(name)) return { status: 500 };
+    const url = URL.createObjectURL(f);
+    inserted?.(name, f);
+    return { status: 200, body: JSON.stringify({ [`media/${name}`]: url }) };
   };
 }

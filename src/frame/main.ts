@@ -41,10 +41,12 @@ import { pickSettings, readSettings } from '../settings';
 import { BridgeSocketPort, createSocketIo, installSocketIo } from '../shim';
 import { loadedFonts, retry, takeOverDownloads, trimDownloadFormats, type ExportJob } from './export';
 import { holdScripts } from './hold';
-import { keepImagesInPage } from './images';
+import { keepImagesInPage, uploadAnswer } from './images';
+import { LoadedFonts, watchRequests } from './requests';
 import { SaveRetry } from './save-retry';
 import { KeptStorage } from './storage';
 import { serveTemplatesAsTxt } from './text';
+import { findDocumentUrls } from './sdk';
 import { trimThemesPath } from './themes-path';
 import { guardDictionaries, guardWorkers } from './workers';
 
@@ -129,14 +131,32 @@ const settingsReady = new Promise<void>((resolve) => {
   setTimeout(resolve, SETTINGS_WAIT_MS);
 });
 
+/** The font files the editor has loaded (requests.ts), for a PDF. */
+const editorFonts = new LoadedFonts();
+
+/** An image the person inserted: the page keeps it (images.ts); editing together, the others need it too (relay-session.ts). */
+function imageInserted(name: string, file: Blob): void {
+  const key = `media/${name}`;
+  if (MEDIA_NAME.test(name) && !documentUrls[key]) documentUrls[key] = URL.createObjectURL(file);
+  if (session instanceof RelaySession) session.imageInserted(name, file.arrayBuffer());
+}
+
+/**
+ * The editor's register of the document's files (sdk.ts findDocumentUrls;
+ * its name is gone in 10.0), found by the files this page handed it; null
+ * until the editor has taken them in.
+ */
+let urlRegistry: ReturnType<typeof findDocumentUrls> = null;
+function documentRegistry(): ReturnType<typeof findDocumentUrls> {
+  if (!urlRegistry) urlRegistry = findDocumentUrls(win.AscCommon, documentUrls);
+  return urlRegistry;
+}
+
 const socketPort = new BridgeSocketPort(() => ({
   connect: () => {
     phase('socket');
     saveRetry.attach(editorApi());
-    keepImagesInPage(win.AscCommon as Parameters<typeof keepImagesInPage>[0], (name, file) => {
-      // Editing together: the others need the image (relay-session.ts).
-      if (session instanceof RelaySession) session.imageInserted(name, file.arrayBuffer());
-    });
+    keepImagesInPage(win.AscCommon as Parameters<typeof keepImagesInPage>[0], imageInserted);
     connected = true;
     if (bridge) bridge.connect();
     else begin();
@@ -155,6 +175,9 @@ serveTemplatesAsTxt(win);
 trimThemesPath(win);
 guardWorkers(win, document.baseURI);
 guardDictionaries(win, document.baseURI);
+// The font files the editor loads (a PDF's fonts) and the image uploads it
+// makes (10.0, where the functions behind them are renamed): requests.ts.
+watchRequests(win, document.baseURI, editorFonts, uploadAnswer(imageInserted));
 // The editor's Gateway hears the app page (origin.ts): with the origin the
 // app page's address has, which api.js gave the editor as parentOrigin.
 adaptOpaqueOrigin(
@@ -262,9 +285,9 @@ async function imageBytes(url: string): Promise<ArrayBuffer | null> {
 
 /** The document's images, by the names Editor.bin refers to them with. */
 async function snapshotMedia(): Promise<MediaFile[]> {
-  const common = win.AscCommon as Record<string, unknown> | undefined;
-  const registry = common?.g_oDocumentUrls as { getUrls?: () => Record<string, string> } | undefined;
-  const urls = registry?.getUrls?.() ?? {};
+  // The editor's register; without it, the files this page handed the
+  // editor and the images inserted since (imageInserted).
+  const urls = documentRegistry()?.getUrls() ?? { ...documentUrls };
   const out: MediaFile[] = [];
   const seen = new Set<string>();
   for (const [key, url] of Object.entries(urls)) {
@@ -316,7 +339,7 @@ async function onExport(job: ExportJob, done: () => void): Promise<void> {
     const bin = getFile.call(api);
     if (typeof bin !== 'string' || bin.length === 0) throw new Error('the editor gave no document');
     const media = await snapshotMedia();
-    const fonts = job.pdf ? loadedFonts(win) : undefined;
+    const fonts = job.pdf ? await loadedFonts(win, editorFonts) : undefined;
     const id = ++exportSeq;
     pendingExports.set(id, done);
     const pdf = job.pdf ? (job.pdf.buffer.slice(job.pdf.byteOffset, job.pdf.byteOffset + job.pdf.byteLength) as ArrayBuffer) : undefined;
@@ -362,9 +385,8 @@ function registerMedia(name: string, bytes: ArrayBuffer): void {
   if (!MEDIA_NAME.test(name) || documentUrls[`media/${name}`]) return;
   const url = URL.createObjectURL(new Blob([bytes], { type: mediaType(name) }));
   documentUrls[`media/${name}`] = url;
-  const common = win.AscCommon as { g_oDocumentUrls?: { addUrls?: (urls: Record<string, string>) => void } } | undefined;
   try {
-    common?.g_oDocumentUrls?.addUrls?.({ [`media/${name}`]: url });
+    documentRegistry()?.addUrls({ [`media/${name}`]: url });
   } catch (e) {
     notice('image', e);
   }

@@ -12,7 +12,8 @@
 // that last step goes to the app page instead (onExport): it converts with
 // x2t in the browser and hands the result to filex - a download, or a PDF to
 // print. The editor's own files are not touched: the step is replaced on the
-// editor's API object while the page runs.
+// editor's API object while the page runs. In 10.0 its name is gone, and
+// sdk.ts findDownloadStep finds it by what downloadAs does.
 //
 // The File menu's "Download as" lists every format a Document Server writes;
 // trimDownloadFormats leaves the ones x2t writes here (formats.ts), and the
@@ -20,6 +21,8 @@
 
 import { exportFormat, isPdf, textEncodings, textOptions, type DocumentKind, type ExportFormat, type TextOptions } from '../formats';
 import { MEDIA_NAME, type MediaFile } from '../frame-protocol';
+import { plainFont, type LoadedFonts } from './requests';
+import { findDownloadStep, findEncodings } from './sdk';
 
 type AnyWindow = Record<string, unknown>;
 
@@ -55,12 +58,14 @@ export function trimDownloadFormats(win: AnyWindow, kind: DocumentKind): boolean
   if (proto.__fxTrimmed) return true;
   proto.formats = proto.formats.map((row) => row.filter((item) => exportFormat(item?.type, kind) !== null)).filter((row) => row.length > 0);
   // The TXT (a document) and CSV (a workbook) dialogs list
-  // AscCommon.c_oAscEncodings (getEncodingParams reads it each time): only
-  // the encodings x2t writes that kind's text in here are left in it.
-  const common = win.AscCommon as { c_oAscEncodings?: unknown[][] } | undefined;
+  // AscCommon.c_oAscEncodings (getEncodingParams reads it each time; renamed
+  // in 10.0, sdk.ts findEncodings): only the encodings x2t writes that kind's
+  // text in here are left in it - in place, so whatever holds the list sees it.
   const keep = textEncodings(kind);
-  if (keep && common && Array.isArray(common.c_oAscEncodings)) {
-    common.c_oAscEncodings = common.c_oAscEncodings.filter((e) => Array.isArray(e) && keep.includes(e[0] as number));
+  const list = keep ? findEncodings(win.AscCommon) : null;
+  if (keep && list) {
+    const kept = list.filter((e) => Array.isArray(e) && keep.includes(e[0] as number));
+    list.splice(0, list.length, ...kept);
   }
   proto.__fxTrimmed = true;
   return true;
@@ -98,38 +103,66 @@ interface FontFileLoader {
  * obfuscated, the editor's copy is the plain file - by their id in the
  * package (x2t reads the family and style from the file itself).
  *
- * ⚠ Through getFontStream, not g_fonts_streams: a font the engine has taken
- * in is only a pointer into its WebAssembly memory there ({asc_marker, data,
- * len}). Measured 2026-10-08: reading g_fonts_streams gave x2t one face of
- * the four the page used, and the whole PDF came out in Liberation Serif
- * Bold Italic.
+ * ⚠ 9.4: through getFontStream, not g_fonts_streams: a font the engine has
+ * taken in is only a pointer into its WebAssembly memory there ({asc_marker,
+ * data, len}). Measured 2026-10-08: reading g_fonts_streams gave x2t one
+ * face of the four the page used, and the whole PDF came out in Liberation
+ * Serif Bold Italic.
+ *
+ * 10.0: the list of font files (AscFonts.g_font_files) and their fields are
+ * renamed (sdk.ts). The fonts the editor loaded are the ones requests.ts saw
+ * it fetch; each is read again from the package (the browser's cache has
+ * it) and decoded as the editor decodes it (requests.ts plainFont).
  */
-export function loadedFonts(win: AnyWindow): MediaFile[] {
+export async function loadedFonts(win: AnyWindow, recorded?: LoadedFonts, read: (url: string) => Promise<ArrayBuffer | null> = readPackageFile): Promise<MediaFile[]> {
   const fonts = win.AscFonts as
     | { g_font_files?: (FontFileLoader | undefined)[]; getFontStream?: (index: number) => { data?: Uint8Array; size?: number } | undefined }
     | undefined;
-  const files = fonts?.g_font_files ?? [];
   const out: MediaFile[] = [];
   const seen = new Set<string>();
-  for (const f of files) {
-    if (!f || f.Status !== 0 || typeof f.stream_index !== 'number' || f.stream_index < 0) continue;
-    const name = `${String(f.Id ?? '')}.ttf`;
-    if (!MEDIA_NAME.test(name) || seen.has(name)) continue;
-    let s: { data?: Uint8Array; size?: number } | undefined;
-    try {
-      s = fonts?.getFontStream?.(f.stream_index);
-    } catch {
-      s = undefined;
+  if (Array.isArray(fonts?.g_font_files)) {
+    for (const f of fonts.g_font_files) {
+      if (!f || f.Status !== 0 || typeof f.stream_index !== 'number' || f.stream_index < 0) continue;
+      const name = `${String(f.Id ?? '')}.ttf`;
+      if (!MEDIA_NAME.test(name) || seen.has(name)) continue;
+      let s: { data?: Uint8Array; size?: number } | undefined;
+      try {
+        s = fonts.getFontStream?.(f.stream_index);
+      } catch {
+        s = undefined;
+      }
+      if (!s?.data || typeof s.size !== 'number' || s.size <= 0) continue;
+      seen.add(name);
+      out.push({ name, bytes: ownBuffer(s.data.subarray(0, s.size)) });
     }
-    if (!s?.data || typeof s.size !== 'number' || s.size <= 0) continue;
+    return out;
+  }
+  for (const [id, url] of recorded?.entries() ?? []) {
+    const name = `${id}.ttf`;
+    if (!MEDIA_NAME.test(name) || seen.has(name)) continue;
+    let raw: ArrayBuffer | null = null;
+    try {
+      raw = await read(url);
+    } catch {
+      raw = null;
+    }
+    if (!raw || raw.byteLength === 0) continue;
     seen.add(name);
-    out.push({ name, bytes: ownBuffer(s.data.subarray(0, s.size)) });
+    out.push({ name, bytes: plainFont(raw) });
   }
   return out;
 }
 
+/** A file of the package, as bytes (from the browser's cache when it has it). */
+async function readPackageFile(url: string): Promise<ArrayBuffer | null> {
+  const res = await fetch(url, { cache: 'force-cache' });
+  return res.ok ? res.arrayBuffer() : null;
+}
+
 interface EditorApi {
+  /** Kept by its name in 10.0 too (the API exports it). */
   sync_EndAction?: (type: number, id: number) => void;
+  /** 9.4 only (renamed in 10.0, where the command's title is used). */
   documentTitle?: string;
 }
 
@@ -141,13 +174,22 @@ interface EditorApi {
  */
 export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: (job: ExportJob, done: () => void) => void, onRefused: (why: string) => void): boolean {
   const common = win.AscCommon as { baseEditorsApi?: { prototype?: Record<string, unknown> } } | undefined;
-  const proto = common?.baseEditorsApi?.prototype;
-  if (!proto || typeof proto._downloadAsUsingServer !== 'function') return false;
-  if (proto.__fxDownloads) return true;
-  const asc = win.Asc as { c_oAscAsyncActionType?: { BlockInteraction?: number }; c_oAscAsyncAction?: { Print?: number } } | undefined;
+  const asc = win.Asc as
+    | { c_oAscAsyncActionType?: { BlockInteraction?: number }; c_oAscAsyncAction?: { Print?: number }; editor?: unknown; asc_docs_api?: { prototype?: unknown }; spreadsheet_api?: { prototype?: unknown } }
+    | undefined;
+  // 9.4: AscCommon.baseEditorsApi; 10.0: the editor's API object or its
+  // constructor (the names web-apps starts the editor with).
+  const where = [common?.baseEditorsApi?.prototype, asc?.editor, win.editor, asc?.asc_docs_api?.prototype, asc?.spreadsheet_api?.prototype];
+  let step: { owner: Record<string, unknown>; name: string } | null = null;
+  for (const w of where) {
+    if (w && (step = findDownloadStep(w))) break;
+  }
+  if (!step) return false;
+  const { owner, name } = step;
+  if (owner.__fxDownloads) return true;
   const BLOCK = asc?.c_oAscAsyncActionType?.BlockInteraction ?? 1;
   const PRINT = asc?.c_oAscAsyncAction?.Print ?? 7;
-  proto._downloadAsUsingServer = function (this: EditorApi, actionType: number, options: Record<string, unknown> | null, additional: Record<string, unknown> | null, container: { data?: unknown } | null, downloadType: unknown) {
+  owner[name] = function (this: EditorApi, actionType: number, options: Record<string, unknown> | null, additional: Record<string, unknown> | null, container: { data?: unknown } | null, downloadType: unknown) {
     const end = () => {
       if (actionType) {
         try {
@@ -157,8 +199,10 @@ export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: 
         }
       }
     };
+    // options.fileType and options.callback are renamed in 10.0; the
+    // command's own fields (quoted in sdkjs) are not.
     const format = exportFormat(options?.fileType ?? additional?.outputformat, kind);
-    const plain = additional?.c === 'save' && !options?.callback;
+    const plain = additional?.c === 'save' && !options?.callback && downloadType !== MAIL_MERGE;
     if (!format || !plain) {
       // A server command this app does not answer (mail merge, a document
       // from an address...) or a format x2t does not write here.
@@ -201,6 +245,9 @@ export function takeOverDownloads(win: AnyWindow, kind: DocumentKind, onExport: 
       end();
     });
   };
-  proto.__fxDownloads = true;
+  owner.__fxDownloads = true;
   return true;
 }
+
+/** sdkjs AscCommon.DownloadType.MailMerge: a mail merge's documents, which go to the Document Server. */
+const MAIL_MERGE = 'asc_onSaveMailMerge';

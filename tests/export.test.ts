@@ -180,7 +180,7 @@ describe("the editor's Download as", () => {
 });
 
 describe('the fonts a PDF needs', () => {
-  it('every loaded font file once, as the editor holds it, by its id', () => {
+  it('every loaded font file once, as the editor holds it, by its id (9.4)', async () => {
     const plain = new Uint8Array([0, 1, 0, 0, 5, 5, 5, 5]);
     const heap = new Uint8Array([7, 7, 0, 1, 0, 0, 6]);
     const win = {
@@ -194,7 +194,7 @@ describe('the fonts a PDF needs', () => {
         getFontStream: (i: number) => (i === 0 ? { data: plain, size: 4 } : { data: heap.subarray(2), size: 5 }),
       },
     };
-    const got = loadedFonts(win);
+    const got = await loadedFonts(win);
     expect(got.map((f) => f.name)).toEqual(['074.ttf', '075.ttf']);
     expect(Array.from(new Uint8Array(got[0].bytes))).toEqual([0, 1, 0, 0]);
     expect(Array.from(new Uint8Array(got[1].bytes))).toEqual([0, 1, 0, 0, 6]);
