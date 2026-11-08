@@ -22,7 +22,9 @@ layout running 10.0's sdkjs.
 
 - **ONLYOFFICE Docs 10.0.0** (build 10.0.0.169; 0.4.0 carried 9.4.0, build
   9.4.0.129): the editor files from `onlyoffice/documentserver:10.0.0.1`,
-  pinned by digest, @@BUNDLE_LINE@@
+  pinned by digest, 2,794 files, 102.5 MiB zipped (`editor.zip`, the same
+  bytes on two machines): `ui.zip` is 114.9 MiB (120,439,888 bytes; 0.4.0's
+  119.9 MiB), 10.0's sdkjs being minified much further.
 - **x2t `v10.0.0.169+1`**, in the page and on the server: ONLYOFFICE core
   and build_tools at `v10.0.0.169`. CryptPad's changes (patch 01) are
   carried over to 10.0; patches 02 to 06, 08 and 09 apply unchanged; patch
@@ -33,7 +35,10 @@ layout running 10.0's sdkjs.
   CMap folder, whose code is not built here). libxml2, which 10.0 takes
   out of core's tree, is fetched by core's own script at the commit it
   names. binaryen's one-caller inlining is capped in the two links (it ran
-  for hours on 10.0's module). @@X2T_LINE@@
+  for hours on 10.0's module). `x2t.zip` is 12.3 MiB (12,919,278
+  bytes; 0.4.0's 10,977,184), `x2t.wasm` 58.5 MB and `x2t-server.wasm`
+  62.3 MB, the same three files from two machines, one of them from an
+  empty tree.
 - **The editor page and 10.0's sdkjs.** ONLYOFFICE 10.0 builds sdkjs with
   property renaming: only what it exports by a quoted name keeps its name.
   What the editor page took part in under 9.4's names - the last step of
@@ -58,7 +63,8 @@ layout running 10.0's sdkjs.
   asks it for, and a worker's next sheet finds the sheet's renamed
   collaborative-editing key by what it holds. `layout-host.wasm` is
   quickjs-ng **0.18.0** (0.17.0), built with wasi-sdk 34's image (25).
-  @@ENGINE_LINE@@
+  `engine.zip` is 14.7 MiB (15,441,434 bytes; 0.4.0's
+  13.0 MiB).
 - **A release in one command**, `scripts/release.sh`: `prepare` builds every
   release file and pins it; `publish` builds them again from the signed tag
   in a fresh clone, stops at the first file that is not at its pin, and

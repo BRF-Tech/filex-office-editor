@@ -283,8 +283,8 @@
   ],
   "ui": {
     "bundle": {
-      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.4.0/ui.zip",
-      "sha256": "ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c"
+      "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.5.0/ui.zip",
+      "sha256": "c0e94a12c5e7e476fdee0c9a1c065597a03b8fdd7a2d18255d18a0c6a9dca4f1"
     },
     "csp": [
       "unsafe-eval",
@@ -299,7 +299,7 @@
       "dictionaries": {
         "catalog": {
           "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/dictionaries.json",
-          "sha256": "1fce1671b25545bcac9a96fbc319253993dc5436b68069c58b954543be30418e"
+          "sha256": "d2abe58e8e0cf975cd367800210f609c09dacd8b2e8303a9e367f50ae891247f"
         }
       }
     }
@@ -424,7 +424,7 @@
   "engines": {
     "office": {
       "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/{tag}/engine.zip",
-      "sha256": "a50931b0cbd779145eade16cbd159f5b929823c84de7ea7e2daabdb8d6a79d6a",
+      "sha256": "164dc7d2c21e394dbb3e9d1e0b8082792a328bdc5303beca970bdf251b4d0b6b",
       "editor": "editor"
     }
   }

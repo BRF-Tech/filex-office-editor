@@ -88,11 +88,14 @@ the same 28 libraries linked a second time (`steps.sh x2t_server`):
   conversion that reaches an undefined function ends with `missing
   function: <name>` (`x2t.MissingFunction`).
 
-`x2t-server.wasm` of x2t `v9.4.0.129+4` is 41.4 MB (`36474a79...`, pinned in
-`upstream/onlyoffice.json` beside the page's two files), its imports 26 WASI
-functions, 13 `invoke_*`, two emscripten ones and the 87 undefined. Linking
-it again with the libraries built takes about 5-7 minutes, the whole tree
-about an hour.
+`x2t-server.wasm` of x2t `v10.0.0.169+1` is 62.3 MB (`d394b5c4...`, pinned
+in `upstream/onlyoffice.json` beside the page's two files; `v9.4.0.129+4`'s
+was 41.4 MB), its imports 26 WASI functions, 14 `invoke_*`, two emscripten
+ones and the 87 undefined (71 of them OpenSSL's API: no OpenSSL is linked,
+and what calls it - digital signatures - ends with `missing function`, as
+in 9.4). Linking it again with the libraries built takes about 5 minutes
+(with binaryen's one-caller inlining capped, `steps.sh` `INLINE_CAP`), the
+whole tree about an hour.
 
 ### What the Go side learnt (server/x2t/env.go)
 
@@ -407,14 +410,14 @@ it.
 **Where the engine lives: in the app's release, never in filex.** The engine
 is ONLYOFFICE's code (x2t, sdkjs, `fonts_ie.js`) and AGPL; filex is MIT and
 never links it. A release attaches an `engine.zip` beside `ui.zip` -
-`x2t-server.wasm` (41.4 MB), `layout-host.wasm` (1.6 MB) and `layout/`
+`x2t-server.wasm` (62.3 MB), `layout-host.wasm` (1.6 MB) and `layout/`
 (`worker.js`, `fonts_ie.js`, `xregexp-all-min.js`) - named in the manifest
 with its SHA-256, as `ui.bundle` is (a new block, `engines.office`, whose
 derived permission the install review shows). sdkjs and the fonts are in
 `ui.zip` already: the engine mounts the installed package read-only. A
 browser never downloads `engine.zip`, and `ui.zip` keeps its room under
-filex's 128 MiB (0.4.0's: 119.9 MiB with the dictionaries and the macro
-editor).
+filex's 128 MiB (0.5.0's: 114.9 MiB with the dictionaries and the macro
+editor; 0.4.0's 119.9 MiB).
 
 **The runner: a process of its own, wazero without the context watch.**
 filex starts `filex office-engine` (a hidden command of its own binary) and

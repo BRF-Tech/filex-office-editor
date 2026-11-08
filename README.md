@@ -65,8 +65,10 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > is this project's own build ([x2t, the converter](#x2t-the-converter)).
 > Measured for 0.5.0: the unit tests, x2t's round trips with the pinned
 > build, the server's Go tests with the real modules, the run in three
-> browsers ([Measured in the browsers](#measured-in-the-browsers)) and two
-> builds of every release file from empty trees
+> browsers ([Measured in the browsers](#measured-in-the-browsers)) and
+> every release file built twice to the same bytes - by `scripts/release.sh
+> prepare`, then by `publish` from the signed tag in a fresh clone - with x2t
+> from two machines, one of them from an empty tree
 > ([Building a release](#building-a-release)); in a real filex, 0.4.0's
 > measurement ([Measured in filex 0.57](#measured-in-filex-057)) and
 > 0.3.1's in encrypted folders ([Measured in filex 0.56](#measured-in-filex-056)).
@@ -77,7 +79,7 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 |---|---|
 | Based on | ONLYOFFICE Docs 10.0.0 (build 10.0.0.169; releases 0.1.0 to 0.4.0: 9.4.0, build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
 | filex | 0.5.0 and 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.4.0** (tag `v0.4.0`): `ui.zip`, 119.9 MiB, SHA-256 `ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c`; `engine.zip`, the office engine filex runs on the server, 13.0 MiB, SHA-256 `a50931b0cbd779145eade16cbd159f5b929823c84de7ea7e2daabdb8d6a79d6a`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| Release | **0.5.0** (tag `v0.5.0`): `ui.zip`, 114.9 MiB, SHA-256 `c0e94a12c5e7e476fdee0c9a1c065597a03b8fdd7a2d18255d18a0c6a9dca4f1`; `engine.zip`, the office engine filex runs on the server, 14.7 MiB, SHA-256 `164dc7d2c21e394dbb3e9d1e0b8082792a328bdc5303beca970bdf251b4d0b6b`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
@@ -86,7 +88,7 @@ Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
 or together, nor, with filex 0.57, for conversions and office thumbnails on
 the server. In filex 0.57.0 or later, as an administrator: **Admin →
 Plugins → Apps → Install an app → GitHub repository**,
-`BRF-Tech/filex-office-editor`, tag `v0.4.0` (in filex 0.56, `v0.3.1`; in
+`BRF-Tech/filex-office-editor`, tag `v0.5.0` (in filex 0.56, `v0.3.1`; in
 filex 0.55, `v0.1.1`). filex reads `filex-app.json` at that tag, downloads
 the release's `ui.zip` and `engine.zip` and refuses each unless its SHA-256
 is the one the manifest names.
@@ -332,7 +334,7 @@ dictionaries - filex 0.57's.
 | Download as | `ui.download` (`ui:download`): filex hands the person a file, on a gesture or after asking | used as it is |
 | Print (a sandboxed frame without `allow-modals` may not open the browser's print dialog: measured, in the app's frame `window.print()` does nothing in Chromium - "Ignored call to 'print()'. The document is sandboxed, and the 'allow-modals' keyword is not set" - nor in Firefox) | `ui.print` in the manifest → permission `ui:print`: the app hands filex a PDF (`ui.print {name, data, mime}`), filex asks the person every time, and its own print page (`/_print/`, a frame of a `blob:` PDF) opens the print dialog on their Allow | 0.1.0; without the grant, or on a filex that does not have it (`unknown_method`, `unavailable`), the app hands the PDF over as a download and says so |
 | No inline scripts | `script-src` is the package only | 0.1.0: the build moves web-apps' inline scripts into files ([The editor bundle](#the-editor-bundle)) |
-| A large package (0.4.0: 119.9 MiB zipped with x2t, the phone apps, the dictionaries of filex's languages and the macro editor, 2,796 files, 391.9 MiB unpacked, 38.1 MiB for `x2t.wasm`; 0.1.0: 98.2 MiB) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | a later filex: serving the package's files compressed (`Content-Encoding`), cached by version |
+| A large package (0.5.0: 114.9 MiB zipped with x2t, the phone apps, the dictionaries of filex's languages and the macro editor, 2,804 files, 347.6 MiB unpacked, 55.8 MiB for `x2t.wasm`; 0.4.0: 119.9 MiB; 0.1.0: 98.2 MiB) | 128 MiB zipped, 512 MiB unpacked, 20,000 files, 64 MiB a file; served uncompressed | a later filex: serving the package's files compressed (`Content-Encoding`), cached by version |
 
 ## What is in this repository
 
@@ -452,12 +454,13 @@ third of 9.4's.
 | The dictionaries of filex's six interface languages (`.aff`, `.dic`, `hyph_` patterns, their licences) | 46 | 52.0 | 17.6 |
 | The macro editor (`web-apps/vendor/monaco`) | 117 | 15.3 | 3.3 |
 | **The editor bundle** | **2,794** (2,786) | **291.4** (353.5) | **102.5** (109.4) |
-| **The app's bundle** (`ui.zip` of 0.4.0: with x2t, 38.2 MiB unpacked, and the app; built in the pinned Node image; 0.3.1's, 0.3.0's, 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,796** | **391.9** | **119.9** |
+| **The app's bundle** (`ui.zip` of 0.5.0: with x2t, 56.0 MiB unpacked, and the app; built in the pinned Node image; 0.4.0's was 119.9 MiB, 0.3.1's, 0.3.0's, 0.2.0's and 0.1.1's 98.3 MiB, 0.1.0's 98.2 MiB) | **2,804** (2,796) | **347.6** (391.9) | **114.9** (119.9) |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
-64 MiB a file; the largest files are `x2t.wasm` (38.1 MiB), the Turkish
-dictionary (`tr_TR.dic`, 34.5 MiB) and `sdkjs/cell/sdk-all.js`
-(30.9 MiB). The editor part is 114.7 MB in 2,786 files, within the 120 MB
+64 MiB a file; the largest files are `x2t.wasm` (55.8 MiB; 38.1 MiB in
+0.4.0), the Turkish dictionary (`tr_TR.dic`, 34.5 MiB) and
+`sdkjs/cell/sdk-all.js` (10.0 MiB; 30.9 MiB with 9.4). The editor part is
+107.5 MB in 2,794 files (9.4's: 114.7 MB in 2,786), within the 120 MB
 and 3,000 files the build aims for (`BUDGET`, `scripts/editor/rules.mjs`;
 what grows next goes to the files an administrator adds) - filex's limits
 are what refuse.
@@ -758,6 +761,20 @@ stamps reset for `kernel_network` and the links - `x2t.js` unchanged
 50.6 minutes. Release 0.4.0 attaches it as `x2t.zip` (10,977,184
 bytes, SHA-512 `851d27f1...54fa1766`, pinned under `x2t`).
 
+`v10.0.0.169+1` (core and build_tools `v10.0.0.169`, 2026-11-08): an
+x86-64 Linux machine, `--cpus 4 --jobs 4 --memory 12g --server`, from a
+tree that started empty that day, and an x86-64 PC (WSL2, `--server`), in
+a tree resumed from its stamps through each fix, gave the same three files - `x2t.js` (134,197 bytes, `68296e8d...`),
+`x2t.wasm` (58,534,243 bytes, `21eb135e...`) and `x2t-server.wasm`
+(62,254,457 bytes, `d394b5c4...`), the sums pinned (the ICU data and the
+two links were built again in both trees after the SASLprep data was
+added). From the empty tree: the libraries 44 minutes, the links 8 with
+binaryen's one-caller inlining capped (`INLINE_CAP` in `steps.sh`;
+uncapped, `wasm-opt -Os` was still on the page build after two hours), the
+build container 3.5 GiB of memory at most, the tree 5.4 GB. Release 0.5.0
+attaches it as `x2t.zip` (12,919,278 bytes, SHA-512
+`f47796bb...4c263d884b`, pinned under `x2t`).
+
 ### txt and csv
 
 CryptPad's build wrote a txt or csv with **every letter outside ASCII cut
@@ -915,6 +932,17 @@ printed), bash, git, docker, curl and python3. The pins and the checks are
 `tests/release-pins.test.ts`). 0.4.0 and the releases before it were
 uploaded by hand; 0.5.0 is the first published by the script.
 
+**On a GitHub-hosted runner** (4 vCPUs, 16 GB, about 14 GB of free disk),
+measured for 0.5.0 on a Linux machine with the same share: x2t from an
+empty tree with `--cpus 4 --jobs 4 --memory 12g --server` took 52 minutes
+(the libraries 44, the two links 8), its container 3.5 GiB of memory at
+most, its tree 5.4 GB and the toolchain image 3.5 GB - a runner holds that.
+The whole release in one job does not fit its disk: x2t's 9 GB, the
+Document Server image's 3.1 GB and the release files' 1.3 GB, and
+Playwright's image (3.6 GB) for the browser run. So x2t is built in a job
+of its own and handed on with `--x2t DIR` (its three files, 121 MB), and
+the browser run is a job of its own too.
+
 The steps, one by one: a release's `ui.zip` is built from its tag with docker alone, every step
 pinned - the Document Server image and the Node image by digest, the npm
 packages by `package-lock.json`, x2t by its hashes - so anyone can make the
@@ -976,7 +1004,24 @@ editor reads it from under the package's `extra/dictionaries/`, its address
 beside the catalog, size and SHA-256). The release attaches all of them;
 `--manifest` writes the catalog's SHA-256 into `ui.extras.dictionaries`.
 The same image gives the same files and catalog (no dates, no compression;
-measured: `1fce1671...`, 37,522 bytes).
+measured: 0.4.0's `1fce1671...`, 37,522 bytes, from Docs 9.4; 0.5.0's
+`d2abe58e...`, 37,523 bytes, from Docs 10.0 - the same Hunspell and
+hyphenation files, each licence file one byte longer, as it names the
+release it comes from).
+
+Measured for 0.5.0 (2026-11-08, an x86-64 Linux machine): `bash
+scripts/release.sh prepare 0.5.0 --x2t DIR` in a fresh clone of the
+release's version commit, with the PC's x2t (its three files at the pinned
+sums, [x2t, the converter](#x2t-the-converter)), building
+`layout-host.wasm`, the image's files, the editor files and the
+dictionaries again: `ui.zip` 120,439,888 bytes, 2,804 files, SHA-256
+`c0e94a12c5e7e476fdee0c9a1c065597a03b8fdd7a2d18255d18a0c6a9dca4f1`;
+`x2t.zip` 12,919,278 bytes, SHA-512 `f47796bb...4c263d884b`; `engine.zip`
+15,441,434 bytes, SHA-256 `164dc7d2...4d0b6b`; the 159 dictionary files
+and their catalog (`d2abe58e...`); `editor.zip` the same as the lock file
+(`283b3a1b...`, the same as the PC's and the same machine's earlier that
+day): 7.7 minutes, the clone and its files 1.5 GB. `layout-host.wasm`
+came out at its pin on both machines (`f461115f...`).
 
 Measured for 0.4.0 (2026-10-16, an x86-64 PC, WSL2 with docker-ce): two
 complete builds in two fresh clones of the release commit, from the image
@@ -1255,7 +1300,7 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
   without a network leaves it ([docs/PARITY.md](docs/PARITY.md), row A15).
 - **How filex runs it** ([docs/SERVER.md](docs/SERVER.md), "How filex
   runs it"): the release attaches `engine.zip` - `x2t-server.wasm`,
-  `layout-host.wasm` and the layout's scripts, 13.0 MiB - named in the
+  `layout-host.wasm` and the layout's scripts, 14.7 MiB - named in the
   manifest by its SHA-256 (`engines.office`, granted as `office-engine`).
   filex 0.57 installs it beside the app, compiles it once in the background
   (a few minutes; **Default apps → Office engine** says "Being prepared")
@@ -1284,7 +1329,7 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
 
 ## Measured in the browsers
 
-The run below imitates filex 0.55 and 0.56 and last measured 0.3.1; what
+The run below imitates filex 0.55 and 0.56 and last measured 0.5.0; what
 0.4.0 adds for filex 0.57 (saving beside, csv, passwords, the dictionaries,
 conflict copies, the fixed editor language) is measured by the unit tests
 and x2t's round trips, not by this run yet.
@@ -1324,6 +1369,26 @@ page went away (its event stream closed and not opened again within 5 s),
 as filex drops one it has not heard from for 45 s. Last, a document x2t
 stops on is opened together: the opening stays "failed" with the app's
 message and no editor, and its member leaves the session it started.
+
+**0.5.0, with ONLYOFFICE Docs 10.0** (2026-11-08; the branch's bundle
+built in the pinned Node image with x2t `v10.0.0.169+1`, run on Linux in
+Playwright 1.65.0's image, headless: Chromium 158.0.8127.18, Firefox 159.0,
+WebKit 27.2): `node e2e/run.mjs` 39 of 39 - the six documents, the settings
+and print run, the phone run, the two formula odts, the document x2t stops
+on, the encrypted folder and the two people with a watcher, in each
+browser - in 387 seconds, with no failed request and none outside the
+package. Openings 0.9-1.3 s in Chromium, 1.5-2.6 s in Firefox, 2.3-2.6 s in
+WebKit; the watcher's editor showed the typed text 264-279 ms after it was
+typed. What 10.0 changed for the run itself: the document is read through
+its builder API (`AscBuilder.Word.Api`), the live viewer's modes from
+web-apps; ONLYOFFICE 10.0 shows one person no "New" hint, so the settings
+run keeps a setting the editor writes in its place; the csv dialog offers
+the editor's whole list (53 code pages, since `v9.4.0.129+3`). The console
+holds what the browsers say about the sandbox and its policy - Chromium:
+one inline event handler the policy refuses and the permissions policy's
+`unload` and `focus-without-user-activation`; Firefox: the host page's
+`favicon.ico` and a service worker it may not register; WebKit: two
+viewport keys - none of it a failed request or a step of the run.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
