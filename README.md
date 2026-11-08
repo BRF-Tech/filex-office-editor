@@ -1021,7 +1021,13 @@ dictionaries again: `ui.zip` 120,439,888 bytes, 2,804 files, SHA-256
 and their catalog (`d2abe58e...`); `editor.zip` the same as the lock file
 (`283b3a1b...`, the same as the PC's and the same machine's earlier that
 day): 7.7 minutes, the clone and its files 1.5 GB. `layout-host.wasm`
-came out at its pin on both machines (`f461115f...`).
+came out at its pin on both machines (`f461115f...`). Then, after the
+signed tag, `bash scripts/release.sh publish 0.5.0 --x2t DIR
+--skip-tag-verify` on the same machine (which has no copy of the signer's
+key) built every file again from `v0.5.0` in a fresh clone, with this
+machine's own x2t (from the tree that started empty): all 163 at their
+pins, uploaded, read back on GitHub at the SHA-256 of the files built, and
+the release published - 10.3 minutes, 4 of them the build.
 
 Measured for 0.4.0 (2026-10-16, an x86-64 PC, WSL2 with docker-ce): two
 complete builds in two fresh clones of the release commit, from the image
