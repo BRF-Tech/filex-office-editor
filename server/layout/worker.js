@@ -214,6 +214,51 @@ function load() {
   return Date.now() - t;
 }
 
+// AscCommon's keys a sheet's api fills with its own objects while it opens:
+// its collaborative-editing object (initCollaborativeEditing:
+// AscCommon.CollaborativeEditing = this.collaborativeEditing, made only
+// while that key is empty), so in a worker that keeps its context the next
+// sheet's api had none ("SetLogicDocument of null" in 9.4, "cannot read
+// property 'o4c' of null" in 10.0, measured). 10.0 renames the key
+// (AscCommon.Be in 10.0.0.169) and the bytecode has no source to read it
+// from, so it is found by what it holds: a key empty (or absent) before the
+// first sheet opened and, after it, one of that api's own objects. Emptied
+// before each sheet, as in the context of its own doctrenderer gives one.
+// The text and slide editors make theirs when sdkjs loads: kept.
+var cellEmptyBefore = null;
+var cellFilledByOpen = null;
+
+function beforeCellOpen() {
+  var ac = globalThis.AscCommon;
+  if (!ac) return;
+  if (cellFilledByOpen) {
+    cellFilledByOpen.forEach(function (k) {
+      ac[k] = undefined;
+    });
+    return;
+  }
+  cellEmptyBefore = {};
+  Object.getOwnPropertyNames(ac).forEach(function (k) {
+    var d = Object.getOwnPropertyDescriptor(ac, k);
+    cellEmptyBefore[k] = !!d && 'value' in d && d.value == null;
+  });
+}
+
+function afterCellOpen(api) {
+  var ac = globalThis.AscCommon;
+  if (cellFilledByOpen || !cellEmptyBefore || !ac || !api) return;
+  var own = new Set();
+  Object.getOwnPropertyNames(api).forEach(function (k) {
+    var d = Object.getOwnPropertyDescriptor(api, k);
+    if (d && 'value' in d && d.value && typeof d.value === 'object') own.add(d.value);
+  });
+  cellFilledByOpen = Object.getOwnPropertyNames(ac).filter(function (k) {
+    if (cellEmptyBefore[k] === false) return false;
+    var d = Object.getOwnPropertyDescriptor(ac, k);
+    return !!d && 'value' in d && own.has(d.value);
+  });
+}
+
 function layout(j) {
   var ms = {};
   var t = Date.now();
@@ -237,13 +282,11 @@ function layout(j) {
     // api's constructor fills Asc.editor only while it is empty.
     globalThis.Asc.editor = undefined;
     globalThis.editor = undefined;
-    // The spreadsheet api makes its collaborative-editing object only while
-    // AscCommon.CollaborativeEditing is empty (initCollaborativeEditing), so
-    // the next sheet's api had none ("SetLogicDocument of null", measured).
-    // The text and slide editors make theirs when sdkjs loads: kept.
-    if (KIND === 'cell' && globalThis.AscCommon) globalThis.AscCommon.CollaborativeEditing = undefined;
+    // A sheet's collaborative-editing object (beforeCellOpen, above).
+    if (KIND === 'cell') beforeCellOpen();
     globalThis.NativeOpenFileData(data, version, undefined, opts);
     var api = globalThis.Asc.editor;
+    if (KIND === 'cell') afterCellOpen(api);
     lap('open');
     stage = 'calculate';
     var params = j.json && typeof j.json === 'object' ? j.json : null;
