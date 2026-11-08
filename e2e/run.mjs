@@ -185,17 +185,31 @@ async function people(page, ext) {
 }
 
 /**
- * What a document editor shows, read from its own document (sdkjs's
- * CDocument), and whether it is in view mode and ONLYOFFICE's live viewer.
+ * What a document editor shows, read from its own document, and whether it
+ * is in view mode and ONLYOFFICE's live viewer. ONLYOFFICE 10.0's sdkjs
+ * renames its internals (CDocument, isViewMode, isLiveViewer: src/frame/
+ * sdk.ts), so the document is read through its document builder API (the
+ * one macros and plugins use, which keeps its names) and the two modes from
+ * what web-apps set the editor to (Main's appOptions and its co-editing
+ * setting: asc_setViewMode, asc_SetFastCollaborative).
  */
 async function viewerFacts(page) {
   return editorFrame(page).evaluate(() => {
     const api = (window.Asc && window.Asc.editor) || window.editor;
-    const doc = api && api.WordControl && api.WordControl.m_oLogicDocument;
+    let text = '';
+    try {
+      const doc = api && typeof api.GetDocument === 'function' ? api.GetDocument() : null;
+      if (doc) text = doc.GetAllParagraphs().map((p) => String(p.GetText())).join('\n');
+    } catch {
+      text = '';
+    }
+    const main = window.DE && window.DE.getController('Main');
+    const opts = (main && main.appOptions) || {};
+    const fast = window.Common && window.Common.Utils.InternalSettings.get('de-settings-coauthmode');
     return {
-      text: doc && typeof doc.GetText === 'function' ? String(doc.GetText()) : '',
-      viewMode: !!(api && api.isViewMode),
-      liveViewer: !!(api && typeof api.isLiveViewer === 'function' && api.isLiveViewer()),
+      text,
+      viewMode: !opts.isEdit && !opts.isRestrictedEdit && !!main,
+      liveViewer: !!opts.canLiveView && !!fast,
     };
   });
 }
@@ -491,7 +505,9 @@ async function runOne(browser, server, engine, doc, o) {
 
 /**
  * Once per engine, in one browser context (one person): a "New" hint closed
- * in one opening is kept and does not show in the next; Print where filex
+ * in one opening is kept and does not show in the next (ONLYOFFICE 10.0
+ * shows one person none: a setting the editor writes is kept, and is there
+ * in the next opening); Print where filex
  * has no print (an older filex), and where the app has no ui:print grant,
  * hands the PDF over as a download.
  */
@@ -511,12 +527,31 @@ async function settingsRun(browser, server, engine) {
   try {
     const first = await open('&print=none');
     step('opened');
-    await hint(first).first().waitFor({ state: 'visible', timeout: 20_000 });
-    await hint(first).first().click();
-    const kept = await until('the closed hint to be kept', async () => {
+    let hinted = true;
+    try {
+      await hint(first).first().waitFor({ state: 'visible', timeout: 15_000 });
+    } catch {
+      hinted = false;
+    }
+    let keyOf = /help-tip/;
+    if (hinted) {
+      await hint(first).first().click();
+    } else {
+      // ONLYOFFICE 10.0 shows no "New" hint when one person opens a text
+      // document (its two: following a co-editor, with three or more; the
+      // AI tools, with plugins): a setting the editor writes through its
+      // own storage stands in for the closed hint.
+      r.notes.push(`no "New" hint on this opening: a setting written through the editor's storage is kept in its place`);
+      await editorFrame(first).evaluate(() => {
+        const store = window.Common && window.Common.localStorage ? window.Common.localStorage : window.localStorage;
+        store.setItem('de-settings-fx-e2e', 'kept');
+      });
+      keyOf = /^de-settings-fx-e2e$/;
+    }
+    const kept = await until('the closed hint (or the setting) to be kept', async () => {
       const raw = await first.evaluate(() => localStorage.getItem('fx-app-state:office-editor'));
       const values = raw ? JSON.parse(raw)['editor-settings'] : null;
-      return values && Object.keys(values).some((k) => /help-tip/.test(k)) ? values : false;
+      return values && Object.keys(values).some((k) => keyOf.test(k)) ? values : false;
     }, 20_000);
     r.kept = Object.keys(kept);
     step('hint kept', { keys: r.kept.length });
@@ -546,7 +581,7 @@ async function settingsRun(browser, server, engine) {
     });
     const missing = r.kept.filter((k) => storage[k] !== kept[k]);
     if (missing.length) r.problems.push(`the next opening lacks the kept ${missing.join(', ')}`);
-    if (shown) r.problems.push(`the closed hint shows again (${shown})`);
+    if (hinted && shown) r.problems.push(`the closed hint shows again (${shown})`);
     const before2 = server.files.filter((f) => f.tag === tag).length;
     await editorFrame(second).evaluate(() => {
       const api = (window.Asc && window.Asc.editor) || window.editor;
@@ -825,8 +860,10 @@ const FORMULA_LINES = ['Iğdır: [math]', 'Önce [math] sonra metin.'];
  * (formula.odt: the frames styled as LibreOffice writes them;
  * formula-nostyle.odt: no style, which x2t made a floating shape at the top
  * left of the margin before scripts/x2t/patches/05-frame-anchor.patch). In
- * the editor's own document (sdkjs: the paragraphs' runs and math) each
- * formula is in the line where its frame is, and nothing floats.
+ * the editor's own document (read through its document builder API, whose
+ * names 10.0 keeps: the paragraphs' runs and math) each formula is in the
+ * line where its frame is, and there is no shape (these documents have
+ * none: a formula in a shape is one that is not in its line).
  */
 async function formulaRun(browser, server, engine, doc) {
   const r = { engine, doc: `${doc} (where the formula is)`, ok: false, steps: [], problems: [], notes: [] };
@@ -845,36 +882,33 @@ async function formulaRun(browser, server, engine, doc) {
     step(end);
     if (end !== 'ready') throw new Error(end);
     const seen = await editorFrame(page).evaluate(() => {
-      const W = window.AscCommonWord;
-      const doc = window.editor.WordControl.m_oLogicDocument;
-      let floating = 0;
-      const lines = doc.Content.map((para) =>
-        (para.Content || [])
-          .map((el) => {
-            if (el instanceof W.ParaMath) return '[math]';
-            if (!(el instanceof W.ParaRun)) return '';
-            let t = '';
-            for (const x of el.Content) {
-              if (x instanceof W.ParaDrawing) {
-                if (x.Is_Inline && x.Is_Inline()) t += '[drawing]';
-                else floating++;
-              } else if (typeof x.Value === 'number') t += String.fromCodePoint(x.Value);
-              else if (x.Type === 2 || x.Type === 3) t += ' ';
-            }
-            return t;
-          })
-          .join('')
-          .replace(/\s*\[/g, ' [')
-          .replace(/\]\s*/g, '] ')
-          .replace(/\s+/g, ' ')
-          .trim(),
-      ).filter((l) => l !== '');
-      return { lines, floating };
+      const api = (window.Asc && window.Asc.editor) || window.editor;
+      const doc = api.GetDocument();
+      const kinds = new Set();
+      const lines = doc
+        .GetAllParagraphs()
+        .map((para) => {
+          let t = '';
+          for (let i = 0; i < para.GetElementsCount(); i++) {
+            const el = para.GetElement(i);
+            const kind = el && typeof el.GetClassType === 'function' ? el.GetClassType() : 'none';
+            kinds.add(kind);
+            if (kind === 'math') t += '[math]';
+            else if (el && typeof el.GetText === 'function') t += String(el.GetText());
+          }
+          return t
+            .replace(/\s*\[/g, ' [')
+            .replace(/\]\s*/g, '] ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        })
+        .filter((l) => l !== '');
+      return { lines, floating: doc.GetAllDrawingObjects().length, kinds: [...kinds] };
     });
     step('read', seen);
     r.formula = seen;
-    for (const l of FORMULA_LINES) if (!seen.lines.includes(l)) r.problems.push(`no line ${JSON.stringify(l)} in ${JSON.stringify(seen.lines)}`);
-    if (seen.floating) r.problems.push(`${seen.floating} floating shape(s): a formula is not in its line`);
+    for (const l of FORMULA_LINES) if (!seen.lines.includes(l)) r.problems.push(`no line ${JSON.stringify(l)} in ${JSON.stringify(seen.lines)} (elements: ${seen.kinds.join(', ')})`);
+    if (seen.floating) r.problems.push(`${seen.floating} shape(s): a formula is not in its line (the paragraphs' elements: ${seen.kinds.join(', ')})`);
   } catch (e) {
     r.problems.push(String(e?.message ?? e).slice(0, 400));
   }
