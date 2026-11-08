@@ -41,8 +41,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-# Node 22.23.3 (zlib 1.3.1-e00f703), Debian bookworm, by its digest.
-NODE_IMAGE="docker.io/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392"
+# Node 22.23.4 (zlib 1.3.1-e00f703), Debian bookworm, by its digest.
+NODE_IMAGE="docker.io/library/node:22.23.4-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d"
 PLATFORM="linux/amd64"
 
 update=0
