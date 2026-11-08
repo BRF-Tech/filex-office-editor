@@ -25,6 +25,17 @@ decrypted in the browser, edited there and encrypted again before they are
 saved, so no server ever reads them ([In an encrypted folder](#in-an-encrypted-folder),
 since 0.2.0) - and edited together there too (since 0.3.0).
 
+![A Word document open in the Office editor inside filex](docs/screenshots/editing.png)
+
+More of it in filex, as the app store shows it:
+[a spreadsheet in filex's dark theme](docs/screenshots/spreadsheet-dark.png),
+[a presentation](docs/screenshots/presentation.png),
+[Print, which filex asks about first](docs/screenshots/print.png),
+[New document's six rows](docs/screenshots/new-document.png), and on a phone
+[reading](docs/screenshots/phone-reading.png) and
+[editing](docs/screenshots/phone-editing.png) - ONLYOFFICE Docs 10.0 (this
+app's 0.5.0) in filex 0.59, taken 2026-11-08.
+
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
 > have been modified. The ONLYOFFICE code it carries or builds on is
