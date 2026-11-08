@@ -49,7 +49,7 @@ app's 0.5.0) in filex 0.59, taken 2026-11-08.
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.5.0**, for filex 0.57 or later: ONLYOFFICE Docs **10.0.0**
+> **Status: 0.5.1**, for filex 0.57 or later: ONLYOFFICE Docs **10.0.0**
 > (build 10.0.0.169) - the editor files, x2t (`v10.0.0.169+1`) and the
 > office engine. On the server, filex runs the app's office engine
 > (`engine.zip`) for the conversions apps ask for and for office
@@ -74,9 +74,9 @@ app's 0.5.0) in filex 0.59, taken 2026-11-08.
 > editor's settings are kept; New document gets six rows; on a phone the
 > document opens in ONLYOFFICE's phone view to read, with "Edit". Its x2t
 > is this project's own build ([x2t, the converter](#x2t-the-converter)).
-> Measured for 0.5.0: the unit tests, x2t's round trips with the pinned
-> build, the server's Go tests with the real modules, the run in three
-> browsers ([Measured in the browsers](#measured-in-the-browsers)) and
+> Measured for 0.5.0 and 0.5.1: the unit tests, x2t's round trips with the
+> pinned build, the server's Go tests with the real modules, the run in
+> three browsers ([Measured in the browsers](#measured-in-the-browsers)) and
 > every release file built twice to the same bytes - by `scripts/release.sh
 > prepare`, then by `publish` from the signed tag in a fresh clone - with x2t
 > from two machines, one of them from an empty tree
@@ -89,8 +89,8 @@ app's 0.5.0) in filex 0.59, taken 2026-11-08.
 | | |
 |---|---|
 | Based on | ONLYOFFICE Docs 10.0.0 (build 10.0.0.169; releases 0.1.0 to 0.4.0: 9.4.0, build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.5.0 and 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
-| Release | **0.5.0** (tag `v0.5.0`): `ui.zip`, 114.9 MiB, SHA-256 `c0e94a12c5e7e476fdee0c9a1c065597a03b8fdd7a2d18255d18a0c6a9dca4f1`; `engine.zip`, the office engine filex runs on the server, 14.7 MiB, SHA-256 `164dc7d2c21e394dbb3e9d1e0b8082792a328bdc5303beca970bdf251b4d0b6b`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
+| filex | 0.5.1, 0.5.0 and 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
+| Release | **0.5.1** (tag `v0.5.1`): `ui.zip`, 114.9 MiB, SHA-256 `27e7234975c41f88c57bc7ac3948ddb8fab5276e2075ad25fe78ead128fe2dc7`; `engine.zip`, the office engine filex runs on the server, 14.7 MiB, SHA-256 `164dc7d2c21e394dbb3e9d1e0b8082792a328bdc5303beca970bdf251b4d0b6b`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
 ## Installing
@@ -99,7 +99,7 @@ Nothing else to set up: **no ONLYOFFICE Document Server**, for editing alone
 or together, nor, with filex 0.57, for conversions and office thumbnails on
 the server. In filex 0.57.0 or later, as an administrator: **Admin →
 Plugins → Apps → Install an app → GitHub repository**,
-`BRF-Tech/filex-office-editor`, tag `v0.5.0` (in filex 0.56, `v0.3.1`; in
+`BRF-Tech/filex-office-editor`, tag `v0.5.1` (in filex 0.56, `v0.3.1`; in
 filex 0.55, `v0.1.1`). filex reads `filex-app.json` at that tag, downloads
 the release's `ui.zip` and `engine.zip` and refuses each unless its SHA-256
 is the one the manifest names.
@@ -1029,6 +1029,14 @@ measured: 0.4.0's `1fce1671...`, 37,522 bytes, from Docs 9.4; 0.5.0's
 hyphenation files, each licence file one byte longer, as it names the
 release it comes from).
 
+Measured for 0.5.1 (2026-11-08, the same machine): `bash scripts/release.sh
+prepare 0.5.1 --x2t DIR` with x2t's three files taken from 0.5.0's own
+`x2t.zip` and `engine.zip` (at the pinned sums), 4.3 minutes: `ui.zip`
+120,440,087 bytes, SHA-256
+`27e7234975c41f88c57bc7ac3948ddb8fab5276e2075ad25fe78ead128fe2dc7`;
+`x2t.zip`, `engine.zip`, the dictionaries and their catalog the same bytes
+as 0.5.0's.
+
 Measured for 0.5.0 (2026-11-08, an x86-64 Linux machine): `bash
 scripts/release.sh prepare 0.5.0 --x2t DIR` in a fresh clone of the
 release's version commit, with the PC's x2t (its three files at the pinned
@@ -1416,6 +1424,14 @@ one inline event handler the policy refuses and the permissions policy's
 `favicon.ico` and a service worker it may not register; WebKit: two
 viewport keys - none of it a failed request or a step of the run.
 
+**0.5.1** (2026-11-08, the same machine and browsers, the release's tree
+after `prepare`): 39 of 39 twice in a row, each run checking the 21
+openings of the six documents and the phone app for Content Security
+Policy violations in the app's pages - none (0.5.0's bundle: one at each
+opening, api.js's empty `onmousewheel`). Print now waits for the editor to
+end the download before it (`exportsSettled`): once, Firefox printed in
+that moment and the editor refused it without a word.
+
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
 reads aside), 21 of 21:
@@ -1724,8 +1740,8 @@ put the new release in `upstream/onlyoffice.json`, run
 for filex 0.55.0 or later, **0.2.0** (2026-10-10, encrypted folders)
 and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
 0.56.0 or later, and **0.4.0** (2026-10-28, the app on a server) and
-**0.5.0** (2026-11-08, ONLYOFFICE Docs 10.0.0), for filex 0.57.0 or later,
-are what works today:
+**0.5.0** and **0.5.1** (2026-11-08, ONLYOFFICE Docs 10.0.0), for filex
+0.57.0 or later, are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,
