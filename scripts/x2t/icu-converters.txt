@@ -60,3 +60,10 @@ ibm-437_P100-1995.cnv         # IBM437, 437 (US)
 ibm-5348_P100-1997.cnv        # windows-1252 (Western European)
 ibm-5354_P100-1998.cnv        # windows-1258 (Vietnamese)
 gb18030.cnv                   # GB18030 (Chinese)
+#
+# Not a converter: the data ICU's SASLprep (RFC 4013) reads. ONLYOFFICE's
+# PDF writer runs each link's address and a PDF's password through it
+# (CUnicodeConverter::SASLprepToUtf8); without the profile and the NFKC data
+# it runs on, SASLprep failed and a PDF's links had an empty address.
+rfc4013.spp
+nfkc.nrm
