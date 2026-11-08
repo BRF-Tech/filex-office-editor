@@ -56,8 +56,8 @@
     },
     "files": {
       "x2t.js": "68296e8dba634214dae3f5a38973aa21c19477f22faf7b68413f9b11e410c780",
-      "x2t.wasm": "422b8c3fa7ccb6961ddb9b93d079cff895e5981b96c1baf48a698ee1c3f6c4f7",
-      "x2t-server.wasm": "39261ec8084c79801f7b279ac63a5fb14ab365350a18ad8c0c94081e10217249"
+      "x2t.wasm": "21eb135e8b256d5cef5a617e8851b8c4ff6dcd80841a366a6dccf1a17bf9c920",
+      "x2t-server.wasm": "d394b5c433ff82ee5e40b521782c663610b0336754f4f5ee5563935bc0dd01e2"
     },
     "url": "https://github.com/BRF-Tech/filex-office-editor/releases/download/v0.4.0/x2t.zip",
     "sha512": "851d27f158dc971516a2bd7001f34487c8da8e143a969e255f9b087880c3a0c6fa95f2bdacc31a4dfe1101e10efd3494f674c578e155118065d38dbc54fa1766",

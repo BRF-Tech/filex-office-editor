@@ -165,7 +165,9 @@ CPP
 # alias table and the tables icu-converters.txt names out of the data
 # package of the ICU release the port is built from (its sha512 pinned by
 # emscripten) and writes them as ICU's data entry point (icudt68_dat), an
-# object linked into both builds before the port's stub: 1.2 MiB.
+# object linked into both builds before the port's stub: 1.3 MiB. The list
+# also names SASLprep's data, which the PDF writer runs a link's address
+# through (without it every link of a PDF had an empty address).
 icu_data() {
   local d=$W/b/icu-data dat
   dat=$(ls "$EM_CACHE"/ports/icu/icu/source/data/in/icudt*l.dat)
