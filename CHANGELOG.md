@@ -9,6 +9,17 @@ update.
 
 ## [Unreleased]
 
+### Changed
+
+- **No Content Security Policy violation when the editor opens.** The
+  editor bundle leaves out the one line of ONLYOFFICE's `api.js` that gives
+  the editor's iframe an empty inline `onmousewheel` handler ("for Safari
+  on Mac"): filex serves an app's pages without `'unsafe-inline'`, so the
+  handler never ran, and Chromium reported a violation on every opening
+  (0.1.0 to 0.5.0). Nothing else changes; wheel scrolling measured the same
+  in WebKit and Chromium. The browser run now fails on any violation in
+  the app's pages.
+
 ## [0.5.0] - 2026-11-08
 
 For filex 0.57.0 or later, as 0.4.0, asking for the same permissions:

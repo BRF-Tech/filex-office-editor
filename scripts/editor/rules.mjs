@@ -47,7 +47,7 @@ export const APPS = ['main', 'mobile'];
  * is part of the build's input, not the clock, so two builds agree: change
  * it together with html.mjs, storage.js or the rules below.
  */
-export const CHANGES_DATED = '2026-10-16';
+export const CHANGES_DATED = '2026-11-08';
 
 /**
  * Rules, first match wins. `drop` leaves a file out (`why` is counted in the
@@ -128,6 +128,55 @@ const RULES = [
     why: 'a license file, renamed with .txt so filex serves it (content unchanged)',
   },
 ];
+
+/**
+ * Edits of a script's text, made after the rules above (on the served name):
+ * each pattern must match exactly once - an upstream release that moves or
+ * drops the line stops the build instead of passing unedited - and is
+ * replaced by `replace`. Recorded with the other changes (the lock file,
+ * filex/CHANGES.txt).
+ */
+const EDITS = [
+  {
+    // createIframe() gives the editor's iframe an empty inline handler, "for
+    // Safari on Mac". filex serves an app's pages without 'unsafe-inline', so
+    // script-src-attr refuses it in every deployment (Chromium reports the
+    // violation on each opening, measured 2026-11-08 in filex 0.59: api.js
+    // line 1345, ONLYOFFICE web-apps v10.0.0.169 apps/api/documents/api.js
+    // line 1301; 9.4 had it too); an empty handler does nothing even where it
+    // runs. Wheel scrolling over the document measured the same without it
+    // (WebKit 27.2, Chromium 158).
+    path: 'web-apps/apps/api/documents/api.js',
+    re: /^[ \t]*iframe\.setAttribute\(\s*["']onmousewheel["']\s*,\s*["']["']\s*\)\s*;[^\n]*\n/gm,
+    replace: '',
+    why: "the editor iframe's empty inline onmousewheel handler left out (filex's policy refuses inline handlers; it did nothing)",
+  },
+];
+
+/** The edits that apply to a served path. */
+export function editsFor(path) {
+  return EDITS.filter((e) => e.path === path);
+}
+
+/** Every served path an edit names (each must be in the bundle). */
+export const EDITED_PATHS = [...new Set(EDITS.map((e) => e.path))];
+
+/**
+ * editScript(path, text) → { text, changes }: `text` with this path's edits
+ * made, and why for each. Throws when an edit's pattern is not there exactly
+ * once.
+ */
+export function editScript(path, text) {
+  let out = text;
+  const changes = [];
+  for (const e of editsFor(path)) {
+    const n = (out.match(e.re) ?? []).length;
+    if (n !== 1) throw new Error(`${path}: the edit "${e.why}" matches ${n} times, not once (scripts/editor/rules.mjs EDITS)`);
+    out = out.replace(e.re, e.replace);
+    changes.push(e.why);
+  }
+  return { text: out, changes };
+}
 
 /**
  * classify(path) → { action: 'keep' } | { action: 'drop', why } |

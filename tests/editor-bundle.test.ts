@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import { diffLocks } from '../scripts/editor/bundle.mjs';
 import { inlineCodeIn, isExecutableType, transformHtml } from '../scripts/editor/html.mjs';
-import { BUDGET, FONT_EXCLUDE, LIMITS, checkBundle, classify, pathOK, servedType } from '../scripts/editor/rules.mjs';
+import { BUDGET, EDITED_PATHS, FONT_EXCLUDE, LIMITS, checkBundle, classify, editScript, pathOK, servedType } from '../scripts/editor/rules.mjs';
 import { crc32, readZip, writeZip } from '../scripts/lib/zip.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -171,6 +171,35 @@ describe('what the bundle keeps', () => {
     expect(checkBundle([{ name: 'A.js', size: 1 }, { name: 'a.js', size: 1 }], 1).join()).toMatch(/case/);
     const many = Array.from({ length: LIMITS.files + 1 }, (_, i) => ({ name: `f${i}.js`, size: 1 }));
     expect(checkBundle(many, 1).join()).toMatch(/files, over/);
+  });
+});
+
+describe("scripts edited by their text (rules.mjs EDITS)", () => {
+  const API = 'web-apps/apps/api/documents/api.js';
+  // createIframe() of ONLYOFFICE web-apps v10.0.0.169 (apps/api/documents/api.js, lines 1299-1302).
+  const createIframe = [
+    '        iframe.allowFullscreen = true;',
+    '        iframe.setAttribute("allowfullscreen",""); // for IE11',
+    '        iframe.setAttribute("onmousewheel",""); // for Safari on Mac',
+    '        iframe.setAttribute("allow", "autoplay; camera; microphone; display-capture;");',
+    '',
+  ].join('\n');
+
+  it("leaves the editor iframe's empty inline onmousewheel handler out of api.js, and nothing else", () => {
+    const r = editScript(API, createIframe);
+    expect(r.text).not.toMatch(/onmousewheel/);
+    expect(r.text).toBe(createIframe.replace('        iframe.setAttribute("onmousewheel",""); // for Safari on Mac\n', ''));
+    expect(r.changes).toEqual([expect.stringMatching(/onmousewheel/)]);
+    expect(EDITED_PATHS).toEqual([API]);
+  });
+
+  it('stops the build when the line is not there exactly once (an upstream release moved it)', () => {
+    expect(() => editScript(API, 'iframe.setAttribute("allow", "x");\n')).toThrow(/0 times/);
+    expect(() => editScript(API, createIframe + createIframe)).toThrow(/2 times/);
+  });
+
+  it('changes no other file', () => {
+    expect(editScript('web-apps/apps/api/documents/other.js', createIframe)).toEqual({ text: createIframe, changes: [] });
   });
 });
 
@@ -372,6 +401,7 @@ describe('upstream/editor.lock.json (the committed build)', () => {
     for (const editor of ['documenteditor', 'spreadsheeteditor', 'presentationeditor']) {
       expect(lock.changed[`web-apps/apps/${editor}/main/index.html`]).toMatch(/inline scripts moved/);
     }
+    expect(lock.changed['web-apps/apps/api/documents/api.js']).toMatch(/onmousewheel/);
   });
 
   it('carries this exact storage stand-in', () => {

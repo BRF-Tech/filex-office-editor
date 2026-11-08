@@ -349,15 +349,57 @@ async function storageReport(frame) {
   });
 }
 
+/**
+ * Content Security Policy violations in the app's pages. filex serves an
+ * app's pages without 'unsafe-inline' (backend/internal/wasmplugin/
+ * uipolicy.go; the harness serves the same policy): a violation is code the
+ * bundle carries that filex refuses - 0.5.0's was api.js's empty inline
+ * onmousewheel on the editor's iframe, now left out by the build
+ * (scripts/editor/rules.mjs EDITS). Each page of the context reports the
+ * securitypolicyviolation events of its frames on the console; cspIn keeps
+ * those of the package's own pages.
+ */
+const CSP_TAG = 'FXCSP ';
+async function watchCsp(ctx) {
+  await ctx.addInitScript((tag) => {
+    document.addEventListener(
+      'securitypolicyviolation',
+      (e) => {
+        let target = '';
+        try {
+          target = e.target && e.target.outerHTML ? e.target.outerHTML.slice(0, 160) : '';
+        } catch {
+          target = '';
+        }
+        console.log(tag + JSON.stringify({ page: String(location.href), directive: e.effectiveDirective, blocked: e.blockedURI, source: e.sourceFile, line: e.lineNumber, target }));
+      },
+      true,
+    );
+  }, CSP_TAG);
+}
+function collectCsp(page, into) {
+  page.on('console', (m) => {
+    const t = m.text();
+    if (t.startsWith(CSP_TAG)) into.push(JSON.parse(t.slice(CSP_TAG.length)));
+  });
+}
+function cspIn(list, server) {
+  const pkg = `${server.origin}${APP_PATH}`;
+  return list.filter((v) => String(v.page).startsWith(pkg)).map((v) => `${v.directive} ${v.blocked} at ${String(v.source).replace(pkg, '')}:${v.line} ${v.target}`.slice(0, 300));
+}
+
 async function runOne(browser, server, engine, doc, o) {
   const ext = doc.slice(doc.lastIndexOf('.') + 1);
   const tag = `${engine}-${doc.replace(/\W/g, '_')}`;
   const r = { engine, doc, ok: false, steps: [], problems: [], notes: [] };
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  await watchCsp(ctx);
   const page = await ctx.newPage();
   const requests = [];
   const failures = [];
   const consoleErrors = [];
+  const csp = [];
+  collectCsp(page, csp);
   page.on('request', (q) => requests.push(q.url()));
   page.on('response', (s) => {
     if (s.status() >= 400) failures.push(`${s.status()} ${s.url()}`);
@@ -511,8 +553,10 @@ async function runOne(browser, server, engine, doc, o) {
   r.outside = [...new Set(requests.filter((u) => !u.startsWith(pkg) && !u.startsWith('blob:') && !u.startsWith('data:') && !host.some((h) => u.startsWith(h))))];
   r.failures = [...new Set(failures)];
   r.consoleErrors = [...new Set(consoleErrors)];
+  r.csp = [...new Set(cspIn(csp, server))];
   if (r.outside.length) r.problems.push(`requests outside the package: ${r.outside.slice(0, 5).join(', ')}`);
   if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
+  if (r.csp.length) r.problems.push(`Content Security Policy violations in the app's pages: ${r.csp.slice(0, 3).join(' | ')}`);
   r.ok = r.problems.length === 0;
   await ctx.close();
   return r;
@@ -667,10 +711,13 @@ async function phoneRun(browser, server, engine, o) {
   const r = { engine, doc: 'tr.docx (phone)', ok: false, steps: [], problems: [], notes: [] };
   const tag = `${engine}-phone`;
   const ctx = await phoneContext(browser, engine);
+  await watchCsp(ctx);
   const page = await ctx.newPage();
   const failures = [];
   const requests = [];
   const consoleErrors = [];
+  const csp = [];
+  collectCsp(page, csp);
   page.on('request', (q) => requests.push(q.url()));
   page.on('response', (s) => {
     if (s.status() >= 400) failures.push(`${s.status()} ${s.url()}`);
@@ -800,8 +847,10 @@ async function phoneRun(browser, server, engine, o) {
   r.outside = [...new Set(requests.filter((u) => !u.startsWith(pkg) && !u.startsWith('blob:') && !u.startsWith('data:') && !u.startsWith('about:') && !host.some((h) => u.startsWith(h))))];
   r.failures = [...new Set(failures)];
   r.consoleErrors = [...new Set(consoleErrors)];
+  r.csp = [...new Set(cspIn(csp, server))];
   if (r.outside.length) r.problems.push(`requests outside the package: ${r.outside.slice(0, 5).join(', ')}`);
   if (r.failures.length) r.problems.push(`failed requests: ${r.failures.slice(0, 5).join(', ')}`);
+  if (r.csp.length) r.problems.push(`Content Security Policy violations in the app's pages: ${r.csp.slice(0, 3).join(' | ')}`);
   r.ok = r.problems.length === 0;
   await ctx.close();
   return r;

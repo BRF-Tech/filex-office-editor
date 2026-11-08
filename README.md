@@ -501,6 +501,15 @@ the lock file (`changed`, `added`) and in the bundle itself
   web-apps uses, a stylesheet loaded as `media="print"` and switched to
   `all` on load, becomes a plain `media="all"` stylesheet. Any other inline
   code (a handler, a `javascript:` address) stops the build.
+- **One line of `api.js` is left out** (`scripts/editor/rules.mjs`,
+  `EDITS`): `createIframe()` gives the editor's iframe an empty inline
+  `onmousewheel` handler, "for Safari on Mac". filex's policy refuses it in
+  every deployment - Chromium reported the violation on each opening - and
+  an empty handler does nothing where it runs; wheel scrolling over the
+  document measured the same without it (WebKit 27.2, Chromium 158). An
+  edit names its line by a pattern that must match exactly once, so a
+  release that moves it stops the build. The browser run fails on any
+  Content Security Policy violation in the app's pages.
 - **The storage stand-in** (`filex/storage.js`) is the first script of
   every page: in filex's sandboxed frame the browser refuses
   `localStorage`, where the editor keeps its settings; the page gets an

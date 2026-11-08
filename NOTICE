@@ -66,9 +66,9 @@ sponsored by Ascensio System SIA.
    they ship is kept.
 
    Changes this project makes to those files, by BRF Tech, 2026-10-08 to
-   2026-10-16 (each one listed with its file in upstream/editor.lock.json,
+   2026-11-08 (each one listed with its file in upstream/editor.lock.json,
    "changed" and "added", and in the bundle as filex/CHANGES.txt, which
-   dates them 2026-10-16, the last change of the rules that make them):
+   dates them 2026-11-08, the last change of the rules that make them):
      - the HTML pages of web-apps: each inline script moved, unchanged, into
        a file next to its page (index.inline-1.js, ...) and loaded from the
        same place; the stylesheet loaded as media="print" with an onload
@@ -77,7 +77,9 @@ sponsored by Ascensio System SIA.
        takes navigator.serviceWorker away where reading it throws
        (filex/storage.js, this project's own);
      - web-apps/apps/api/documents/api.js is api.js.tpl, with the cache tag
-       left as a placeholder;
+       left as a placeholder, and without the line that gives the editor's
+       iframe an empty inline onmousewheel handler (2026-11-08: filex's
+       policy refuses inline handlers, and the handler did nothing);
      - ONLYOFFICE's license/*.license files, the editors' interface
        templates (web-apps/apps/*/main/{app,lib}/template/*.template) and
        the dictionaries' files (dictionaries/<lang>/*.aff, *.dic and their

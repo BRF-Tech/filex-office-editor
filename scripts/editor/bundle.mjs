@@ -29,7 +29,7 @@ import { validatePin } from '../upstream-watch.mjs';
 import { compareNames, writeZip } from '../lib/zip.mjs';
 import { fontNotices } from './fontnames.mjs';
 import { inlineCodeIn, transformHtml } from './html.mjs';
-import { BUDGET, CHANGES_DATED, FONT_EXCLUDE, LIMITS, checkBundle, classify, isHtml, pathOK, servedType } from './rules.mjs';
+import { BUDGET, CHANGES_DATED, EDITED_PATHS, FONT_EXCLUDE, LIMITS, checkBundle, classify, editScript, isHtml, pathOK, servedType } from './rules.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', '..');
@@ -123,6 +123,18 @@ export function buildBundle({ raw, pin }) {
     if (c.action === 'rename') changed[to] = `renamed from ${rel}: ${c.why}`;
     if (!servedType(to)) throw new Error(`${rel}: filex does not serve this extension and no rule says what to do with it (scripts/editor/rules.mjs)`);
     put(to, readFileSync(path.join(raw, rel)));
+  }
+
+  // Scripts edited by their text (rules.mjs EDITS), each edit there once.
+  for (const p of EDITED_PATHS) {
+    const buf = files.get(p);
+    if (!buf) throw new Error(`${p}: an edit names it (scripts/editor/rules.mjs EDITS) and the bundle has no such file`);
+    const text = buf.toString('utf8');
+    if (!Buffer.from(text, 'utf8').equals(buf)) throw new Error(`${p}: not UTF-8; the build would change bytes it does not mean to`);
+    const r = editScript(p, text);
+    files.set(p, Buffer.from(r.text, 'utf8'));
+    const note = `${r.changes.join('; ')} (${CHANGES_DATED})`;
+    changed[p] = changed[p] ? `${changed[p]}; ${note}` : note;
   }
 
   // The HTML pages: inline code out, the storage stand-in first.
