@@ -245,13 +245,15 @@ page's run in Node on the very same files - and a fourth was lost:
   lost - a windows-1254 csv read as an empty sheet and written as `^ehir`, a
   Word 95 document's text gone. `scripts/x2t/icu-data.py` links the
   converter alias table and the 53 tables core's UnicodeConverter reaches
-  (`icu-converters.txt`) as ICU's data entry point, 1.2 MiB of the module;
+  (`icu-converters.txt`, which from 0.5.0 also names the SASLprep data a
+  PDF's links need) as ICU's data entry point, 1.3 MiB of the module;
   each decodes as with ICU's whole data. The app still turns a csv into
   UTF-8 before x2t sees it (`src/csv.ts`).
 - **A Word 95 document's paragraphs**: core `v9.4.0.129` read a Word 95
   paragraph table as Word 97's when the file says it was saved "complex";
-  two of core's own later fixes (`patches/07-doc-word95-upstream.patch`)
-  read it as the Document Server does.
+  two of core's own later fixes (`patches/07-doc-word95-upstream.patch`,
+  0.4.0) read it as the Document Server does; core `v10.0.0.169` carries
+  them itself.
 
 Measured on `+3` (2026-10-16), page and server alike: picture.doc,
 Bug47731.doc and Bug61268.doc open (above); sample.docx's PDF is the DS's
@@ -304,16 +306,20 @@ x2t has no layout of its own: a Document Server runs sdkjs, the editor's
 JavaScript, in V8 (doctrenderer) to lay the document out, and x2t turns the
 drawing into a PDF or an image. In the browser the editor is that layout. On
 a server, `server/layout/worker.js` runs the same sdkjs in **QuickJS-ng
-0.17.0** under wazero:
+0.18.0** (0.4.0: 0.17.0) under wazero:
 
 - the scripts doctrenderer loads, in its order (core
   `DesktopEditor/doctrenderer/editors.cpp`): `native.js`,
   `jquery_native.js`, `xregexp-all-min.js`, `sdk-all-min.js`, the font
-  engine, `sdk-all.js`, `AllFonts.js`, then `InitNativeEditors()`;
+  engine, `sdk-all.js`, from 10.0 `common/Charts/ChartStyles.js` and
+  `common/Drawings/Format/path-boolean-min.js`, `AllFonts.js`, then
+  `InitNativeEditors()`;
 - `native` and `CreateEmbedObject` answered as doctrenderer's embedded
   objects answer them (`embed/NativeControlEmbed.cpp`): the file, the fonts
-  (the package's web fonts, their 32-byte obfuscation undone), the images'
-  sizes, the length of the drawing (`Save_End`);
+  (the package's web fonts, their 32-byte obfuscation undone; the ones
+  asked for are the job's fonts - 9.4's `AscFonts.g_font_files` is renamed
+  in 10.0's build, `native.GetFontBinary` is not), the images' sizes, the
+  length of the drawing (`Save_End`);
 - the font engine is **`fonts_ie.js`** - FreeType and HarfBuzz compiled to
   asm.js, which doctrenderer loads when it has no native shaper (the
   bundle leaves it out; it comes from the same Document Server release, as
@@ -327,7 +333,10 @@ a server, `server/layout/worker.js` runs the same sdkjs in **QuickJS-ng
   emptied before each document, so each gets its own api, as in a new
   context, and for a sheet `AscCommon.CollaborativeEditing` too (the sheet
   api makes its own only while that is empty: a warm worker's second sheet
-  failed to open without it);
+  failed to open without it). 10.0 renames that key (`AscCommon.Be` in
+  10.0.0.169), and the bytecode keeps no source to read it from, so it is
+  the key that was empty before the worker's first sheet and holds one of
+  that sheet's api's own objects after it;
 - **`layout-host.wasm`** (`server/layout/host`): quickjs-ng with
   `compileScript`/`runBytecode`, so the worker keeps sdkjs as QuickJS
   bytecode (without the functions' source text) and does not parse it again.

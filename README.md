@@ -38,17 +38,19 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > what the app is based on, never as the name of the repository or of the
 > app (in filex it is the "Office editor").
 
-> **Status: 0.4.0**, for filex 0.57 or later. On the server, filex runs
-> the app's office engine (`engine.zip`) for the conversions apps ask for
-> and for office thumbnails, without a browser and without a Document
-> Server ([The app on a server](#the-app-on-a-server)). In the browser,
-> every kind a Document Server edits for filex opens in the editor - doc,
-> xls, ppt, rtf, csv, the templates, the macro-enabled and the flat
-> OpenDocument kinds (`src/kinds.ts`) - and a format x2t cannot write is
-> saved beside the file as OOXML; a csv keeps its delimiter and encoding, a
-> password-protected document opens with its password and stays protected,
-> spelling is checked with the dictionaries of filex's languages (43 more
-> an administrator adds with one click), macros run after the editor's
+> **Status: 0.5.0**, for filex 0.57 or later: ONLYOFFICE Docs **10.0.0**
+> (build 10.0.0.169) - the editor files, x2t (`v10.0.0.169+1`) and the
+> office engine. On the server, filex runs the app's office engine
+> (`engine.zip`) for the conversions apps ask for and for office
+> thumbnails, without a browser and without a Document Server ([The app on
+> a server](#the-app-on-a-server)). In the browser, every kind a Document
+> Server edits for filex opens in the editor - doc, xls, ppt, rtf, csv, the
+> templates, the macro-enabled and the flat OpenDocument kinds
+> (`src/kinds.ts`) - and a format x2t cannot write is saved beside the file
+> as OOXML; a csv keeps its delimiter and encoding, a password-protected
+> document opens with its password and stays protected, spelling is
+> checked with the dictionaries of filex's languages (43 more an
+> administrator adds with one click), macros run after the editor's
 > question, and a document somebody changed while it was open gets a
 > conflict copy ([docs/PARITY.md](docs/PARITY.md)). Several people edit one
 > document together through filex's relay, with the Document Server's lock
@@ -60,26 +62,21 @@ since 0.2.0) - and edited together there too (since 0.3.0).
 > Print go through filex (csv in every code page of the editor's list); the
 > editor's settings are kept; New document gets six rows; on a phone the
 > document opens in ONLYOFFICE's phone view to read, with "Edit". Its x2t
-> is this project's own build, `v9.4.0.129+4`
-> ([x2t, the converter](#x2t-the-converter)). Measured for 0.4.0: the unit
-> tests, x2t's round trips with the pinned build, the server's Go tests
-> with the real modules, filex 0.57's own checks of the release's files and
-> its test of the office engine with them
-> ([Building a release](#building-a-release),
-> [The app on a server](#the-app-on-a-server)), and the release in a real
-> filex 0.57.6, installed over 0.3.1 as an update - the engine prepared,
-> office thumbnails drawn and a conversion made with no Document Server, a
-> csv and a docx edited and saved in Chromium
-> ([Measured in filex 0.57](#measured-in-filex-057)); the run in three
-> browsers ([Measured in the browsers](#measured-in-the-browsers)) and in
-> encrypted folders ([Measured in filex 0.56](#measured-in-filex-056))
-> are 0.3.1's. On filex 0.56, install 0.3.1; on filex 0.55, 0.1.1: each
-> refuses the manifests after its own.
+> is this project's own build ([x2t, the converter](#x2t-the-converter)).
+> Measured for 0.5.0: the unit tests, x2t's round trips with the pinned
+> build, the server's Go tests with the real modules, the run in three
+> browsers ([Measured in the browsers](#measured-in-the-browsers)) and two
+> builds of every release file from empty trees
+> ([Building a release](#building-a-release)); in a real filex, 0.4.0's
+> measurement ([Measured in filex 0.57](#measured-in-filex-057)) and
+> 0.3.1's in encrypted folders ([Measured in filex 0.56](#measured-in-filex-056)).
+> On filex 0.56, install 0.3.1; on filex 0.55, 0.1.1: each refuses the
+> manifests after its own.
 
 | | |
 |---|---|
-| Based on | ONLYOFFICE Docs 9.4.0 (build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
-| filex | 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
+| Based on | ONLYOFFICE Docs 10.0.0 (build 10.0.0.169; releases 0.1.0 to 0.4.0: 9.4.0, build 9.4.0.129) by Ascensio System SIA: the editor's files (web-apps, sdkjs, fonts) from the official Document Server image, pinned by digest in [`upstream/onlyoffice.json`](upstream/onlyoffice.json); the converter, x2t, built by this project from ONLYOFFICE core at the same tag (`scripts/x2t/`, pinned under `x2t` in the same file; 0.1.0 carried CryptPad's build) - see [NOTICE](NOTICE) |
+| filex | 0.5.0 and 0.4.0: **0.57.0** or later (`"filex": ">=0.57.0"`; the office engine, the manifest's `engines.office` block, granted as `office-engine`; the dictionaries an administrator adds, `ui.extras`; file.save's `beside`, `csv` and `conflict`, FileInfo's `text_dialect`, `session.editor_lang`). filex 0.56 refuses it: there, 0.3.1 (and 0.2.0, 0.3.0: **0.56.0** or later; editing together, the `co_edit` block, granted as `files:co-edit`; encrypted folders, the `encrypted_folders` block, granted as `files:e2e-plaintext`). filex 0.55 refuses a manifest with a block it does not know: there, 0.1.1 (**0.55.0** or later) |
 | Release | **0.4.0** (tag `v0.4.0`): `ui.zip`, 119.9 MiB, SHA-256 `ef36750f8234290d7aad071a60508c31bc61d33a190fc5bcda15b14f295dd94c`; `engine.zip`, the office engine filex runs on the server, 13.0 MiB, SHA-256 `a50931b0cbd779145eade16cbd159f5b929823c84de7ea7e2daabdb8d6a79d6a`; `dictionaries.json` and its 159 `dict-*` files, the dictionaries of 43 languages for an administrator to add; `x2t.zip`, the converter alone ([Installing](#installing), [Building a release](#building-a-release)) |
 | License | **AGPL-3.0-or-later** ([LICENSE](LICENSE)); one file, `src/locks.ts`, AGPL-3.0-only ([NOTICE](NOTICE)) |
 
@@ -342,7 +339,7 @@ dictionaries - filex 0.57's.
 | File | What it does |
 |---|---|
 | `src/bridge.ts` | `OfficeBridge`: answers the editor's Document Server protocol (license, auth, authChanges, documentOpen, getLock, isSaveLock, saveChanges, unLockDocument, cursor, forceSaveStart) and turns what has to be shared into entries of the session's log; applies the log's entries, in order, to its changes, locks and participants |
-| `src/locks.ts` | The Document Server's lock rules (text, spreadsheet, presentation) and the spreadsheet's lock recalculation after inserted or deleted rows and columns, kept as Docs 9.4 has them |
+| `src/locks.ts` | The Document Server's lock rules (text, spreadsheet, presentation) and the spreadsheet's lock recalculation after inserted or deleted rows and columns, kept as Docs 9.4 has them (unchanged in 10.0) |
 | `src/shim.ts` | A `socket.io` stand-in: the editor's socket is plugged into the bridge |
 | `src/session.ts` | `LocalSession`: the session's log for one person, in the editor page, with the relay's rules (one order, changes only under the lease, the lease only for a member that has seen every change) |
 | `src/relay-session.ts` | `RelaySession`: the session when the document is edited together (filex 0.56), in the editor page - LocalSession's place in front of the bridge, the log filex's, through the app page; images go to the session before the change that shows them |
@@ -352,7 +349,7 @@ dictionaries - filex 0.57's.
 | `src/settings.ts` | Which of the editor's settings are kept between openings, and how they fit in filex's store |
 | `src/protocol.ts` | The messages and numbers both sides use |
 | `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)); editing together: `coedit-client.ts` (filex's `coedit.*`) and `together.ts` (the session, the base, the log to the editor page) |
-| `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)) |
+| `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)); `sdk.ts` and `requests.ts` find what 10.0's renamed sdkjs no longer names, or take part at the editor's own requests (its font files, an image upload) |
 | `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
 | `src/worker/x2t-worker.ts` | The converter's worker: loads x2t and converts one document at a time; when x2t stops it says so once, with why, and converts nothing more - the app page's client (`src/app/x2t-client.ts`) then starts a new one, and ends one that does not finish in time ([When x2t stops](#when-x2t-stops)) |
 | `app/` | The app page itself: `index.html` and `filex/app.css` |
@@ -367,6 +364,7 @@ dictionaries - filex 0.57's.
 | `scripts/ds-dictionaries.sh`, `scripts/pack-dictionaries.mjs` | The dictionaries a release publishes (the 43 languages of the image the bundle does not carry) and their catalog, `dictionaries.json`, which the manifest pins (`ui.extras`) |
 | `scripts/lib/zip.mjs` | A reproducible zip writer and a reader, on `node:zlib` alone |
 | `scripts/upstream-watch.mjs` | The weekly check against ONLYOFFICE's newest release ([Keeping up with ONLYOFFICE](#keeping-up-with-onlyoffice)) |
+| `scripts/release.sh`, `scripts/release-pins.mjs` | A release in one command: `prepare` builds and pins the release files, `publish` builds them again from the signed tag, holds each to its pin and publishes the GitHub Release with every asset checked ([Building a release](#building-a-release)) |
 | `tests/` | Unit tests for all of the above (vitest, in Node); `tests/x2t-wasm.test.ts` runs the real x2t build |
 | `server/` | The app on a server, in Go with wazero ([The app on a server](#the-app-on-a-server)): `x2t/` runs the server build of x2t, `layout/` lays a document out into pages with sdkjs in QuickJS (`worker.js` plays the Document Server's doctrenderer), `cmd/` the measurement commands (`x2t-run`, `office-convert`, `wasi-run`); Go tests of its own (`cd server && go test ./...`) |
 | `scripts/x2t/server/` | What the server build of x2t adds to the page's: file calls over WASI (`wasi-fs.c`) and the module's own indirect calls for setjmp/longjmp (`dyncalls.py`) |
@@ -433,26 +431,27 @@ zip is written sorted, with one date and no extra fields, by
 `scripts/lib/zip.mjs` in the pinned Node image (deflate's bytes depend on
 the zlib that makes them).
 
-Measured with ONLYOFFICE Docs 9.4.0 (build 9.4.0.129), on an x86-64 Linux
-machine (about three minutes, most of it the font and theme generators),
-after the browser measurement of 2026-10-08 (the interface templates in,
-the per-theme thumbnails out, below), with the dictionaries and the macro
-editor 0.4.0 adds (2026-10-16):
+Measured with ONLYOFFICE Docs 10.0.0 (build 10.0.0.169), on an x86-64 PC
+(WSL2) and an x86-64 Linux machine, the same `editor.zip` on both (about
+two and five minutes, most of it the font and theme generators); 9.4.0's
+numbers, where they differ, in brackets. 10.0's sdkjs is minified much
+further (property renaming, [The app](#the-app)): its six scripts are a
+third of 9.4's.
 
 | Part | Files | Unpacked (MiB) | Zipped (MiB) |
 |---|---:|---:|---:|
 | Web fonts (generated from core-fonts) | 157 | 38.5 | 19.4 |
-| sdkjs `sdk-all.js` + `sdk-all-min.js` (word, cell, slide) | 6 | 94.7 | 15.7 |
+| sdkjs `sdk-all.js` + `sdk-all-min.js` (word, cell, slide) | 6 | 31.5 (94.7) | 8.5 (15.7) |
 | Presentation themes (36) | 144 | 20.7 | 13.8 |
 | sdkjs images (font and theme thumbnails, cursors, icons) | 217 | 14.0 | 11.9 |
-| web-apps: the three editors, common, vendor, the interface templates | 969 | 34.9 | 10.0 |
-| web-apps locales (46 languages, three editors) | 138 | 43.8 | 8.3 |
-| sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.3 | 3.4 |
-| Licenses, notices, `filex/`, the three blank documents | 79 | 0.4 | 0.1 |
-| The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 743 | 22.9 | 5.5 |
+| web-apps: the three editors, common, vendor, the interface templates | 979 (969) | 35.2 (34.9) | 10.0 |
+| web-apps locales (46 languages, three editors) | 138 | 44.3 (43.8) | 8.4 (8.3) |
+| sdkjs common (font, zlib, hash, spell engines; SmartArt; charts) | 170 | 16.2 (16.3) | 3.4 |
+| Licenses, notices, `filex/`, the three blank documents | 78 (79) | 0.4 | 0.1 |
+| The three phone apps (`web-apps/apps/*/mobile`, with their pages' moved inline scripts) | 742 (743) | 23.2 (22.9) | 5.6 (5.5) |
 | The dictionaries of filex's six interface languages (`.aff`, `.dic`, `hyph_` patterns, their licences) | 46 | 52.0 | 17.6 |
 | The macro editor (`web-apps/vendor/monaco`) | 117 | 15.3 | 3.3 |
-| **The editor bundle** | **2,786** | **353.5** | **109.4** |
+| **The editor bundle** | **2,794** (2,786) | **291.4** (353.5) | **102.5** (109.4) |
 | **The app's bundle** (`ui.zip` of 0.4.0: with x2t, 38.2 MiB unpacked, and the app; built in the pinned Node image; 0.3.1's, 0.3.0's, 0.2.0's and 0.1.1's were 98.3 MiB, 0.1.0's 98.2 MiB) | **2,796** | **391.9** | **119.9** |
 
 filex's limits are 128 MiB zipped, 512 MiB unpacked, 20,000 files and
@@ -523,8 +522,9 @@ turn a docx, xlsx or pptx into the editor's format and back, and to write
 the other formats of Download as. Here it is the same program, from
 ONLYOFFICE core, compiled to WebAssembly and run in a worker (`src/x2t.ts`
 drives it). It is **this project's own build, from ONLYOFFICE core at the
-editor files' tag** - `v9.4.0.129`, commit `a016fc28` - released here as
-**`v9.4.0.129+4`** and pinned under `x2t` in
+editor files' tag** - `v10.0.0.169`, commit `76af764f` - released here as
+**`v10.0.0.169+1`** (0.4.0: `v9.4.0.129+4`, from core `v9.4.0.129`) and
+pinned under `x2t` in
 [`upstream/onlyoffice.json`](upstream/onlyoffice.json): how it is built,
 every source by its commit, and the SHA-256 of `x2t.js` and `x2t.wasm`.
 Release 0.1.0 carried CryptPad's build
@@ -554,11 +554,12 @@ says so. Every step leaves a stamp, so a build that stopped goes on from
 where it stopped; an empty `--work` builds everything. In the container:
 
 1. every source is fetched by the commit pinned in `x2t.build.sources` -
-   ONLYOFFICE core and build_tools at `v9.4.0.129`, hyphen, OpenSSL
+   ONLYOFFICE core and build_tools at `v10.0.0.169`, hyphen, OpenSSL
    1.1.1f (its headers only) - and Boost 1.84.0 by its tarball's SHA-256;
    core's own fetch scripts bring the rest of its third-party code
-   (harfbuzz, brotli, gumbo, katana, md4c, the iWork readers), each at the
-   commit it names;
+   (harfbuzz, brotli, gumbo, katana, md4c, the iWork readers and, from
+   10.0, libxml2, which up to 9.4 was in core's tree), each at the commit
+   it names;
 2. the patches in `scripts/x2t/patches/` are applied to core (below);
 3. Boost's date_time and regex and emscripten's ICU port are compiled, and
    ICU's conversion tables written as an object (below);
@@ -569,17 +570,31 @@ where it stopped; an empty `--work` builds everything. In the container:
 5. x2t is linked: `main1` exported (the page calls it with the path of a
    `params.xml`, as the Document Server calls x2t), `ccall` and the
    in-memory file system, CryptPad's `pre-js.js`. The documents it writes
-   name their application `ONLYOFFICE/9.4.0.129`, as the Document Server's
+   name their application `ONLYOFFICE/10.0.0.169`, as the Document Server's
    do (CryptPad's build wrote `ONLYOFFICE/2.5.565.0`).
 
 The recipe is CryptPad's - its Dockerfile and `embuild.sh` at commit
-`7debf5e6` - carried over to 9.4, with the libraries built in one container
-instead of a Docker stage each. The patches, each saying what it changes
-and why:
+`7debf5e6` (`v9.3.2+3`) - carried over to 9.4 and then 10.0, with the
+libraries built in one container instead of a Docker stage each. CryptPad's
+`v9.3.2+4` (commit `17bd0351`, 2026-11-03) was read for this release and
+changes nothing here: podman support in its build script, an ATTRIBUTION
+file (its tree is based on Euro-Office's copy of ONLYOFFICE core, now said
+in [NOTICE](NOTICE) too), and UnicodeConverter built with `DISABLE_ICU` for
+its issue 2432 (an exported PDF's links pointed at the file itself: x2t
+runs a link's address through ICU's SASLprep, which fails without its data,
+and writes `/URI ()`). This build keeps ICU, for its conversion tables
+(below), which `DISABLE_ICU` would take away, and carries SASLprep's data
+with them: a PDF of a document with a link keeps the link's address (0.4.0's
+did not; measured on the server's conversion, `office-convert` on a docx
+with a link, 2026-11-08). The patches, each saying what it changes and why:
 
 - `01-cryptpad-wasm.patch`: CryptPad's changes to ONLYOFFICE core for
   WebAssembly - its `core/` at tag `v9.3.0+0` against core `v9.3.0.140`,
-  the commit it was pulled from - applied to `v9.4.0.129` three-way. Kept:
+  the commit it was pulled from - applied to `v9.4.0.129` three-way, and
+  that to `v10.0.0.169` three-way (10.0 changed three places it touches:
+  doctrenderer.pri's drawingfile block and x2t's memory limit are
+  commented out as before, X2tConverter.pri keeps 10.0's block for macOS
+  and iOS). Kept:
   the build files of the libraries (emscripten's ICU instead of core's, no
   second zlib, no library linked into another twice, the text shaper on),
   doctrenderer without a JavaScript engine (CryptPad's stand-ins), two
@@ -621,9 +636,11 @@ and why:
   (and of the Document Server's sample.xlsx) stopped, and HTML to md
   stopped or looped on any HTML - in `v9.4.0.129+2` and CryptPad's builds
   alike ([docs/PARITY.md](docs/PARITY.md) A14, found with `build.sh --diag`).
-- `07-doc-word95-upstream.patch`: two of ONLYOFFICE core's own fixes to its
-  Word 97-2003 reader, made after `v9.4.0.129` (commits `507f0ae0`, "fix bug
-  #82318", and `9848afc4`, "fix bug #82612"), carried back unchanged. Core
+- `07-doc-word95-upstream.patch` (0.4.0 only; core `v10.0.0.169` carries
+  both fixes, and the patch is gone): two of ONLYOFFICE core's own fixes to
+  its Word 97-2003 reader, made after `v9.4.0.129` (commits `507f0ae0`,
+  "fix bug #82318", and `9848afc4`, "fix bug #82612"), carried back
+  unchanged. Core
   read a Word 95 document's paragraph table as Word 97's whenever the file
   says it was saved "complex", and the paragraphs came from the wrong
   places: a 96-page Word 95 document came out as one paragraph with a third
@@ -657,6 +674,22 @@ and why:
   docker's `--network none` draws the linked .docx's thumbnail as the same
   picture as the .docx without it, and writes an HTML page with a picture
   elsewhere into the same document.xml as this x2t.
+- `10-wasm-no-localipc.patch` (`v10.0.0.169+1`): the local IPC core 10.0
+  adds to kernel_network (`Common/Network/network.pro`, a loopback
+  request-response over asio sockets and `std::thread`) is left out under
+  `core_wasm`. Nothing in x2t calls it, WebAssembly here has neither its
+  sockets nor its threads, and its asio headers come from
+  socket.io-client-cpp, which only build_tools fetches.
+- `11-cfloat.patch` (`v10.0.0.169+1`): `<cfloat>` in the spreadsheet
+  reader's `SheetData.cpp`, which compares a cell's value with `DBL_MAX`;
+  with glibc another header brings it in, with emscripten's libc++ at
+  10.0 none does and DocxFormatLib stopped (measured).
+- `12-wasm-no-cmap-folder.patch` (`v10.0.0.169+1`): from 10.0
+  doctrenderer's `editors.cpp` tells the PDF editor's drawing file its CMap
+  folder, a static member of `drawingfile.cpp` - which patch 01 leaves out
+  with the JavaScript engine, so x2t's link stopped on
+  `CDrawingFile::m_sCMapFolder`. Under `__EMSCRIPTEN__` the call is left
+  out: this doctrenderer runs no scripts.
 
 And **ICU's conversion tables** (`v9.4.0.129+3`): emscripten's ICU port
 links ICU's empty data stub, so ICU converted only UTF-8, UTF-16, UTF-32 and
@@ -668,9 +701,12 @@ the code pages it opens by number - windows-125x, ISO-8859-x, KOI8, the DOS
 code pages, Shift_JIS, EUC-JP, GBK, GB18030, Big5, the Korean ones, and the
 tables those extend) out of the data package of the ICU release the port is
 built from (ICU 68.2), and writes them as ICU's data entry point, linked
-into both builds in place of the stub: 1,274,128 bytes, 683 KB of
-`x2t.zip`. Measured against ICU's whole data: each of them opens and
-decodes the same.
+into both builds in place of the stub. Measured against ICU's whole data:
+each of them opens and decodes the same. From `v10.0.0.169+1` the list also
+names the data of ICU's SASLprep (`rfc4013.spp` and the NFKC table it runs
+on, `nfkc.nrm`): x2t's PDF writer runs each link's address (and a PDF's
+password) through it, and without them every link of a PDF x2t wrote had an
+empty address. 1,342,064 bytes in all (1,274,128 before).
 
 `bash scripts/x2t/build.sh --diag` also links a page build with function
 names, emscripten's assertions and checked memory access (`SAFE_HEAP`) into
@@ -849,17 +885,47 @@ and that every file `filex-app.json` names is in it.
 
 ### Building a release
 
-A release's `ui.zip` is built from its tag with docker alone, every step
+**One command does all of what follows** (from 0.5.0), with no person in
+it - `scripts/release.sh`:
+
+```bash
+bash scripts/release.sh prepare 0.5.0 [--x2t DIR]
+#   in this checkout: every release file built into dist/ and pinned for the
+#   version (filex-app.json ui.bundle, engines.office, the dictionaries'
+#   catalog; upstream/onlyoffice.json x2t's url and SHA-512), then checked.
+#   Then, outside the script: commit, a signed tag v0.5.0, push both.
+bash scripts/release.sh publish 0.5.0 [--x2t DIR] [--work DIR] [--dry-run]
+#   a fresh clone of the tag: every file built again and held to the tag's
+#   pins - one mismatch and it stops, with nothing on GitHub - then a draft
+#   GitHub Release (title "filex-office-editor 0.5.0", the CHANGELOG
+#   section as its notes), the 163 assets uploaded, every asset read back
+#   at the SHA-256 of the file built, and only then the release published.
+```
+
+`--x2t DIR` takes `x2t.js`, `x2t.wasm` and `x2t-server.wasm` from a build
+made elsewhere (checked against the pins like the rest) instead of building
+x2t again (`X2T_BUILD_ARGS` passes `build.sh` its options, as `--cpus 4
+--jobs 4 --memory 12g`). The script never signs: the tag must be there,
+annotated, signed, on GitHub at the same object, and verify (`git
+verify-tag`; `--skip-tag-verify` on a machine without the signer's public
+key, the signature still required). publish needs `GH_TOKEN` with
+`contents: write` (or a logged-in `gh`, whose token it uses; it is never
+printed), bash, git, docker, curl and python3. The pins and the checks are
+`scripts/release-pins.mjs` (`write`, `check`, `assets`, `notes`;
+`tests/release-pins.test.ts`). 0.4.0 and the releases before it were
+uploaded by hand; 0.5.0 is the first published by the script.
+
+The steps, one by one: a release's `ui.zip` is built from its tag with docker alone, every step
 pinned - the Document Server image and the Node image by digest, the npm
 packages by `package-lock.json`, x2t by its hashes - so anyone can make the
 same bytes and compare them with `ui.bundle.sha256` in `filex-app.json`:
 
 ```bash
-git clone --branch v0.4.0 https://github.com/BRF-Tech/filex-office-editor
+git clone --branch v0.5.0 https://github.com/BRF-Tech/filex-office-editor
 cd filex-office-editor
 bash scripts/extract-editor.sh        # the editor files, checked against upstream/editor.lock.json
 docker run --rm -v "$PWD:/src" -w /src \
-  docker.io/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 \
+  docker.io/library/node:22.23.4-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d \
   sh -c 'npm ci && node scripts/fetch-x2t.mjs && node scripts/build-app.mjs'
 sha256sum dist/ui.zip                 # the value in filex-app.json
 ```
@@ -1043,9 +1109,11 @@ measured in the browser before it was written:
 | The interface templates | served as `.template.txt` (above) | `src/frame/text.ts`: the text plugin's `createXhr` setting |
 | The spell checker | an opaque origin may not start a worker from an address; the exception came inside the editor's answer to the server's auth and stopped the document from opening | `src/frame/workers.ts`: every worker from the package starts from a `blob:` address; the spell engine's with spell.wasm's place and its dictionaries' addresses - the bundle's `editor/dictionaries/`, or `extra/dictionaries/` for a language an administrator added - and the editor page's hyphenation requests go the same way |
 | The presentation themes | the editor loads `sdkjs/slide/themes//themes.js`; nginx merges the two slashes, filex refuses an empty path segment | `src/frame/themes-path.ts`: the editor is given its themes folder without the trailing slash |
-| Save while the editor hands over its changes | the editor's Save does nothing while a hand-over runs, and keeps nothing for later (sdkjs `asc_Save`); a Ctrl+S right after typing was lost | `src/frame/save-retry.ts`: the Save is kept until the editor has started it, and asked again when the editor is free |
-| Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture |
-| Download as and Print | the editor posts the document to the Document Server, which converts it and answers with an address | `src/frame/export.ts`: the editor's last step (`_downloadAsUsingServer`) goes to the app page instead, with the document, its pictures and - for PDF - the pages the editor drew and the font files it holds (read through `getFontStream`: a font the engine has taken in is only a pointer into its memory in `g_fonts_streams`, and a PDF made from those came out in a single face); the editor waits as it would for the server. The File menu's Download as lists only what x2t writes here |
+| Save while the editor hands over its changes | the editor's Save does nothing while a hand-over runs, and keeps nothing for later (sdkjs `asc_Save`); a Ctrl+S right after typing was lost | `src/frame/save-retry.ts`: the Save is kept until the editor has started it, and asked again when the editor is free; from 10.0 under each key the editor has it by (`asc_Save` and its renamed one, which the editor's own Ctrl+S calls) |
+| A reader following the others' changes (editing together) | the Document Server's license turns on the live viewer, which applies the changes as they land in fast co-editing; ONLYOFFICE 10.0's text editor turns fast co-editing off when it sets view mode (the review display "Original") | `src/frame/live-viewer.ts`: after the editor sets view mode, web-apps' choice of fast co-editing is made again - for a reader, web-apps makes it only for the live viewer |
+| Inserting a picture from the computer | the editor uploads it to the Document Server | `src/frame/images.ts`: the picture stays in the page as a `blob:` address under a new `media/` name, and goes into the next save like every other picture; from 10.0 the upload request itself is answered as the Document Server answers it (`src/frame/requests.ts`), and the editor registers the picture |
+| Download as and Print | the editor posts the document to the Document Server, which converts it and answers with an address | `src/frame/export.ts`: the editor's last step (`_downloadAsUsingServer`) goes to the app page instead, with the document, its pictures and - for PDF - the pages the editor drew and the font files it holds (read through `getFontStream`: a font the engine has taken in is only a pointer into its memory in `g_fonts_streams`, and a PDF made from those came out in a single face); the editor waits as it would for the server. The File menu's Download as lists only what x2t writes here. From 10.0 the step is found by what `downloadAs` does, and the fonts are the font files the editor fetched, read again from the package (`src/frame/requests.ts`) |
+| sdkjs's renamed internals (10.0) | ONLYOFFICE Docs 10.0 builds sdkjs with property renaming: only what it exports by a quoted name keeps its name (word's `sdk-all.js` went from 28.9 MB to 9.4 MB). `baseEditorsApi`, `_downloadAsUsingServer`, `g_oDocumentUrls`, `UploadImageFiles`, `c_oAscEncodings` and `g_font_files`, which the rows above used, are in none of 10.0.0.169's files | `src/frame/sdk.ts`: each is found by its 9.4 name first, then by what it is - the server step as the last call of the method that builds the `{c: "save"}` command (at the end of the method, or of the block word runs it in), the end of the editor's wait (`sync_EndAction`, renamed in the spreadsheet and presentation builds) as the method that sends `asc_onEndAction`, the register of the document's files by a file this page handed the editor, the encodings by their shape; what is not found is refused and said, not guessed at |
 | The editor's settings between openings | the stand-in forgets them with the page, so the "New" hints showed at every opening | `src/frame/storage.ts` watches the stand-in and reports what the editor writes; the kept settings are the app page's first word, and the editor's start waits for them (a RequireJS loader plugin holds the `socketio` module the editor's code depends on, at most 5 s) |
 | The phone app's start waits for the kept settings | the phone apps have no RequireJS, so the hold above does not reach them; they load their scripts one after another and create the editor when sdkjs has loaded | `src/frame/hold.ts`: sdkjs's scripts appended to the phone app's page wait until the kept settings are in (at most the same 5 s), then go in, in order; the page's `appendChild` is put back |
 | One person counts one | the bridge's keeper is a participant (it keeps the editor sending its changes as it makes them: an editor that thinks it is alone does not), and the editor showed "2" | the keeper's name carries a group of its own (the editor's `group<NBSP>name` form) and the editor shows only people without a group (`permissions.userInfoGroups: [""]`) |
@@ -1064,7 +1132,7 @@ the person is told).
 
 **It reads; it does not edit.** The phone apps in ONLYOFFICE's Document
 Server image are the open-source build, whose editing controller is a stub
-(`isSupportEditFeature()` returns false in all three bundles of 9.4.0.129).
+(`isSupportEditFeature()` returns false in all three bundles of 9.4.0.129 and of 10.0.0.169).
 In edit mode they show "Using the free Community version, you can open
 documents for viewing only. To access mobile web editors, a commercial
 license is required." and stay read-only: editing in the phone apps is a
@@ -1539,8 +1607,10 @@ Once a week the [upstream watch](.github/workflows/upstream-watch.yml)
 compares that with the newest release on Docker Hub. When ONLYOFFICE has
 published a newer one, it opens an issue with what changed and what an
 update involves (the lock rules in `src/locks.ts` and the protocol in
-`src/bridge.ts` are compared with the new server and sdkjs, and the phone
-apps are checked: how they load sdkjs, and that they still only read). It
+`src/bridge.ts` are compared with the new server and sdkjs, the phone
+apps are checked - how they load sdkjs, and that they still only read -
+and so are the editor page's hooks into sdkjs, which 10.0's renamed build
+showed can fail without a word, and the page layout's scripts). It
 opens one
 issue per version and never a second one, even after the first is closed;
 a version announced on GitHub whose image is not out yet waits for the
@@ -1562,8 +1632,9 @@ put the new release in `upstream/onlyoffice.json`, run
 **0.1.0** (2026-10-09) and **0.1.1** (2026-10-10, this project's own x2t),
 for filex 0.55.0 or later, **0.2.0** (2026-10-10, encrypted folders)
 and **0.3.0** and **0.3.1** (2026-10-10, editing together), for filex
-0.56.0 or later, and **0.4.0** (2026-10-28, the app on a server), for
-filex 0.57.0 or later, are what works today:
+0.56.0 or later, and **0.4.0** (2026-10-28, the app on a server) and
+**0.5.0** (2026-11-08, ONLYOFFICE Docs 10.0.0), for filex 0.57.0 or later,
+are what works today:
 
 1. The editor bundle from ONLYOFFICE's official Document Server image
    (`upstream/onlyoffice.json`), the three editors and their phone apps,

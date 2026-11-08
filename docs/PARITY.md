@@ -11,7 +11,10 @@ everything the Document Server did for filex.
   `thumb/office.go`, `server/office_engine.go`, `wasmplugin/office.go`,
   `pkg/pluginkit/officecmd`, `desktop/src/openwith.ts`), filex-convert's
   office edges (`internal/graph/edges.go`), ONLYOFFICE Docs 9.4.0.129 (the
-  image this app's files come from) and this app's 0.4.0.
+  image this app's files came from) and this app's 0.4.0. 0.5.0 moves the
+  editor files and x2t to ONLYOFFICE Docs 10.0.0.169; the rows below are
+  0.4.0's measurements unless a row says otherwise (0.5.0's own are in the
+  README, "Measured in the browsers", and in CHANGELOG.md).
 - **Measured** (2026-10-15/16): the server build of x2t and the page layout
   without a browser, both new in 0.4.0 - numbers, method and files in
   [SERVER.md](SERVER.md). The pinned Document Server image, in a throwaway

@@ -34,7 +34,8 @@ Ascensio System SIA. This project is not affiliated with, endorsed by or
 sponsored by Ascensio System SIA.
 
 1. src/locks.ts is a modified version of ONLYOFFICE Docs: the lock rules of
-   the server's DocService/sources/DocsCoServer.js (Docs 9.4.0: getLock,
+   the server's DocService/sources/DocsCoServer.js (Docs 9.4.0, compared
+   again with 10.0.0 on 2026-11-08: getLock,
    _checkLockExcel, _checkLockPresentation, compareExcelBlock,
    comparePresentationBlock, _recalcLockArray, _addRecalcIndex,
    CRecalcIndex, and the in-memory editorData's addLocksNX), translated to
@@ -46,14 +47,16 @@ sponsored by Ascensio System SIA.
 
 2. src/bridge.ts and src/protocol.ts answer the editor in the Document
    Server's protocol (the names and numbers of sdkjs common/docscoapi.js and
-   DocsCoServer.js, 9.4), so the editor runs unchanged.
+   DocsCoServer.js, 9.4, compared again with 10.0 on 2026-11-08), so the
+   editor runs unchanged.
 
 3. The editor files the bundle carries (web-apps, sdkjs, the fonts) are
    ONLYOFFICE's, taken from ONLYOFFICE's official Document Server image
    (docker.io/onlyoffice/documentserver) at the release, image tag and
-   digest pinned in upstream/onlyoffice.json - today ONLYOFFICE Docs 9.4.0,
-   build 9.4.0.129; their source is ONLYOFFICE's sdkjs and web-apps at tag
-   v9.4.0.129. scripts/extract-editor.sh builds the bundle from that image;
+   digest pinned in upstream/onlyoffice.json - today ONLYOFFICE Docs 10.0.0,
+   build 10.0.0.169 (releases 0.1.0 to 0.4.0: 9.4.0, build 9.4.0.129);
+   their source is ONLYOFFICE's sdkjs and web-apps at tag v10.0.0.169.
+   scripts/extract-editor.sh builds the bundle from that image;
    upstream/editor.lock.json lists every file in it with its SHA-256. The
    fonts are generated from ONLYOFFICE's core-fonts the way the image does
    on its first start; each font family's license files, and the notices
@@ -124,8 +127,9 @@ sponsored by Ascensio System SIA.
 
 4. The x2t WebAssembly build (x2t/x2t.js, x2t/x2t.wasm in the app's
    bundle) is ONLYOFFICE's converter, x2t, built by this project from
-   ONLYOFFICE core (https://github.com/ONLYOFFICE/core) at tag v9.4.0.129,
-   the editor files' own tag, with emscripten. scripts/x2t/ builds it
+   ONLYOFFICE core (https://github.com/ONLYOFFICE/core) at tag v10.0.0.169,
+   the editor files' own tag (releases 0.1.1 to 0.4.0: v9.4.0.129), with
+   emscripten. scripts/x2t/ builds it
    (build.sh, Dockerfile, steps.sh) and upstream/onlyoffice.json pins it
    ("x2t": every source by its commit, the toolchain by its digest, the two
    files by their SHA-256). It is a modified version of ONLYOFFICE core.
@@ -143,7 +147,10 @@ sponsored by Ascensio System SIA.
        of HtmlFile2 renamed, the FB2 converter left out, x2t's memory limit
        left out, pdf.bin read from beside the document. Ported to core
        v9.4.0.129 by BRF Tech on 2026-10-10, with the parts that do not
-       apply there left out (README.md, "x2t, the converter");
+       apply there left out, and to v10.0.0.169 on 2026-11-08 (README.md,
+       "x2t, the converter"). CryptPad's tree of that tag is based on
+       Euro-Office's copy of ONLYOFFICE core (https://github.com/Euro-Office/core;
+       CryptPad's ATTRIBUTION, from its release v9.3.2+4);
      - 02-wasm-link-flags.patch (BRF Tech, 2026-10-10): two linker flags
        emscripten's linker does not know are not passed to it, and HEIF
        pictures (libheif, not built for WebAssembly) are left out;
@@ -165,12 +172,13 @@ sponsored by Ascensio System SIA.
        it no longer runs HtmlFile2's copy, built for another layout of the
        same classes; scripts/x2t/steps.sh builds it again instead of
        leaving it out, as CryptPad's recipe did;
-     - 07-doc-word95-upstream.patch (BRF Tech, 2026-10-16): two later
-       commits of ONLYOFFICE core itself (507f0ae06b67, "fix bug #82318",
-       and 9848afc4066a, "fix bug #82612", by Ascensio System SIA), applied
-       unchanged to v9.4.0.129: the Word 97-2003 reader reads a Word 95
-       document's paragraphs, and keeps its reads of a document's pages and
-       tables inside them;
+     - 07-doc-word95-upstream.patch (BRF Tech, 2026-10-16; releases 0.4.0
+       only): two later commits of ONLYOFFICE core itself (507f0ae06b67,
+       "fix bug #82318", and 9848afc4066a, "fix bug #82612", by Ascensio
+       System SIA), applied unchanged to v9.4.0.129: the Word 97-2003
+       reader reads a Word 95 document's paragraphs, and keeps its reads of
+       a document's pages and tables inside them. Core v10.0.0.169 carries
+       both, and the patch is gone;
      - 08-cximage-png-rows.patch (BRF Tech, 2026-10-16): CxImage's PNG
        writer and reader (DesktopEditor/cximage/CxImage/ximapng.cpp, .h)
        fill a row of a picture with an alpha channel in a function of its
@@ -180,24 +188,41 @@ sponsored by Ascensio System SIA.
        FileTransporter_private.h) runs a download or an upload on the
        caller's thread and takes the branch it takes when the network is
        not allowed, so it ends at once; it waited for a thread WebAssembly
-       cannot start, forever.
+       cannot start, forever;
+     - 10-wasm-no-localipc.patch (BRF Tech, 2026-11-08): the local IPC
+       core 10.0 adds to kernel_network (Common/Network/network.pro) is
+       left out of a WebAssembly build: asio sockets and threads, called by
+       nothing in x2t;
+     - 11-cfloat.patch (BRF Tech, 2026-11-08): <cfloat> included in
+       OOXML/XlsxFormat/Worksheets/SheetData.cpp, which uses DBL_MAX; with
+       emscripten's headers nothing else includes it there;
+     - 12-wasm-no-cmap-folder.patch (BRF Tech, 2026-11-08): under
+       __EMSCRIPTEN__ doctrenderer's editors.cpp does not tell the PDF
+       editor's drawing file (drawingfile.cpp, left out with the JavaScript
+       engine) its CMap folder.
    ICU's conversion tables are linked in too (BRF Tech, 2026-10-16):
    scripts/x2t/icu-data.py takes the converter alias table and the tables
    scripts/x2t/icu-converters.txt names, unchanged, out of the data package
    of ICU 68.2 (icudt68l.dat, in the ICU release emscripten's port is built
-   from; the Unicode license) and writes them as ICU's data entry point.
+   from; the Unicode license) and writes them as ICU's data entry point;
+   from release 0.5.0 the list also names SASLprep's profile and the NFKC
+   table it runs on (BRF Tech, 2026-11-08), so a PDF's links keep their
+   address.
    The build is CryptPad's recipe (its Dockerfile and embuild.sh) carried
    over to that tag. The third-party code ONLYOFFICE core builds into x2t
    is fetched by core's own scripts at the commits they name, and keeps its
-   license (core's 3DPARTY.md); it is a part of the third-party code the
+   license (core's 3DPARTY.md) - from 10.0 libxml2 too (MIT, GNOME's
+   libxml2 at the commit Common/3dParty/libxml/fetch.py names, with core's
+   changes; up to 9.4 it was in core's tree); it is a part of the third-party code the
    Document Server's own x2t carries, whose license files travel in the
    bundle (editor/license/, editor/3rd-Party.txt). The build adds:
    Boost 1.84.0 (Boost Software License 1.0), the headers of OpenSSL
    1.1.1f (no OpenSSL code is linked), hyphen (MPL 1.1, GPL 2.0 or LGPL
    2.1) and emscripten 4.0.11's runtime, C and C++ libraries and ICU 68.2
    port (MIT, the University of Illinois/NCSA license, Apache 2.0 with the
-   LLVM exception, the Unicode license). Release 0.4.0 carries this
-   build (x2t v9.4.0.129+4); releases 0.2.0 to 0.3.1 carried it without
+   LLVM exception, the Unicode license). Release 0.5.0 carries this
+   build (x2t v10.0.0.169+1); release 0.4.0 carried it at core v9.4.0.129
+   (x2t v9.4.0.129+4); releases 0.2.0 to 0.3.1 carried it without
    patches 06 to 09 and ICU's tables (x2t v9.4.0.129+2); release
    0.1.1 carried it without 05-frame-anchor.patch either (x2t
    v9.4.0.129+1); release 0.1.0 carried CryptPad's own build of x2t
@@ -225,9 +250,10 @@ sponsored by Ascensio System SIA.
    DesktopEditor/doctrenderer, translated in part to JavaScript), so it is
    a modified version of ONLYOFFICE core. The JavaScript engine is
    QuickJS-ng (https://github.com/quickjs-ng/quickjs, MIT): its release's
-   qjs-wasi.wasm, or layout-host.wasm, quickjs-ng 0.17.0 built for WASI with
-   server/layout/host/layout-host.c (BRF Tech) by
-   server/layout/host/build.sh, which fetches its source by SHA-256;
+   qjs-wasi.wasm, or layout-host.wasm, quickjs-ng 0.18.0 (0.4.0: 0.17.0)
+   built for WASI with server/layout/host/layout-host.c (BRF Tech) by
+   server/layout/host/build.sh in wasi-sdk 34's image (wasi-libc, MIT,
+   Apache 2.0 with the LLVM exception), which fetches its source by SHA-256;
    engine.zip carries layout-host.wasm, worker.js and the two files of the
    image.
 

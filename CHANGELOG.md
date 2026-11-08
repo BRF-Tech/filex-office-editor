@@ -9,6 +9,77 @@ update.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-08
+
+For filex 0.57.0 or later, as 0.4.0, asking for the same permissions:
+installing it over 0.4.0 is an update. The editor, the converter and the
+office engine move to **ONLYOFFICE Docs 10.0.0** (build 10.0.0.169): the
+editor files from the official image `10.0.0.1`, x2t built again from
+ONLYOFFICE core at the same tag (`v10.0.0.169+1`), and the server's page
+layout running 10.0's sdkjs.
+
+### Changed
+
+- **ONLYOFFICE Docs 10.0.0** (build 10.0.0.169; 0.4.0 carried 9.4.0, build
+  9.4.0.129): the editor files from `onlyoffice/documentserver:10.0.0.1`,
+  pinned by digest, @@BUNDLE_LINE@@
+- **x2t `v10.0.0.169+1`**, in the page and on the server: ONLYOFFICE core
+  and build_tools at `v10.0.0.169`. CryptPad's changes (patch 01) are
+  carried over to 10.0; patches 02 to 06, 08 and 09 apply unchanged; patch
+  07, two of core's own later fixes to its Word 97-2003 reader, is in core
+  from 10.0 and is gone; three patches are new for 10.0 (10: the local IPC
+  10.0 adds to kernel_network is left out of WebAssembly; 11: `<cfloat>` in
+  the spreadsheet reader; 12: doctrenderer does not set the PDF editor's
+  CMap folder, whose code is not built here). libxml2, which 10.0 takes
+  out of core's tree, is fetched by core's own script at the commit it
+  names. binaryen's one-caller inlining is capped in the two links (it ran
+  for hours on 10.0's module). @@X2T_LINE@@
+- **The editor page and 10.0's sdkjs.** ONLYOFFICE 10.0 builds sdkjs with
+  property renaming: only what it exports by a quoted name keeps its name.
+  What the editor page took part in under 9.4's names - the last step of
+  Download as and Print, the register of the document's pictures (saving a
+  document with pictures, editing together), inserting a picture, the
+  encodings of the TXT and CSV dialogs, the fonts of a PDF - is found by
+  what it is (`src/frame/sdk.ts`) or done at the request the editor makes,
+  as a Document Server answers it (`src/frame/requests.ts`): the font files
+  it loads, the picture it uploads. A Save pressed while the editor is busy
+  is kept under each key the editor has its Save by (Ctrl+S calls the
+  renamed one), and the end of a Download as is found in the spreadsheet
+  and presentation builds, which rename `sync_EndAction`.
+- **The live viewer**, editing together: 10.0's text editor puts a document
+  in view mode into the review display "Original", which turns fast
+  co-editing off, and the live viewer applies the others' changes only in
+  fast co-editing - a member who may only read saw none of them. After
+  view mode is set, the editor page makes web-apps' choice of fast
+  co-editing again (`src/frame/live-viewer.ts`).
+- **The page layout on the server** loads the two scripts 10.0's
+  doctrenderer loads after `sdk-all.js` (`ChartStyles.js`,
+  `path-boolean-min.js`), and takes a PDF's fonts from the font files sdkjs
+  asks it for, and a worker's next sheet finds the sheet's renamed
+  collaborative-editing key by what it holds. `layout-host.wasm` is
+  quickjs-ng **0.18.0** (0.17.0), built with wasi-sdk 34's image (25).
+  @@ENGINE_LINE@@
+- **A release in one command**, `scripts/release.sh`: `prepare` builds every
+  release file and pins it; `publish` builds them again from the signed tag
+  in a fresh clone, stops at the first file that is not at its pin, and
+  only then makes the GitHub Release, uploads the assets and checks each one
+  on GitHub against the file built (`scripts/release-pins.mjs`). This
+  release is the first it published.
+- Building: the pinned Node image is 22.23.4 (22.23.3; the same zlib, the
+  same bytes); the development tools are esbuild 0.28.2, TypeScript 7.0.2,
+  vitest 5.1.0 and playwright-core 1.65.0, and filex's SDK
+  `@brftech/filex-app-ui` 0.59.0 (the same bridge as 0.53.0).
+
+### Fixed
+
+- **A PDF's links keep their address.** x2t runs a link's address through
+  ICU's SASLprep before it writes it into a PDF, and the ICU data x2t
+  carried held only the conversion tables: every link of a PDF x2t wrote -
+  Download as and Print in the browser, conversions on the server - had an
+  empty address (`/URI ()`; 0.4.0 too, measured with its release files).
+  The data now holds SASLprep's profile and the NFKC table it runs on
+  (`scripts/x2t/icu-converters.txt`, 66 KiB more).
+
 ## [0.4.0] - 2026-10-28
 
 For filex 0.57.0 or later, where an administrator can delete the Document
