@@ -471,6 +471,10 @@ function onWindowMessage(ev: MessageEvent): void {
   head: () => session?.head ?? 0,
   changes: () => bridge?.changeCount ?? 0,
   together: () => session instanceof RelaySession,
+  // Download as and Print waiting for the app page: until each ends, the
+  // editor holds its long action and its asc_Print returns without a word
+  // (sdkjs apiBase.js: isLongAction).
+  exports: () => pendingExports.size,
 };
 
 if (window.parent !== window) {

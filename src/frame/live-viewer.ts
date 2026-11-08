@@ -21,6 +21,9 @@
 // own asc_setViewMode; on again by hand, the changes showed). So after each
 // asc_setViewMode(true) the choice web-apps made is made again - only when it
 // chose fast co-editing, which for a reader it does only for the live viewer.
+//
+// Reported upstream: https://github.com/ONLYOFFICE/DocumentServer/issues/3900
+// (2026-11-08). When a release fixes it there, this workaround can go.
 
 import { keysOf } from './sdk';
 

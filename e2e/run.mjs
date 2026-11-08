@@ -388,6 +388,20 @@ function cspIn(list, server) {
   return list.filter((v) => String(v.page).startsWith(pkg)).map((v) => `${v.directive} ${v.blocked} at ${String(v.source).replace(pkg, '')}:${v.line} ${v.target}`.slice(0, 300));
 }
 
+/**
+ * Waits until the editor page has no Download as or Print waiting for the
+ * app page (src/frame/main.ts __fxBridge.exports). The harness has a file as
+ * soon as the app page hands it over, a moment before the editor hears the
+ * export is over; until then the editor holds its long action, and an
+ * asc_Print (or asc_DownloadAs) in that moment returns without a word
+ * (sdkjs: isLongAction) - Firefox's tr.xlsx run then waited 60 s for a
+ * print that never came (2026-11-08). A person cannot press Print then: the
+ * editor's mask is up.
+ */
+async function exportsSettled(frame) {
+  await until("the editor's last export to end", async () => (await frame.evaluate(() => (window.__fxBridge ? window.__fxBridge.exports() : 0))) === 0, 30_000);
+}
+
 async function runOne(browser, server, engine, doc, o) {
   const ext = doc.slice(doc.lastIndexOf('.') + 1);
   const tag = `${engine}-${doc.replace(/\W/g, '_')}`;
@@ -526,7 +540,9 @@ async function runOne(browser, server, engine, doc, o) {
         if (missing.length) r.problems.push(`the ${text.ext} does not hold ${JSON.stringify(missing)}`);
       }
 
-      // Print: the editor's own call, as its File menu and Ctrl+P make it.
+      // Print: the editor's own call, as its File menu and Ctrl+P make it,
+      // once the last download has ended in the editor.
+      await exportsSettled(editorFrame(page));
       await editorFrame(page).evaluate(() => {
         const api = (window.Asc && window.Asc.editor) || window.editor;
         api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
@@ -767,6 +783,7 @@ async function phoneRun(browser, server, engine, o) {
     const facts = pdfFacts(readFileSync(pdf.file));
     step('download pdf (phone app)', { bytes: pdf.size, ...facts });
     if (pdf.how !== 'download' || !facts.pdf || facts.pages < 1 || facts.fonts < 1) r.problems.push(`the phone app's PDF: ${pdf.how} ${JSON.stringify(facts)}`);
+    await exportsSettled(reader);
     await reader.evaluate(() => {
       const api = (window.Asc && window.Asc.editor) || window.editor;
       api.asc_Print(new window.Asc.asc_CDownloadOptions(null, true));
@@ -776,6 +793,7 @@ async function phoneRun(browser, server, engine, o) {
     if (printed.how !== 'print') r.problems.push(`Print in the phone app gave filex ${printed.how} ${printed.name}`);
     // A format the phone app lists that x2t does not write here: refused, and said.
     const toastsBefore = (await page.evaluate(() => window.__fx.toasts)).length;
+    await exportsSettled(reader);
     await reader.evaluate(() => {
       const T = window.Asc.c_oAscFileType;
       const api = (window.Asc && window.Asc.editor) || window.editor;
