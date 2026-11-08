@@ -9,6 +9,12 @@ update.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-08
+
+For filex 0.57.0 or later, as 0.5.0, asking for the same permissions:
+ONLYOFFICE Docs 10.0.0 and x2t `v10.0.0.169+1` as in 0.5.0, with one line
+fewer in the editor bundle.
+
 ### Changed
 
 - **No Content Security Policy violation when the editor opens.** The
@@ -19,6 +25,15 @@ update.
   (0.1.0 to 0.5.0). Nothing else changes; wheel scrolling measured the same
   in WebKit and Chromium. The browser run now fails on any violation in
   the app's pages.
+- The app store's pictures are ONLYOFFICE Docs 10.0's, in filex 0.59
+  (`docs/screenshots/`, shown in the README): 0.5.0's listing still showed
+  9.4's editor.
+- The live viewer's workaround (`src/frame/live-viewer.ts`) names its
+  upstream report, ONLYOFFICE/DocumentServer#3900, to go when a release
+  fixes it there.
+- Building: the browser run waits for the editor to end its last Download
+  as before it prints - the editor refuses a Print while one is still
+  ending (Firefox waited 60 s for a print that never came, once in a run).
 
 ## [0.5.0] - 2026-11-08
 
