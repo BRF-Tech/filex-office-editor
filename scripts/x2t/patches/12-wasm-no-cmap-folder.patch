@@ -1,0 +1,29 @@
+filex-office-editor (scripts/x2t), BRF Tech, 2026-11-08: doctrenderer's
+editors.cpp does not tell the PDF editor's drawing file its CMap folder in
+a WebAssembly build.
+
+From 10.0 (v10.0.0.169), editors.cpp, as it puts together the scripts a
+JavaScript engine would run, calls CDrawingFile::SetCMapFolder, which sets
+a static member defined in drawingfile.cpp. That file is the PDF editor's
+part of doctrenderer, which 01-cryptpad-wasm.patch leaves out with the
+JavaScript engine (doctrenderer here runs no scripts; CryptPad's stand-ins
+answer for it), so x2t's link stopped: "undefined symbol:
+CDrawingFile::m_sCMapFolder" (measured). Under __EMSCRIPTEN__ the call is
+left out; nothing in this build reads the folder.
+
+git apply reads from the first "diff --git" line on.
+
+diff --git a/DesktopEditor/doctrenderer/editors.cpp b/DesktopEditor/doctrenderer/editors.cpp
+index ea973d68..2d9dcd2a 100644
+--- a/DesktopEditor/doctrenderer/editors.cpp
++++ b/DesktopEditor/doctrenderer/editors.cpp
+@@ -115,7 +115,9 @@ namespace NSDoctRenderer
+ #endif
+ 
+ 			std::wstring sCachePath = L"";
++#ifndef __EMSCRIPTEN__
+ 			CDrawingFile::SetCMapFolder(config->m_strSdkPath + L"/pdf/src/engine");
++#endif
+ 
+ 			switch (type)
+ 			{
