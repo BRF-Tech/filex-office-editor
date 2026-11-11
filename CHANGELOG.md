@@ -9,6 +9,34 @@ update.
 
 ## [Unreleased]
 
+For filex 0.57.0 or later, as 0.5.1, asking for the same permissions:
+ONLYOFFICE Docs 10.0.0 and x2t `v10.0.0.169+1` as in 0.5.1.
+
+### Changed
+
+- **"About this editor" in place of the line under the editor.** The
+  notice ONLYOFFICE's terms ask for (based on ONLYOFFICE Docs by Ascensio
+  System SIA, this version may have been modified, the Docs version and
+  source tag, the AGPL and the source at this version's tag, the trademark
+  line) no longer runs along the bottom of every opening: it is behind a
+  small round ⓘ button in the corner of the editor - bottom left, over the
+  empty foot of ONLYOFFICE's left menu, in all three editors, folded or
+  not; on a phone at the right end of the footer, beside "Edit". The button
+  is there at every opening, in both themes, and is the first thing Tab
+  reaches; a click, Enter or Space opens the notice whole, Escape or the
+  close button closes it. filex's sandbox lets the app's page open no tab,
+  so a click on the source link puts it on the clipboard through filex and
+  the panel says so. The notice's words are 0.5.1's, in English and
+  Turkish; the editor's own About is not touched.
+- The pictures in the README and the app store show the button in place of
+  the line.
+- Building: the browser run checks the button at every opening (shown,
+  named, its colours apart enough, over no control of the editor's; on a
+  phone in the footer) and, once per browser on a computer and a phone, in
+  light and dark, its panel: the first Tab, Enter, the whole notice, the
+  link and its copy, Escape, Space and the close button (`aboutRun`); the
+  harness answers `clipboard.write`.
+
 ## [0.5.1] - 2026-11-08
 
 For filex 0.57.0 or later, as 0.5.0, asking for the same permissions:

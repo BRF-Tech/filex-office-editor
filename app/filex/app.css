@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later
    Copyright (C) 2026 BRF Tech. Part of filex-office-editor (see README.md and NOTICE).
-   The app page around ONLYOFFICE's editor: the editor fills it, a thin line
-   at the bottom says whose work the editor is. Colours are filex's (the SDK
-   puts --fe-* on <html>), with plain fallbacks. */
+   The app page around ONLYOFFICE's editor: the editor fills it; a small
+   "About this editor" button in its corner opens the notice that says whose
+   work the editor is (src/app/about.ts). Colours are filex's (the SDK puts
+   --fe-* on <html>), with plain fallbacks. */
 html, body {
   margin: 0;
   height: 100%;
@@ -16,6 +17,7 @@ html[data-theme="dark"] {
   color: var(--fe-text, #e6e6e6);
 }
 #fx-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -36,12 +38,19 @@ html[data-theme="dark"] {
   border: 0;
   display: block;
 }
+/* The footer is a phone's only (main.ts puts data-fx-phone on <html>):
+   "Edit" / "Reading view" on the left, the About button on the right. */
 #fx-foot {
+  display: none;
+}
+html[data-fx-phone] #fx-foot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  min-height: 44px;
+  padding-right: 44px;
   border-top: 1px solid var(--fe-border, rgba(127, 127, 127, 0.25));
 }
 #fx-switch {
@@ -72,21 +81,141 @@ html[data-theme="dark"] {
   outline: 2px solid var(--fe-accent, #2f6feb);
   outline-offset: 2px;
 }
-#fx-legal {
-  flex: 1 1 auto;
-  min-width: 0;
+/* "About this editor" (src/app/about.ts): at every opening, in the editor's
+   bottom-left corner - over the empty foot of ONLYOFFICE's left menu, above
+   the status bar, in all three editors, folded or not - and on a phone at
+   the right end of the footer, off the document. Above the editor and the
+   opening message; never hidden. */
+#fx-about {
+  position: absolute;
+  z-index: 3;
+  left: 8px;
+  bottom: 40px;
+  box-sizing: border-box;
+  inline-size: 26px;
+  block-size: 26px;
   margin: 0;
-  padding: 3px 10px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--fe-text-muted, #6e7781);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--fe-border, rgba(127, 127, 127, 0.45));
+  border-radius: 50%;
+  background: var(--fe-bg, #fff);
+  color: var(--fe-text-muted, #57606a);
+  cursor: pointer;
+}
+html[data-theme="dark"] #fx-about {
+  background: var(--fe-bg, #1b1b1f);
+  color: var(--fe-text-muted, #a5adb6);
+}
+html[data-fx-phone] #fx-about {
+  left: auto;
+  right: 9px;
+  bottom: 9px;
+}
+#fx-about:hover, #fx-about[aria-expanded="true"] {
+  color: var(--fe-accent, #2f6feb);
+  border-color: var(--fe-accent, #2f6feb);
+}
+#fx-about:focus-visible {
+  outline: 2px solid var(--fe-accent, #2f6feb);
+  outline-offset: 2px;
+}
+#fx-about svg {
+  display: block;
+}
+/* The notice, whole, above the button. */
+#fx-about-panel {
+  position: absolute;
+  z-index: 4;
+  left: 8px;
+  bottom: 74px;
+  box-sizing: border-box;
+  inline-size: min(30em, calc(100% - 16px));
+  max-block-size: calc(100% - 90px);
+  overflow: auto;
+  padding: 10px 12px 12px 14px;
+  border: 1px solid var(--fe-border, rgba(127, 127, 127, 0.45));
+  border-radius: 8px;
+  background: var(--fe-bg, #fff);
+  color: var(--fe-text, #1f2328);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+html[data-theme="dark"] #fx-about-panel {
+  background: var(--fe-bg, #1b1b1f);
+  color: var(--fe-text, #e6e6e6);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+html[data-fx-phone] #fx-about-panel {
+  left: 8px;
+  right: 8px;
+  bottom: 52px;
+  inline-size: auto;
+  max-block-size: calc(100% - 64px);
+}
+#fx-about-panel[hidden] {
+  display: none;
+}
+#fx-about-panel:focus {
+  outline: none;
+}
+#fx-about-panel:focus-visible {
+  outline: 2px solid var(--fe-accent, #2f6feb);
+  outline-offset: 2px;
+}
+.fx-about-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#fx-about-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+#fx-about-close {
+  flex: 0 0 auto;
+  inline-size: 30px;
+  block-size: 30px;
+  margin: 0 -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 20px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+#fx-about-close:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+#fx-about-close:focus-visible {
+  outline: 2px solid var(--fe-accent, #2f6feb);
+  outline-offset: 1px;
+}
+#fx-about-text {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
   user-select: text;
 }
-#fx-legal:hover, #fx-legal:focus-within {
-  white-space: normal;
+#fx-about-text a {
+  color: var(--fe-accent, #2f6feb);
+  text-decoration: underline;
+}
+#fx-about-text a:focus-visible {
+  outline: 2px solid var(--fe-accent, #2f6feb);
+  outline-offset: 1px;
+}
+#fx-about-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fe-text-muted, #57606a);
+}
+#fx-about-note:empty {
+  display: none;
 }
 #fx-status {
   position: absolute;

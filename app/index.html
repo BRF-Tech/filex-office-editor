@@ -10,11 +10,17 @@
 </head>
 <body>
 <main id="fx-shell">
+  <button id="fx-about" type="button" aria-label="About this editor" title="About this editor" aria-haspopup="dialog" aria-expanded="false" aria-controls="fx-about-panel"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.15" fill="currentColor"/><path d="M10 9.1v5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+  <section id="fx-about-panel" role="dialog" aria-labelledby="fx-about-title" tabindex="-1" hidden>
+    <div class="fx-about-head"><h2 id="fx-about-title">About this editor</h2><button id="fx-about-close" type="button" aria-label="Close" title="Close">&times;</button></div>
+    <p id="fx-about-text"></p>
+    <p id="fx-about-note" role="status" aria-live="polite"></p>
+  </section>
   <div id="fx-editor-box"><div id="fx-editor"></div></div>
   <div id="fx-status" role="status" aria-live="polite"><div class="fx-spin" aria-hidden="true"></div><p id="fx-status-text"></p>
     <form id="fx-password" hidden><label id="fx-password-label" for="fx-password-input"></label><input id="fx-password-input" type="password" autocomplete="off"><span class="fx-password-buttons"><button id="fx-password-open" type="submit"></button><button id="fx-password-cancel" type="button"></button></span></form>
   </div>
-  <footer id="fx-foot"><button id="fx-switch" type="button" hidden></button><p id="fx-legal"></p></footer>
+  <footer id="fx-foot"><button id="fx-switch" type="button" hidden></button></footer>
 </main>
 </body>
 </html>

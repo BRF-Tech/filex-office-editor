@@ -60,13 +60,22 @@
 //     "unsaved changes" while the other may save, and when one leaves the
 //     other counts one again; a document x2t stops on, opened together,
 //     stays "failed" and its member leaves the session (togetherRun);
+//   - "About this editor", the notice ONLYOFFICE's terms ask for (src/app/about.ts):
+//     at every opening above, the button in the corner of the editor - shown,
+//     named, its colours apart enough, over no control of the editor's (on a
+//     phone in the footer, off the frame) - and no line under the editor;
+//     once per engine, light and dark, on a computer and a phone (aboutRun):
+//     the first Tab reaches it, Enter or a tap opens the notice whole with
+//     the source link at this version's tag, a click on the link opens no
+//     page and puts it on filex's clipboard (said in the panel), Escape and
+//     the close button close it;
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
 // chromium firefox webkit), node scripts/build-app.mjs and
 // node e2e/make-docs.mjs. Writes dist/e2e-report.json; exit 1 on a failure.
 //
-//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted] [--no-together]
+//   node e2e/run.mjs [--engines chromium,firefox,webkit] [--docs blank.docx,...] [--shots] [--keep] [--no-settings] [--no-phone] [--no-formula] [--no-stop] [--no-encrypted] [--no-together] [--no-about]
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -123,6 +132,7 @@ function args(argv) {
     stop: true,
     encrypted: true,
     together: true,
+    about: true,
     frameAncestors: process.env.FX_FRAME_ANCESTORS === 'star',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -137,6 +147,7 @@ function args(argv) {
     else if (a === '--no-stop') o.stop = false;
     else if (a === '--no-encrypted') o.encrypted = false;
     else if (a === '--no-together') o.together = false;
+    else if (a === '--no-about') o.about = false;
     else throw new Error(`unknown argument ${a}`);
   }
   return o;
@@ -439,6 +450,9 @@ async function runOne(browser, server, engine, doc, o) {
       return ph === 'ready';
     }, OPEN_MS);
     step('opened');
+    const about = await aboutChecks(page, editorFrame(page), { phone: false });
+    r.about = about.facts;
+    r.problems.push(...about.problems);
     r.phases = {
       app: await appFrame(page).evaluate(() => window.__fxPhases || []),
       editor: await editorFrame(page).evaluate(() => window.__fxPhases || []),
@@ -762,6 +776,10 @@ async function phoneRun(browser, server, engine, o) {
     step('opened (phone app)');
     const reader = phoneFrame(page);
     if (!reader) throw new Error("the phone app's page is not the editor's frame");
+    await sleep(1000);
+    const about = await aboutChecks(page, reader, { phone: true });
+    r.about = about.facts;
+    r.problems.push(...about.problems);
     const words = await reader.evaluate(() => document.body.innerText || '');
     if (/Community version|commercial license/i.test(words)) r.problems.push('the phone app shows its open-source licence message');
     const app = appFrame(page);
@@ -871,6 +889,271 @@ async function phoneRun(browser, server, engine, o) {
   if (r.csp.length) r.problems.push(`Content Security Policy violations in the app's pages: ${r.csp.slice(0, 3).join(' | ')}`);
   r.ok = r.problems.length === 0;
   await ctx.close();
+  return r;
+}
+
+// ---------------------------------------------------------------------------
+// "About this editor" (src/app/about.ts): the notice ONLYOFFICE's terms ask
+// for, behind a button in the corner of the editor, at every opening.
+// ---------------------------------------------------------------------------
+
+/** What the notice says in Turkish for this build (src/app/strings.ts tr.legal, the facts from upstream/onlyoffice.json and package.json). */
+const LEGAL_TR = (() => {
+  const pin = JSON.parse(readFileSync(path.join(ROOT, 'upstream', 'onlyoffice.json'), 'utf8'));
+  const version = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const repo = 'github.com/BRF-Tech/filex-office-editor';
+  const source = /^\d+\.\d+\.\d+$/.test(version) && version !== '0.0.0' ? `${repo}/tree/v${version}` : repo;
+  const build = Number(String(pin.build).split('.').pop());
+  return {
+    source,
+    text:
+      `Ascensio System SIA'nın ONLYOFFICE Docs'una dayanır; bu sürüm değiştirilmiş olabilir (Docs ${pin.version}, yapı ${build}, ONLYOFFICE kaynak etiketi ${pin.source_tag}). ` +
+      `GNU AGPL sürüm 3 ile lisanslı özgür yazılımdır; kaynak kodu: ${source}. ` +
+      "ONLYOFFICE®, Ascensio System SIA'nın tescilli markasıdır; bu uygulama onunla bağlantılı değildir ve onun tarafından onaylanmamıştır.",
+  };
+})();
+const ABOUT_LABEL_TR = 'Bu düzenleyici hakkında';
+
+/** WCAG's contrast ratio of two CSS colours ("rgb(...)" / "rgba(...)", alpha ignored). */
+function contrast(a, b) {
+  const lum = (c) => {
+    const [r, g, bl] = (String(c).match(/[\d.]+/g) ?? ['0', '0', '0']).slice(0, 3).map((v) => {
+      const s = Number(v) / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100;
+}
+
+/**
+ * The button at this opening: there, never hidden, named in the person's
+ * language, inside the page, nothing over it, its colours apart enough
+ * (WCAG 1.4.11: 3:1) - and over nothing of the editor's that does
+ * something: on a computer the editor frame's elements under five points of
+ * it are no control and not the document; on a phone it is beside the frame
+ * (the footer). No line under the editor. `editor`: the frame of the editor
+ * (or the phone app) on screen.
+ */
+async function aboutChecks(page, editor, { phone }) {
+  const problems = [];
+  const a = appFrame(page);
+  const f = await a.evaluate(() => {
+    const b = document.getElementById('fx-about');
+    if (!b) return null;
+    const q = b.getBoundingClientRect();
+    const cs = getComputedStyle(b);
+    const frame = document.querySelector('#fx-editor-box iframe');
+    const fr = frame ? frame.getBoundingClientRect() : null;
+    const top = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2);
+    const foot = document.getElementById('fx-foot');
+    return {
+      hidden: b.hidden,
+      label: b.getAttribute('aria-label'),
+      rect: { x: q.x, y: q.y, w: q.width, h: q.height },
+      display: cs.display,
+      visibility: cs.visibility,
+      opacity: cs.opacity,
+      color: cs.color,
+      background: cs.backgroundColor,
+      viewport: { w: innerWidth, h: innerHeight },
+      onTop: !!(top && top.closest('#fx-about')),
+      line: !!document.getElementById('fx-legal'),
+      foot: foot ? getComputedStyle(foot).display : null,
+      frame: fr ? { x: fr.x, y: fr.y, w: fr.width, h: fr.height } : null,
+    };
+  });
+  if (!f) return { problems: ['no "About this editor" button'], facts: null };
+  const r = f.rect;
+  if (f.hidden || f.display === 'none' || f.visibility !== 'visible' || Number(f.opacity) < 1) problems.push(`the About button is not shown: ${JSON.stringify(f)}`);
+  if (f.label !== ABOUT_LABEL_TR) problems.push(`the About button is named ${JSON.stringify(f.label)}`);
+  if (r.w < 20 || r.h < 20 || r.x < 0 || r.y < 0 || r.x + r.w > f.viewport.w || r.y + r.h > f.viewport.h) problems.push(`the About button is not inside the page: ${JSON.stringify(r)}`);
+  if (!f.onTop) problems.push('something of the app page covers the About button');
+  if (f.line) problems.push('the line under the editor (#fx-legal) is still there');
+  if (f.foot !== (phone ? 'flex' : 'none')) problems.push(`the footer is ${f.foot} ${phone ? 'on a phone' : 'on a computer'}`);
+  const ratio = contrast(f.color, f.background);
+  if (ratio < 3) problems.push(`the About button's icon and its ground are ${ratio}:1 apart (${f.color} on ${f.background})`);
+  let under = [];
+  const fr = f.frame;
+  const overlaps = fr && r.x < fr.x + fr.w && r.x + r.w > fr.x && r.y < fr.y + fr.h && r.y + r.h > fr.y;
+  if (phone) {
+    if (overlaps) problems.push(`on a phone the About button is over the editor's frame: ${JSON.stringify({ button: r, frame: fr })}`);
+  } else if (!fr || !editor) {
+    problems.push("no editor frame to measure the About button's place against");
+  } else {
+    const pts = [
+      [r.x + r.w / 2, r.y + r.h / 2],
+      [r.x + 2, r.y + 2],
+      [r.x + r.w - 2, r.y + 2],
+      [r.x + 2, r.y + r.h - 2],
+      [r.x + r.w - 2, r.y + r.h - 2],
+    ].map(([x, y]) => ({ x: x - fr.x, y: y - fr.y }));
+    under = await editor.evaluate((list) => {
+      const name = (e) => `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${typeof e.className === 'string' && e.className.trim() ? `.${e.className.trim().split(/\s+/).slice(0, 2).join('.')}` : ''}`;
+      return list.map(({ x, y }) => {
+        const e = document.elementFromPoint(x, y);
+        if (!e) return { at: [x, y], el: null, control: false };
+        const path = [];
+        for (let n = e; n && n !== document.body && path.length < 4; n = n.parentElement) path.push(name(n));
+        const control = !!e.closest(
+          'button, a, input, select, textarea, label, canvas, [role="button"], [role="tab"], [role="menuitem"], [role="checkbox"], [onclick], .btn, .btn-category, #editor_sdk, #ws-canvas-outer, #id_main, #id_viewer',
+        );
+        return { at: [Math.round(x), Math.round(y)], el: path.join(' < '), control };
+      });
+    }, pts);
+    const hit = under.filter((u) => u.control || !u.el);
+    if (hit.length) problems.push(`the About button is over the editor's ${hit.map((u) => u.el ?? 'nothing').join(', ')}`);
+  }
+  return { problems, facts: { ...f, contrast: ratio, under } };
+}
+
+/** The panel as it is now (the notice, its link, what it said, where the focus is). */
+async function aboutPanel(page) {
+  return appFrame(page).evaluate(() => {
+    const p = document.getElementById('fx-about-panel');
+    const b = document.getElementById('fx-about');
+    const link = document.querySelector('#fx-about-text a');
+    const q = p.getBoundingClientRect();
+    const cs = getComputedStyle(p);
+    return {
+      open: !p.hidden && cs.display !== 'none',
+      expanded: b.getAttribute('aria-expanded'),
+      focus: document.activeElement ? document.activeElement.id || document.activeElement.tagName : null,
+      title: document.getElementById('fx-about-title').textContent,
+      text: document.getElementById('fx-about-text').textContent,
+      link: link ? { href: link.href, text: link.textContent, color: getComputedStyle(link).color } : null,
+      note: document.getElementById('fx-about-note').textContent,
+      rect: { x: q.x, y: q.y, w: q.width, h: q.height },
+      viewport: { w: innerWidth, h: innerHeight },
+      color: cs.color,
+      background: cs.backgroundColor,
+    };
+  });
+}
+
+/**
+ * Once per engine, in four openings of tr.docx - a computer (1280 x 800) and
+ * a phone (390 x 844), light and dark - the button (aboutChecks), and its
+ * panel: opened from the keyboard on a computer (the first Tab from filex's
+ * page reaches the button, Enter opens) and by a tap on a phone; the notice
+ * whole, in Turkish, with this build's facts, the source at this version's
+ * tag as a link; a click on the link opens nothing (filex's sandbox may open
+ * no tab) and puts the link on filex's clipboard, which the panel says;
+ * Escape closes and gives the focus back to the button; Space opens it
+ * again and its close button closes it. On a phone after "Edit" the button
+ * is still in the footer, off the folded editor.
+ */
+async function aboutRun(browser, server, engine, o) {
+  const r = { engine, doc: 'tr.docx (About this editor)', ok: false, steps: [], problems: [], notes: [], views: {} };
+  const t0 = Date.now();
+  const step = (name, extra) => r.steps.push({ name, ms: Date.now() - t0, ...(extra ?? {}) });
+  const views = [
+    { name: 'computer-light', phone: false, theme: 'light' },
+    { name: 'computer-dark', phone: false, theme: 'dark' },
+    { name: 'phone-light', phone: true, theme: 'light' },
+    { name: 'phone-dark', phone: true, theme: 'dark' },
+  ];
+  for (const v of views) {
+    const ctx = v.phone ? await phoneContext(browser, engine, v.theme) : await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: v.theme });
+    const page = await ctx.newPage();
+    const tag = `${engine}-about-${v.name}`;
+    const said = (p) => r.problems.push(`${v.name}: ${p}`);
+    const shot = async (what) => {
+      if (!o.shots) return;
+      mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+      await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${engine}-about-${v.name}-${what}.png`) });
+    };
+    try {
+      await page.goto(`${server.origin}/?doc=tr.docx&locale=tr&theme=${v.theme}&tag=${tag}`);
+      await viewReady(page, v.phone ? 'reader' : 'editor');
+      // The phone app's "loading" layer stays a moment after the document is ready.
+      await sleep(v.phone ? 1500 : 500);
+      const c = await aboutChecks(page, v.phone ? phoneFrame(page) : editorFrame(page), { phone: v.phone });
+      r.views[v.name] = { button: c.facts };
+      c.problems.forEach(said);
+      await shot('closed');
+      const a = appFrame(page);
+
+      // Open it: the keyboard on a computer, a tap on a phone.
+      if (v.phone) {
+        await a.locator('#fx-about').click();
+      } else {
+        await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+        await page.keyboard.press('Tab');
+        const first = await a.evaluate(() => (document.activeElement ? document.activeElement.id : null));
+        r.views[v.name].firstTab = first;
+        if (first !== 'fx-about') said(`the first Tab from filex's page reached ${JSON.stringify(first)}, not the About button`);
+        await a.locator('#fx-about').focus();
+        await page.keyboard.press('Enter');
+      }
+      await until('the About panel to open', async () => (await aboutPanel(page)).open, 5000);
+      const p = await aboutPanel(page);
+      r.views[v.name].panel = p;
+      step(`${v.name}: panel open`);
+      if (p.expanded !== 'true') said(`aria-expanded is ${p.expanded} while the panel is open`);
+      if (!v.phone && p.focus !== 'fx-about-panel') said(`the focus is on ${p.focus}, not the panel`);
+      if (p.title !== ABOUT_LABEL_TR) said(`the panel is titled ${JSON.stringify(p.title)}`);
+      if (p.text !== LEGAL_TR.text) said(`the panel's notice differs from the notice: ${JSON.stringify(p.text)}`);
+      if (!p.link || p.link.href !== `https://${LEGAL_TR.source}` || p.link.text !== LEGAL_TR.source) said(`the source link is ${JSON.stringify(p.link)}`);
+      const pr = p.rect;
+      if (pr.x < 0 || pr.y < 0 || pr.x + pr.w > p.viewport.w + 0.5 || pr.y + pr.h > p.viewport.h + 0.5) said(`the panel is not inside the page: ${JSON.stringify(pr)}`);
+      const textRatio = contrast(p.color, p.background);
+      const linkRatio = p.link ? contrast(p.link.color, p.background) : 0;
+      r.views[v.name].panelContrast = { text: textRatio, link: linkRatio };
+      if (textRatio < 4.5 || linkRatio < 4.5) said(`the panel's text is ${textRatio}:1 and its link ${linkRatio}:1 from its ground`);
+      await shot('open');
+
+      // The link: nothing opens, filex's clipboard gets it, the panel says so.
+      const pagesBefore = ctx.pages().length;
+      await a.locator('#fx-about-text a').click();
+      await until('the link to reach the clipboard', async () => (await page.evaluate(() => window.__fx.clipboard.length)) > 0, 5000);
+      const clip = await page.evaluate(() => window.__fx.clipboard.slice());
+      const note = (await aboutPanel(page)).note;
+      r.views[v.name].clipboard = clip;
+      r.views[v.name].note = note;
+      if (clip[clip.length - 1] !== `https://${LEGAL_TR.source}`) said(`the clipboard got ${JSON.stringify(clip)}`);
+      if (!/kopyalandı/.test(note)) said(`after the copy the panel says ${JSON.stringify(note)}`);
+      await sleep(500);
+      if (ctx.pages().length !== pagesBefore) said('the link opened a page');
+      if ((await a.evaluate(() => document.documentElement.dataset.fxPhase)) !== 'ready') said('the app page left its document after the link');
+      await shot('copied');
+
+      // Escape closes, the focus is back on the button; Space opens; the close button closes.
+      if (!v.phone) {
+        await page.keyboard.press('Escape');
+        const shut = await aboutPanel(page);
+        if (shut.open || shut.expanded !== 'false' || shut.focus !== 'fx-about') said(`after Escape: open ${shut.open}, aria-expanded ${shut.expanded}, focus ${shut.focus}`);
+        await page.keyboard.press('Space');
+        if (!(await aboutPanel(page)).open) said('Space on the button did not open the panel');
+        if ((await aboutPanel(page)).note !== '') said('the panel opened again still saying what the link did');
+      }
+      await a.locator('#fx-about-close').click();
+      const closed = await aboutPanel(page);
+      if (closed.open || closed.expanded !== 'false') said(`the close button left the panel open ${closed.open}, aria-expanded ${closed.expanded}`);
+
+      if (v.phone) {
+        // "Edit": the folded editor; the button stays in the footer, off it.
+        await a.locator('#fx-switch').click();
+        await viewReady(page, 'editor');
+        await sleep(1000);
+        const e = await aboutChecks(page, editorFrame(page), { phone: true });
+        r.views[v.name].afterEdit = e.facts;
+        e.problems.forEach((x) => said(`after Edit: ${x}`));
+        await shot('edit');
+      }
+    } catch (e) {
+      said(String(e?.message ?? e).slice(0, 400));
+      try {
+        mkdirSync(path.join(DIST, 'e2e-shots'), { recursive: true });
+        await page.screenshot({ path: path.join(DIST, 'e2e-shots', `${tag}-FAILED.png`) });
+      } catch {
+        /* the page is gone */
+      }
+    }
+    await ctx.close();
+  }
+  r.ok = r.problems.length === 0;
   return r;
 }
 
@@ -1375,6 +1658,11 @@ async function main() {
       }
       if (o.together) {
         const r = await togetherRun(browser, server, engine, o);
+        report.results.push(r);
+        console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
+      }
+      if (o.about) {
+        const r = await aboutRun(browser, server, engine, o);
         report.results.push(r);
         console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${engine} ${r.doc}${r.ok ? '' : `: ${r.problems.join('; ')}`}`);
       }

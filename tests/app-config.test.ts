@@ -122,7 +122,7 @@ describe('languages', () => {
     expect(editorLocale('', 'tr')).toEqual({ lang: 'tr', region: 'tr-TR' });
   });
 
-  it('the legal line names ONLYOFFICE, says the version is modified, and where the source is - in both languages', () => {
+  it('the notice (behind "About this editor", about.test.ts) names ONLYOFFICE, says the version is modified, and where the source is - in both languages', () => {
     const o = { version: '9.4.0', build: 129, tag: 'v9.4.0.129', app: '0.1.0' };
     for (const t of [STRINGS.en, STRINGS.tr]) {
       const line = t.legal(o);

@@ -48,7 +48,17 @@ export interface Strings {
   changeRefused: (code: string) => string;
   /** The notice ONLYOFFICE's terms ask for: whose work it is, that it is modified, where the source is. */
   legal: (o: LegalFacts) => string;
+  /** The button in the corner of the editor that opens the notice (about.ts), and its panel's title. */
   legalLabel: string;
+  /** The panel's close button. */
+  close: string;
+  /**
+   * The source link, clicked in filex: filex's sandbox opens no new tab
+   * from the app's page, so the link went to the clipboard (filex's
+   * clipboard.write) - or could not.
+   */
+  sourceCopied: string;
+  sourceCopyFailed: string;
   /** A save of a format x2t cannot write (doc, xls, ppt...) went beside the file, under the name filex chose. */
   savedBeside: (name: string) => string;
   /** Someone changed the file since it was opened: the save went beside it as a conflict copy, as a Document Server's does. */
@@ -117,6 +127,9 @@ export const STRINGS: Record<UiLang, Strings> = {
       `Free software under the GNU AGPL version 3; source code: ${sourceOf(o.app)}. ` +
       'ONLYOFFICE® is a registered trademark of Ascensio System SIA; this app is not affiliated with or endorsed by it.',
     legalLabel: 'About this editor',
+    close: 'Close',
+    sourceCopied: 'The link was copied: paste it into a new tab to open the source code.',
+    sourceCopyFailed: 'The link could not be copied; copy the address above to open the source code.',
     savedBeside: (name) => `This format cannot be written back, so your changes were saved beside it as ${name}; the original file is unchanged.`,
     savedConflict: (name) => `Someone changed this file after you opened it, so your version was saved beside it as ${name}; theirs is unchanged.`,
     passwordPrompt: 'This document is protected with a password. Enter it to open the document.',
@@ -162,6 +175,9 @@ export const STRINGS: Record<UiLang, Strings> = {
       `GNU AGPL sürüm 3 ile lisanslı özgür yazılımdır; kaynak kodu: ${sourceOf(o.app)}. ` +
       "ONLYOFFICE®, Ascensio System SIA'nın tescilli markasıdır; bu uygulama onunla bağlantılı değildir ve onun tarafından onaylanmamıştır.",
     legalLabel: 'Bu düzenleyici hakkında',
+    close: 'Kapat',
+    sourceCopied: 'Bağlantı kopyalandı: kaynak kodunu açmak için yeni bir sekmeye yapıştırın.',
+    sourceCopyFailed: 'Bağlantı kopyalanamadı; kaynak kodunu açmak için yukarıdaki adresi kopyalayın.',
     savedBeside: (name) => `Bu biçim geri yazılamıyor, bu yüzden değişiklikleriniz yanına ${name} olarak kaydedildi; özgün dosya değişmedi.`,
     savedConflict: (name) => `Bu dosya siz açtıktan sonra başka biri tarafından değiştirildi, bu yüzden sizin sürümünüz yanına ${name} olarak kaydedildi; onunki değişmedi.`,
     passwordPrompt: 'Bu belge parolayla korunuyor. Açmak için parolasını girin.',

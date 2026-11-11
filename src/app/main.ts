@@ -65,9 +65,10 @@ import {
 import { adaptOpaqueOrigin } from '../origin';
 import { SETTINGS_KEY, readSettings, sameSettings, type Settings } from '../settings';
 import { NARROW_PX, editorConfig, encryptedNotHanded, isPhone, kindOf, saveRefusal, uiLang, type EncryptionInfo, type Kind, type View } from './config';
+import { legalParts } from './about';
 import { coeditApi } from './coedit-client';
 import { openOptions, saveExtra, saveOptions, saveTarget, wantsPassword, type OpenedDocument } from './document';
-import { STRINGS, type Strings } from './strings';
+import { STRINGS, type LegalFacts, type Strings } from './strings';
 import { Together, joinSession } from './together';
 import { X2tClient, X2tFailure, X2tRefusal, type Converted } from './x2t-client';
 import { CANVAS } from '../kinds';
@@ -195,10 +196,81 @@ function askPassword(t: Strings, wrong: boolean): Promise<string | null> {
   });
 }
 
-function setLegal(t: Strings): void {
-  const box = el('fx-legal');
-  box.setAttribute('aria-label', t.legalLabel);
-  box.textContent = t.legal({ version: __OO_BUILD__.version, build: __OO_BUILD__.number, tag: __OO_SOURCE_TAG__, app: __APP_VERSION__ });
+// ---------------------------------------------------------------------------
+// "About this editor": the notice ONLYOFFICE's terms ask for (about.ts)
+// ---------------------------------------------------------------------------
+
+const LEGAL_FACTS: LegalFacts = { version: __OO_BUILD__.version, build: __OO_BUILD__.number, tag: __OO_SOURCE_TAG__, app: __APP_VERSION__ };
+
+/** The words the panel speaks now, and filex's clipboard (null outside filex: the link then opens as links do). */
+let about: { t: Strings; copy: ((text: string) => Promise<void>) | null } | null = null;
+
+/**
+ * The button in the corner of the editor (index.html #fx-about) and its
+ * panel, in the person's language: the notice whole, the source a link. The
+ * button is there at every opening and is never hidden; a click, Enter or
+ * Space opens the panel, Escape or its close button closes it.
+ *
+ * In filex the app's page is a sandbox that may open no tab (`sandbox
+ * allow-scripts`, no allow-popups): a click on the link puts it on the
+ * clipboard through filex (clipboard.write, the person's call) and says so.
+ */
+function setLegal(t: Strings, copy: ((text: string) => Promise<void>) | null = null): void {
+  const first = about === null;
+  about = { t, copy };
+  const button = el('fx-about');
+  button.setAttribute('aria-label', t.legalLabel);
+  button.title = t.legalLabel;
+  el('fx-about-title').textContent = t.legalLabel;
+  const close = el('fx-about-close');
+  close.setAttribute('aria-label', t.close);
+  close.title = t.close;
+  el('fx-about-text').replaceChildren(
+    ...legalParts(t, LEGAL_FACTS).map((p) => {
+      if (!p.href) return document.createTextNode(p.text);
+      const a = document.createElement('a');
+      a.href = p.href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = p.text;
+      return a;
+    }),
+  );
+  el('fx-about-note').textContent = '';
+  if (first) wireAbout();
+}
+
+function wireAbout(): void {
+  const button = el('fx-about');
+  const panel = el('fx-about-panel');
+  const note = el('fx-about-note');
+  const show = (open: boolean): void => {
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    if (open) {
+      note.textContent = '';
+      panel.focus();
+    } else {
+      button.focus();
+    }
+  };
+  button.addEventListener('click', () => show(panel.hidden !== false));
+  el('fx-about-close').addEventListener('click', () => show(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || panel.hidden) return;
+    e.preventDefault();
+    show(false);
+  });
+  el('fx-about-text').addEventListener('click', (e) => {
+    const a = (e.target as Element | null)?.closest?.('a');
+    const now = about;
+    if (!a || !now?.copy) return;
+    e.preventDefault();
+    now.copy(a.href).then(
+      () => (note.textContent = now.t.sourceCopied),
+      () => (note.textContent = now.t.sourceCopyFailed),
+    );
+  });
 }
 
 function loadScript(src: string): Promise<void> {
@@ -654,7 +726,7 @@ async function main(): Promise<void> {
   phase('connected');
   const s = fx.session;
   const t = STRINGS[uiLang(s.locale)];
-  setLegal(t);
+  setLegal(t, (text) => fx.copy(text));
   const info = s.files?.[0];
   const kind = kindOf(info?.ext);
   if (!info || !kind) {
@@ -697,6 +769,9 @@ async function main(): Promise<void> {
     coarsePointer: typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
     touchPoints: typeof navigator.maxTouchPoints === 'number' ? navigator.maxTouchPoints : 0,
   });
+  // A phone has the footer ("Edit" / "Reading view"), and "About this editor"
+  // at its right end, off the document (app.css).
+  if (phone) document.documentElement.dataset.fxPhone = '';
 
   // The editor's kept settings: the editor page holds the editor's start for them.
   fx.state

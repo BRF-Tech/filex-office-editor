@@ -33,8 +33,10 @@ More of it in filex, as the app store shows it:
 [Print, which filex asks about first](docs/screenshots/print.png),
 [New document's six rows](docs/screenshots/new-document.png), and on a phone
 [reading](docs/screenshots/phone-reading.png) and
-[editing](docs/screenshots/phone-editing.png) - ONLYOFFICE Docs 10.0 (this
-app's 0.5.0) in filex 0.59, taken 2026-11-08.
+[editing](docs/screenshots/phone-editing.png), and
+[the notice behind "About this editor"](docs/screenshots/about.png) -
+ONLYOFFICE Docs 10.0 in filex 0.59: this app's 0.5.2, taken 2026-11-11
+(Print and New document: 0.5.0, 2026-11-08, the same since).
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -361,7 +363,7 @@ dictionaries - filex 0.57's.
 | `src/formats.ts` | What Download as and Print can make here: the formats x2t writes, by the editor's file type, the encodings it writes a txt or csv in, and what was measured to be left out |
 | `src/settings.ts` | Which of the editor's settings are kept between openings, and how they fit in filex's store |
 | `src/protocol.ts` | The messages and numbers both sides use |
-| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice ([The app](#the-app)); editing together: `coedit-client.ts` (filex's `coedit.*`) and `together.ts` (the session, the base, the log to the editor page) |
+| `src/app/` | The app page (`index.html`'s script): filex's SDK, x2t's worker client, the editor's configuration (`config.ts`: the editor, folded or not, or the phone app), saving, the switch between the phone app and the editor, the legal notice behind "About this editor" (`about.ts`, [The app](#the-app)); editing together: `coedit-client.ts` (filex's `coedit.*`) and `together.ts` (the session, the base, the log to the editor page) |
 | `src/frame/` | The editor page's script, served in place of `web-apps/vendor/socketio/socket.io.min.js`: the shim, the bridge and the session, Download as and Print (`export.ts`), the storage watcher (`storage.ts`), the phone app's wait for the kept settings (`hold.ts`), and the few things the editor needs under filex's sandbox ([The app](#the-app)); `sdk.ts` and `requests.ts` find what 10.0's renamed sdkjs no longer names, or take part at the editor's own requests (its font files, an image upload) |
 | `src/frame-protocol.ts`, `src/origin.ts` | What the two pages say to each other; the editor's messages under opaque origins |
 | `src/worker/x2t-worker.ts` | The converter's worker: loads x2t and converts one document at a time; when x2t stops it says so once, with why, and converts nothing more - the app page's client (`src/app/x2t-client.ts`) then starts a new one, and ends one that does not finish in time ([When x2t stops](#when-x2t-stops)) |
@@ -1119,8 +1121,9 @@ same `editor.zip` as the lock file (`ce74fb00...e3be116`); about two minutes
 each. The app's build alone, run again on the final tree, gave the same
 bytes in the pinned Node image (22.23.3) and in Playwright's image (Node
 24.14.1, the same zlib, 1.3.1-e00f703); deflate's bytes follow the zlib. The release attaches that `ui.zip`; the repository does not carry it.
-The bundle names its version in the legal line under the editor, so a
-release's source is the tag the line links to.
+The bundle names its version in the legal notice (behind "About this
+editor" in the corner of the editor), so a release's source is the tag the
+notice links to.
 
 Under filex both pages of the app are sandboxed, each an opaque origin of
 its own (`sandbox allow-scripts`): neither can reach into the other, a
@@ -1168,11 +1171,22 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    (`state.set`, under one key, at most 8 KiB, `src/settings.ts`) a moment
    after the editor writes them, and given back at the next opening. The
    theme is not kept: filex decides it.
-8. It shows, under the editor, the notice ONLYOFFICE's terms ask for: based
-   on ONLYOFFICE Docs by Ascensio System SIA, this version may have been
-   modified, the Docs version and ONLYOFFICE's source tag, the AGPL and this
-   repository at the app's tag, the trademark line. The editor's own About
-   is not touched.
+8. **"About this editor"** (ⓘ, `src/app/about.ts`): a small round button
+   in the corner of the editor's frame - bottom left, over the empty foot
+   of ONLYOFFICE's left menu above the status bar, in all three editors,
+   folded or not; on a phone at the right end of the footer, beside "Edit" -
+   there at every opening, in both themes, never hidden and never put away.
+   It is the first thing Tab reaches in the app's page; a click, Enter or
+   Space opens a panel with the notice ONLYOFFICE's terms ask for, whole:
+   based on ONLYOFFICE Docs by Ascensio System SIA, this version may have
+   been modified, the Docs version and ONLYOFFICE's source tag, the AGPL and
+   this repository at the app's tag (a link), the trademark line. Escape or
+   the panel's close button closes it. filex's sandbox lets the app's page
+   open no tab, so a click on the link puts it on the clipboard (filex's
+   `clipboard.write`) and the panel says so; the address is in the text to
+   copy as well. Until 0.5.1 the notice was a line under the editor. The
+   editor's own About is not touched
+   ([the panel, open](docs/screenshots/about.png)).
 
 **The editor page** is ONLYOFFICE's, as it ships. Its script
 (`src/frame/main.ts`) is served at the address the editor page loads
@@ -1218,8 +1232,8 @@ license is required." and stay read-only: editing in the phone apps is a
 commercial ONLYOFFICE feature, not in the open-source code. So the app
 opens them in view mode, and for editing:
 
-- **"Edit"**, under the phone app (the app page's own button, next to the
-  legal line), replaces it with the editor - the desktop one, folded as on
+- **"Edit"**, under the phone app (the app page's own button, in the footer
+  with "About this editor" at its other end), replaces it with the editor - the desktop one, folded as on
   any narrow screen: the ribbon shows its tabs only (a tap opens one), no
   rulers, the side panel closed, at the person's zoom (measured at 390 px
   before the phone apps came in: a page fitted to the width is drawn at
@@ -1363,7 +1377,7 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
 
 ## Measured in the browsers
 
-The run below imitates filex 0.55 and 0.56 and last measured 0.5.0; what
+The run below imitates filex 0.55 and 0.56 and last measured 0.5.2; what
 0.4.0 adds for filex 0.57 (saving beside, csv, passwords, the dictionaries,
 conflict copies, the fixed editor language) is measured by the unit tests
 and x2t's round trips, not by this run yet.
@@ -1403,6 +1417,23 @@ page went away (its event stream closed and not opened again within 5 s),
 as filex drops one it has not heard from for 45 s. Last, a document x2t
 stops on is opened together: the opening stays "failed" with the app's
 message and no editor, and its member leaves the session it started.
+At every opening of the documents and the phone app it also finds
+"About this editor" (from 0.5.2): shown and named in the person's language,
+nothing over it, its icon 3:1 or more from its ground, and over no control
+of the editor's - the elements of the editor's page under five points of
+it are none of the editor's buttons, inputs or document (in all three
+editors: the empty foot of the left menu) - on a phone in the footer, off
+the frame; and no line under the editor. Once per browser (`aboutRun`), on
+a computer and on a phone, in light and dark: the first Tab from filex's
+page reaches the button, Enter (a tap on a phone) opens the panel with the
+notice whole - the Turkish words of `strings.ts` with this build's Docs
+version, build, source tag and the source at the version's tag as a link -
+its text and link 4.5:1 or more from its ground; a click on the link opens
+no page and hands the address to filex's clipboard (`clipboard.write`, which
+the harness answers as filex does), and the panel says so; Escape closes it
+and gives the focus back to the button, Space opens it again, the close
+button closes it; on a phone, after "Edit", the button is still in the
+footer.
 
 **0.5.0, with ONLYOFFICE Docs 10.0** (2026-11-08; the branch's bundle
 built in the pinned Node image with x2t `v10.0.0.169+1`, run on Linux in
@@ -1431,6 +1462,17 @@ Policy violations in the app's pages - none (0.5.0's bundle: one at each
 opening, api.js's empty `onmousewheel`). Print now waits for the editor to
 end the download before it (`exportsSettled`): once, Firefox printed in
 that moment and the editor refused it without a word.
+
+**0.5.2, "About this editor"** (2026-11-11, before the release: 0.5.1's
+`ui.zip` with this tree's app page built over it, on Linux in Playwright
+1.65.0's image, Chromium 158.0.8127.18, Firefox 159.0, WebKit 27.2): 42 of
+42 in 450 seconds - the 39 above and `aboutRun` in each browser. In all
+three editors the elements under the button were the left menu's
+(`#view-left-menu .tool-menu-btns`), none of its buttons; the first Tab
+from filex's page reached the button in each browser; the icon was 5.25:1
+from its ground in light and 5.97:1 in dark, the panel's text 15.8:1 and
+15.2:1, its link 5.2:1 and 5.8:1. The same run against 0.5.1's page: 0 of
+3 (no button). The release's own run repeats it on the release's build.
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file
@@ -1803,8 +1845,9 @@ installed as an app, never built into the filex binary or image.
 Whoever serves this app serves its source with it: the editor's "About"
 stays as ONLYOFFICE wrote it, and the app shows a legal notice that names
 ONLYOFFICE as the original developer, says this version may have been
-modified, and links to this repository at the exact tag it was built from
-([NOTICE](NOTICE)).
+modified, and links to this repository at the exact tag it was built from -
+behind "About this editor", a button in the corner of the editor at every
+opening ([The app](#the-app), [NOTICE](NOTICE)).
 
 The ONLYOFFICE code is Copyright © Ascensio System SIA, licensed under the
 GNU AGPL version 3 with the additional terms of its section 7. ONLYOFFICE®

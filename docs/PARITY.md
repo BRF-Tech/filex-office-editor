@@ -134,5 +134,5 @@ Legend: **yes** - as the Document Server does it; **part** - some of it;
 
 | What | DS | App | 0.57 |
 |---|---|---|---|
-| Licence | AGPL-3.0, a separate container | AGPL-3.0-or-later (one file AGPL-3.0-only), an installed app, its legal line under the editor | A13 |
+| Licence | AGPL-3.0, a separate container | AGPL-3.0-or-later (one file AGPL-3.0-only), an installed app, its legal notice behind "About this editor" in the corner of the editor | A13 |
 | Third-party parts | the DS's own | NOTICE: ONLYOFFICE's files, CryptPad's x2t recipe, now the server build (item 5), the layout and QuickJS-ng (item 6) and the dictionaries' licences, which travel with them | - |
