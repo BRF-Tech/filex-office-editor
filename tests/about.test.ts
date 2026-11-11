@@ -4,9 +4,10 @@
 // The notice ONLYOFFICE's terms ask for (src/app/strings.ts legal), behind
 // the "About this editor" button in the corner of the editor's frame
 // (app/index.html, app/filex/app.css, src/app/about.ts): the button is there
-// at every opening, reachable by keyboard, and opens the notice whole, with
-// the source as a link. No line under the editor any more. What the browser
-// draws is measured by e2e/run.mjs (aboutRun).
+// at every opening, reachable by keyboard, and opens the notice whole, the
+// source address in it as plain text to select and copy - no link, nothing
+// on a click (from 0.5.3). No line under the editor any more. What the
+// browser draws is measured by e2e/run.mjs (aboutRun).
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,30 +43,24 @@ function rulesOf(selector: string): string {
 const FACTS = { version: '10.0.0', build: 169, tag: 'v10.0.0.169', app: '0.5.2' };
 
 describe('the notice behind "About this editor"', () => {
-  it('is the notice, whole and unchanged, with the source as a link - in both languages', () => {
+  it('is the notice, whole and unchanged, the source address in it as plain text - in both languages', () => {
     for (const t of [STRINGS.en, STRINGS.tr]) {
       for (const o of [FACTS, { ...FACTS, app: '0.0.0' }]) {
         const parts = legalParts(t, o);
         expect(parts.map((p) => p.text).join('')).toBe(t.legal(o));
-        const links = parts.filter((p) => p.href);
-        expect(links).toEqual([{ text: sourceOf(o.app), href: `https://${sourceOf(o.app)}` }]);
+        expect(parts.filter((p) => p.source)).toEqual([{ text: sourceOf(o.app), source: true }]);
+        // No run carries an address to open.
+        for (const p of parts) expect(p).not.toHaveProperty('href');
       }
     }
-    expect(legalParts(STRINGS.en, FACTS).find((p) => p.href)?.href).toBe('https://github.com/BRF-Tech/filex-office-editor/tree/v0.5.2');
+    expect(legalParts(STRINGS.en, FACTS).find((p) => p.source)?.text).toBe('github.com/BRF-Tech/filex-office-editor/tree/v0.5.2');
   });
 
-  it('is named "About this editor" / "Bu düzenleyici hakkında", and its panel says how the link is opened', () => {
+  it('is named "About this editor" / "Bu düzenleyici hakkında", and its panel has a close button', () => {
     expect(STRINGS.en.legalLabel).toBe('About this editor');
     expect(STRINGS.tr.legalLabel).toBe('Bu düzenleyici hakkında');
-    for (const t of [STRINGS.en, STRINGS.tr]) {
-      expect(t.close.length).toBeGreaterThan(0);
-      expect(t.sourceCopied).toMatch(/\S/);
-      expect(t.sourceCopyFailed).toMatch(/\S/);
-    }
+    for (const t of [STRINGS.en, STRINGS.tr]) expect(t.close.length).toBeGreaterThan(0);
     expect(STRINGS.tr.close).toBe('Kapat');
-    // The app's Turkish words carry their own letters, and no long dash.
-    for (const s of [STRINGS.tr.sourceCopied, STRINGS.tr.sourceCopyFailed]) expect(s).not.toMatch(/[—–]/);
-    expect(STRINGS.tr.sourceCopied).toMatch(/[ğıüşöç]/);
   });
 });
 
@@ -94,7 +89,7 @@ describe('the app page: a button in the corner of the editor, no line under it',
     expect(main).not.toMatch(/fx-about'\)\.hidden\s*=\s*true/);
   });
 
-  it('opens a panel that holds the notice, a close button and a line for what the link did', () => {
+  it('opens a panel that holds the notice and a close button', () => {
     const p = tagOf('fx-about-panel');
     expect(p).toMatch(/\brole="dialog"/);
     expect(p).toMatch(/\baria-labelledby="fx-about-title"/);
@@ -103,7 +98,29 @@ describe('the app page: a button in the corner of the editor, no line under it',
     expect(tagOf('fx-about-title')).not.toBeNull();
     expect(tagOf('fx-about-text')).not.toBeNull();
     expect(tagOf('fx-about-close')).toMatch(/^<button\b[^>]*\btype="button"/);
-    expect(tagOf('fx-about-note')).toMatch(/\brole="status"/);
+  });
+
+  it('shows the source address as plain, selectable text: no link, nothing on a click, nothing through filex', () => {
+    // No link in the page, none made for the panel, and no click handler on the notice.
+    expect(html).not.toMatch(/<a\b/i);
+    expect(main).not.toMatch(/createElement\(\s*['"]a['"]\s*\)/);
+    expect(main).not.toMatch(/fx-about-text'\)\.addEventListener/);
+    // Nothing goes to filex's clipboard, nothing asks filex to open a page, and nothing in the panel says what a click did.
+    expect(main).not.toMatch(/\.copy\(|clipboard\.write|ui\.open/);
+    expect(tagOf('fx-about-note')).toBeNull();
+    for (const t of [STRINGS.en, STRINGS.tr]) {
+      expect(t).not.toHaveProperty('sourceCopied');
+      expect(t).not.toHaveProperty('sourceCopyFailed');
+    }
+    // The address: a run of its own, selectable, set apart in a monospace face, with nothing that says "click".
+    expect(main).toMatch(/fx-about-source/);
+    expect(css).not.toMatch(/#fx-about-text a\b/);
+    expect(css).not.toMatch(/user-select:\s*none/);
+    expect(rulesOf('#fx-about-text')).toMatch(/user-select:\s*text/);
+    const s = rulesOf('.fx-about-source');
+    expect(s).toMatch(/user-select:\s*text/);
+    expect(s).toMatch(/font-family:[^;]*monospace/);
+    expect(s).not.toMatch(/cursor:\s*pointer|text-decoration:\s*underline/);
   });
 
   it('draws the button in both themes, above the editor and the opening message, with a focus ring', () => {

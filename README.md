@@ -36,7 +36,8 @@ More of it in filex, as the app store shows it:
 [editing](docs/screenshots/phone-editing.png), and
 [the notice behind "About this editor"](docs/screenshots/about.png) -
 ONLYOFFICE Docs 10.0 in filex 0.59: this app's 0.5.2, taken 2026-11-11
-(Print and New document: 0.5.0, 2026-11-08, the same since).
+(the notice: 0.5.3, the same day; Print and New document: 0.5.0,
+2026-11-08, the same since).
 
 > **ONLYOFFICE.** This app is based on ONLYOFFICE Docs by Ascensio System
 > SIA, the original developer of the editor it runs, and this version may
@@ -1180,12 +1181,13 @@ its own (`sandbox allow-scripts`): neither can reach into the other, a
    Space opens a panel with the notice ONLYOFFICE's terms ask for, whole:
    based on ONLYOFFICE Docs by Ascensio System SIA, this version may have
    been modified, the Docs version and ONLYOFFICE's source tag, the AGPL and
-   this repository at the app's tag (a link), the trademark line. Escape or
-   the panel's close button closes it. filex's sandbox lets the app's page
-   open no tab, so a click on the link puts it on the clipboard (filex's
-   `clipboard.write`) and the panel says so; the address is in the text to
-   copy as well. Until 0.5.1 the notice was a line under the editor. The
-   editor's own About is not touched
+   the address of this repository at the app's tag, the trademark line.
+   Escape or the panel's close button closes it. The address is plain text,
+   not a link: filex's sandbox lets the app's page open no tab, so it is
+   set apart in a monospace face for the person to select, copy and open
+   where they like, and a click on it does nothing (0.5.2 put it on the
+   clipboard through filex instead). Until 0.5.1 the notice was a line
+   under the editor. The editor's own About is not touched
    ([the panel, open](docs/screenshots/about.png)).
 
 **The editor page** is ONLYOFFICE's, as it ships. Its script
@@ -1377,7 +1379,7 @@ gives filex, row by row: [docs/PARITY.md](docs/PARITY.md)):
 
 ## Measured in the browsers
 
-The run below imitates filex 0.55 and 0.56 and last measured 0.5.2; what
+The run below imitates filex 0.55 and 0.56 and last measured 0.5.3; what
 0.4.0 adds for filex 0.57 (saving beside, csv, passwords, the dictionaries,
 conflict copies, the fixed editor language) is measured by the unit tests
 and x2t's round trips, not by this run yet.
@@ -1427,13 +1429,14 @@ the frame; and no line under the editor. Once per browser (`aboutRun`), on
 a computer and on a phone, in light and dark: the first Tab from filex's
 page reaches the button, Enter (a tap on a phone) opens the panel with the
 notice whole - the Turkish words of `strings.ts` with this build's Docs
-version, build, source tag and the source at the version's tag as a link -
-its text and link 4.5:1 or more from its ground; a click on the link opens
-no page and hands the address to filex's clipboard (`clipboard.write`, which
-the harness answers as filex does), and the panel says so; Escape closes it
-and gives the focus back to the button, Space opens it again, the close
-button closes it; on a phone, after "Edit", the button is still in the
-footer.
+version, build, source tag and the address of the source at the version's
+tag - its text and the address 4.5:1 or more from their ground; the address
+plain text (from 0.5.3): no link anywhere in the panel, set apart in a
+monospace face, no hand pointer and no underline, selectable on it and
+around it; a click on it opens no page and asks filex for nothing, and a
+drag across it with the mouse selects it, whole; Escape closes it and gives
+the focus back to the button, Space opens it again, the close button closes
+it; on a phone, after "Edit", the button is still in the footer.
 
 **0.5.0, with ONLYOFFICE Docs 10.0** (2026-11-08; the branch's bundle
 built in the pinned Node image with x2t `v10.0.0.169+1`, run on Linux in
@@ -1473,6 +1476,24 @@ from filex's page reached the button in each browser; the icon was 5.25:1
 from its ground in light and 5.97:1 in dark, the panel's text 15.8:1 and
 15.2:1, its link 5.2:1 and 5.8:1. The same run against 0.5.1's page: 0 of
 3 (no button). The release's own run repeats it on the release's build.
+
+**0.5.3, the source address as plain text** (2026-11-11, before the
+release: 0.5.2's `ui.zip` with this tree's app page built over it - the
+same build of 0.5.2's own tree gives 0.5.2's `filex/app.js` but for one
+path comment - on Linux in Playwright 1.65.0's image, the same browsers;
+`--docs tr.docx`, the opening and `aboutRun` in each browser): in all
+twelve views the panel held no link, the address was a monospace run of
+its own with user-select `text` (none on it or around it), a text cursor
+and no underline, 13.49:1 from its ground in light and 12.81:1 in dark
+(the panel's text 15.8:1 and 15.16:1); a click on it asked filex for
+nothing and opened no page, and a drag across it selected exactly the
+address, on the phone views as well. The same run against 0.5.2's page
+fails in every view (a link in the panel, and a click on it asks for
+`clipboard.write`). In that short run, on both pages alike, WebKit's first
+Tab from the host page landed on no element of the app page on a
+computer; the release's full run (0.5.2: 42 of 42) has it reach the
+button. In a throwaway filex 0.59.1 the panel shows the address as text
+and a drag selects it (the README's picture).
 
 Measured on 2026-10-08 (Playwright 1.59: Chromium 147.0.7727.15, Firefox
 148.0.2, WebKit 26.4; Windows, headless; the harness's own page and file

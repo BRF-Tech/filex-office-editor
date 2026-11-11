@@ -66,9 +66,9 @@
 //     phone in the footer, off the frame) - and no line under the editor;
 //     once per engine, light and dark, on a computer and a phone (aboutRun):
 //     the first Tab reaches it, Enter or a tap opens the notice whole with
-//     the source link at this version's tag, a click on the link opens no
-//     page and puts it on filex's clipboard (said in the panel), Escape and
-//     the close button close it;
+//     the source address at this version's tag as plain text - no link, a
+//     click on it opens no page and asks filex for nothing, a drag across it
+//     selects it - Escape and the close button close it;
 //   - screenshots at 1280 and 390 px, light and dark, and on a phone (--shots).
 //
 // Needs playwright-core and its browsers (npx playwright-core install
@@ -927,6 +927,14 @@ function contrast(a, b) {
   return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100;
 }
 
+/** A CSS colour with alpha ("rgba(...)") laid over an opaque ground: the colour the eye sees, "rgb(...)". */
+function over(top, ground) {
+  const [r, g, b, a = 1] = (String(top).match(/[\d.]+/g) ?? ['0', '0', '0', '0']).map(Number);
+  const [R, G, B] = (String(ground).match(/[\d.]+/g) ?? ['0', '0', '0']).map(Number);
+  const mix = (f, s) => Math.round(f * a + s * (1 - a));
+  return `rgb(${mix(r, R)}, ${mix(g, G)}, ${mix(b, B)})`;
+}
+
 /**
  * The button at this opening: there, never hidden, named in the person's
  * language, inside the page, nothing over it, its colours apart enough
@@ -1008,12 +1016,34 @@ async function aboutChecks(page, editor, { phone }) {
   return { problems, facts: { ...f, contrast: ratio, under } };
 }
 
-/** The panel as it is now (the notice, its link, what it said, where the focus is). */
+/** The panel as it is now (the notice, the source address in it, any link, where the focus is, what is selected). */
 async function aboutPanel(page) {
   return appFrame(page).evaluate(() => {
     const p = document.getElementById('fx-about-panel');
     const b = document.getElementById('fx-about');
-    const link = document.querySelector('#fx-about-text a');
+    const links = [...p.querySelectorAll('a, [href], [role="link"]')].map((e) => ({ tag: e.tagName.toLowerCase(), href: e.getAttribute('href'), text: e.textContent }));
+    const s = document.querySelector('#fx-about-text .fx-about-source');
+    let source = null;
+    if (s) {
+      const ss = getComputedStyle(s);
+      // Selectable: user-select is "none" on neither the address nor any element around it.
+      const unselectable = [];
+      for (let n = s; n && n.nodeType === 1; n = n.parentElement) {
+        const c = getComputedStyle(n);
+        if ((c.userSelect || c.webkitUserSelect) === 'none' || c.webkitUserSelect === 'none') unselectable.push(n.id || n.tagName.toLowerCase());
+      }
+      source = {
+        tag: s.tagName.toLowerCase(),
+        text: s.textContent,
+        userSelect: ss.userSelect || ss.webkitUserSelect,
+        unselectable,
+        cursor: ss.cursor,
+        decoration: ss.textDecorationLine || ss.textDecoration,
+        font: ss.fontFamily,
+        color: ss.color,
+        background: ss.backgroundColor,
+      };
+    }
     const q = p.getBoundingClientRect();
     const cs = getComputedStyle(p);
     return {
@@ -1022,8 +1052,9 @@ async function aboutPanel(page) {
       focus: document.activeElement ? document.activeElement.id || document.activeElement.tagName : null,
       title: document.getElementById('fx-about-title').textContent,
       text: document.getElementById('fx-about-text').textContent,
-      link: link ? { href: link.href, text: link.textContent, color: getComputedStyle(link).color } : null,
-      note: document.getElementById('fx-about-note').textContent,
+      links,
+      source,
+      selection: String(getSelection()),
       rect: { x: q.x, y: q.y, w: q.width, h: q.height },
       viewport: { w: innerWidth, h: innerHeight },
       color: cs.color,
@@ -1033,16 +1064,53 @@ async function aboutPanel(page) {
 }
 
 /**
+ * Select the text of `selector` in the app page as a person does with a
+ * mouse: press on its first character, drag to its last, let go. What the
+ * page then has selected, or null when there is no such text.
+ */
+async function dragAcross(page, selector) {
+  const a = appFrame(page);
+  const ends = await a.evaluate((sel) => {
+    const s = document.querySelector(sel);
+    const node = s && s.firstChild;
+    if (!node || node.nodeType !== 3 || !node.length) return null;
+    getSelection().removeAllRanges();
+    const box = s.getBoundingClientRect();
+    const glyph = (i) => {
+      const r = document.createRange();
+      r.setStart(node, i);
+      r.setEnd(node, i + 1);
+      const q = r.getClientRects()[0] ?? r.getBoundingClientRect();
+      return { x: q.x - box.x, y: q.y - box.y, w: q.width, h: q.height };
+    };
+    return { first: glyph(0), last: glyph(node.length - 1) };
+  }, selector);
+  if (!ends) return null;
+  const box = await a.locator(selector).boundingBox();
+  if (!box) return null;
+  const from = { x: box.x + ends.first.x + 1, y: box.y + ends.first.y + ends.first.h / 2 };
+  const to = { x: box.x + ends.last.x + ends.last.w - 1, y: box.y + ends.last.y + ends.last.h / 2 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await page.mouse.up();
+  return a.evaluate(() => String(getSelection()));
+}
+
+/**
  * Once per engine, in four openings of tr.docx - a computer (1280 x 800) and
  * a phone (390 x 844), light and dark - the button (aboutChecks), and its
  * panel: opened from the keyboard on a computer (the first Tab from filex's
  * page reaches the button, Enter opens) and by a tap on a phone; the notice
- * whole, in Turkish, with this build's facts, the source at this version's
- * tag as a link; a click on the link opens nothing (filex's sandbox may open
- * no tab) and puts the link on filex's clipboard, which the panel says;
- * Escape closes and gives the focus back to the button; Space opens it
- * again and its close button closes it. On a phone after "Edit" the button
- * is still in the footer, off the folded editor.
+ * whole, in Turkish, with this build's facts, the source address at this
+ * version's tag in it as plain text: no link anywhere in the panel, set
+ * apart, nothing about it that says "click", its colours apart enough; a
+ * click on it opens no page and asks filex for nothing (filex's sandbox may
+ * open no tab: the address is there to be selected and copied); a drag
+ * across it selects it, whole. Escape closes and gives the focus back to
+ * the button; Space opens it again and its close button closes it. On a
+ * phone after "Edit" the button is still in the footer, off the folded
+ * editor.
  */
 async function aboutRun(browser, server, engine, o) {
   const r = { engine, doc: 'tr.docx (About this editor)', ok: false, steps: [], problems: [], notes: [], views: {} };
@@ -1095,29 +1163,49 @@ async function aboutRun(browser, server, engine, o) {
       if (!v.phone && p.focus !== 'fx-about-panel') said(`the focus is on ${p.focus}, not the panel`);
       if (p.title !== ABOUT_LABEL_TR) said(`the panel is titled ${JSON.stringify(p.title)}`);
       if (p.text !== LEGAL_TR.text) said(`the panel's notice differs from the notice: ${JSON.stringify(p.text)}`);
-      if (!p.link || p.link.href !== `https://${LEGAL_TR.source}` || p.link.text !== LEGAL_TR.source) said(`the source link is ${JSON.stringify(p.link)}`);
       const pr = p.rect;
       if (pr.x < 0 || pr.y < 0 || pr.x + pr.w > p.viewport.w + 0.5 || pr.y + pr.h > p.viewport.h + 0.5) said(`the panel is not inside the page: ${JSON.stringify(pr)}`);
+
+      // The source address: plain text in the notice, no link anywhere in the panel, nothing that says "click".
+      if (p.links.length) said(`the panel holds a link: ${JSON.stringify(p.links)}`);
+      const src = p.source;
+      if (!src || src.text !== LEGAL_TR.source) said(`the source address in the notice is ${JSON.stringify(src)}`);
+      if (src) {
+        if (src.userSelect === 'none' || src.unselectable.length) said(`the address cannot be selected (user-select ${src.userSelect}; none on ${src.unselectable.join(', ')})`);
+        if (src.cursor === 'pointer') said('the pointer over the address is a hand, as over a link');
+        if (/underline/.test(src.decoration)) said('the address is underlined, as a link');
+        if (!/monospace/.test(src.font)) said(`the address is not set apart: its font is ${src.font}`);
+      }
       const textRatio = contrast(p.color, p.background);
-      const linkRatio = p.link ? contrast(p.link.color, p.background) : 0;
-      r.views[v.name].panelContrast = { text: textRatio, link: linkRatio };
-      if (textRatio < 4.5 || linkRatio < 4.5) said(`the panel's text is ${textRatio}:1 and its link ${linkRatio}:1 from its ground`);
+      const sourceRatio = src ? contrast(src.color, over(src.background, p.background)) : 0;
+      r.views[v.name].panelContrast = { text: textRatio, source: sourceRatio };
+      if (textRatio < 4.5 || sourceRatio < 4.5) said(`the panel's text is ${textRatio}:1 and its source address ${sourceRatio}:1 from their ground`);
       await shot('open');
 
-      // The link: nothing opens, filex's clipboard gets it, the panel says so.
-      const pagesBefore = ctx.pages().length;
-      await a.locator('#fx-about-text a').click();
-      await until('the link to reach the clipboard', async () => (await page.evaluate(() => window.__fx.clipboard.length)) > 0, 5000);
-      const clip = await page.evaluate(() => window.__fx.clipboard.slice());
-      const note = (await aboutPanel(page)).note;
-      r.views[v.name].clipboard = clip;
-      r.views[v.name].note = note;
-      if (clip[clip.length - 1] !== `https://${LEGAL_TR.source}`) said(`the clipboard got ${JSON.stringify(clip)}`);
-      if (!/kopyalandı/.test(note)) said(`after the copy the panel says ${JSON.stringify(note)}`);
-      await sleep(500);
-      if (ctx.pages().length !== pagesBefore) said('the link opened a page');
-      if ((await a.evaluate(() => document.documentElement.dataset.fxPhase)) !== 'ready') said('the app page left its document after the link');
-      await shot('copied');
+      // A click on the address: no page opens, filex is asked for nothing, the panel and the document stay.
+      const target = src ? '#fx-about-text .fx-about-source' : p.links.length ? '#fx-about-text a' : null;
+      if (target) {
+        const pagesBefore = ctx.pages().length;
+        const callsBefore = await page.evaluate(() => window.__fx.calls.length);
+        await a.locator(target).click();
+        await sleep(700);
+        const asked = (await page.evaluate((n) => window.__fx.calls.slice(n), callsBefore)).filter((m) => !/^(state\.(set|get)|ui\.(dirty|title)|coedit\.)/.test(m));
+        r.views[v.name].afterClick = { asked };
+        if (asked.length) said(`a click on the address asked filex for ${asked.join(', ')}`);
+        if (ctx.pages().length !== pagesBefore) said('a click on the address opened a page');
+        if (!(await aboutPanel(page)).open) said('a click on the address closed the panel');
+        if ((await a.evaluate(() => document.documentElement.dataset.fxPhase)) !== 'ready') said('the app page left its document after a click on the address');
+      }
+
+      // Selected as a person selects it: a drag across the address takes it, whole, to copy.
+      if (src) {
+        const selected = await dragAcross(page, '#fx-about-text .fx-about-source');
+        r.views[v.name].selected = selected;
+        if (selected !== LEGAL_TR.source) said(`a drag across the address selected ${JSON.stringify(selected)}`);
+        if (!(await aboutPanel(page)).open) said('selecting the address closed the panel');
+        await shot('selected');
+        await a.evaluate(() => getSelection().removeAllRanges());
+      }
 
       // Escape closes, the focus is back on the button; Space opens; the close button closes.
       if (!v.phone) {
@@ -1126,7 +1214,6 @@ async function aboutRun(browser, server, engine, o) {
         if (shut.open || shut.expanded !== 'false' || shut.focus !== 'fx-about') said(`after Escape: open ${shut.open}, aria-expanded ${shut.expanded}, focus ${shut.focus}`);
         await page.keyboard.press('Space');
         if (!(await aboutPanel(page)).open) said('Space on the button did not open the panel');
-        if ((await aboutPanel(page)).note !== '') said('the panel opened again still saying what the link did');
       }
       await a.locator('#fx-about-close').click();
       const closed = await aboutPanel(page);

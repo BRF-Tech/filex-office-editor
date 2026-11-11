@@ -71,7 +71,7 @@
   if (mode === 'dark') document.documentElement.classList.add('dark');
   document.getElementById('name').textContent = name;
 
-  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], clipboard: [], stateSets: 0, ready: false, hostSave: null, co: { client: '', entries: 0, cursors: 0 } });
+  const fx = (window.__fx = { name, dirty: false, toasts: [], saves: [], titles: [], errors: [], calls: [], files: [], stateSets: 0, ready: false, hostSave: null, co: { client: '', entries: 0, cursors: 0 } });
 
   // ---- enc=folder: filex 0.56's encrypted folder, its key in this page only.
   const E2E_MAGIC = new TextEncoder().encode('filexe2e');
@@ -380,10 +380,6 @@
           fx.titles.push(params && params.text);
           return reply(id, null);
         case 'ui.close':
-          return reply(id, null);
-        case 'clipboard.write':
-          // filex writes it on a gesture in the frame (the person's call); the stand-in keeps it.
-          fx.clipboard.push(String((params && params.text) || ''));
           return reply(id, null);
         case 'state.set':
           return stateSet(id, params);

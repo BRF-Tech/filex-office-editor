@@ -202,22 +202,22 @@ function askPassword(t: Strings, wrong: boolean): Promise<string | null> {
 
 const LEGAL_FACTS: LegalFacts = { version: __OO_BUILD__.version, build: __OO_BUILD__.number, tag: __OO_SOURCE_TAG__, app: __APP_VERSION__ };
 
-/** The words the panel speaks now, and filex's clipboard (null outside filex: the link then opens as links do). */
-let about: { t: Strings; copy: ((text: string) => Promise<void>) | null } | null = null;
+/** The panel's button and keys are wired once, whatever language it speaks. */
+let aboutWired = false;
 
 /**
  * The button in the corner of the editor (index.html #fx-about) and its
- * panel, in the person's language: the notice whole, the source a link. The
- * button is there at every opening and is never hidden; a click, Enter or
- * Space opens the panel, Escape or its close button closes it.
+ * panel, in the person's language: the notice whole, the source address in
+ * it as plain text. The button is there at every opening and is never
+ * hidden; a click, Enter or Space opens the panel, Escape or its close
+ * button closes it.
  *
- * In filex the app's page is a sandbox that may open no tab (`sandbox
- * allow-scripts`, no allow-popups): a click on the link puts it on the
- * clipboard through filex (clipboard.write, the person's call) and says so.
+ * The address is not a link and a click on it does nothing: in filex the
+ * app's page is a sandbox that may open no tab (`sandbox allow-scripts`, no
+ * allow-popups). It is set apart (.fx-about-source) so that the person can
+ * select it and copy it, as any text, and open it where they like.
  */
-function setLegal(t: Strings, copy: ((text: string) => Promise<void>) | null = null): void {
-  const first = about === null;
-  about = { t, copy };
+function setLegal(t: Strings): void {
   const button = el('fx-about');
   button.setAttribute('aria-label', t.legalLabel);
   button.title = t.legalLabel;
@@ -227,32 +227,26 @@ function setLegal(t: Strings, copy: ((text: string) => Promise<void>) | null = n
   close.title = t.close;
   el('fx-about-text').replaceChildren(
     ...legalParts(t, LEGAL_FACTS).map((p) => {
-      if (!p.href) return document.createTextNode(p.text);
-      const a = document.createElement('a');
-      a.href = p.href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = p.text;
-      return a;
+      if (!p.source) return document.createTextNode(p.text);
+      const s = document.createElement('span');
+      s.className = 'fx-about-source';
+      s.translate = false;
+      s.textContent = p.text;
+      return s;
     }),
   );
-  el('fx-about-note').textContent = '';
-  if (first) wireAbout();
+  if (!aboutWired) wireAbout();
+  aboutWired = true;
 }
 
 function wireAbout(): void {
   const button = el('fx-about');
   const panel = el('fx-about-panel');
-  const note = el('fx-about-note');
   const show = (open: boolean): void => {
     panel.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
-    if (open) {
-      note.textContent = '';
-      panel.focus();
-    } else {
-      button.focus();
-    }
+    if (open) panel.focus();
+    else button.focus();
   };
   button.addEventListener('click', () => show(panel.hidden !== false));
   el('fx-about-close').addEventListener('click', () => show(false));
@@ -260,16 +254,6 @@ function wireAbout(): void {
     if (e.key !== 'Escape' || panel.hidden) return;
     e.preventDefault();
     show(false);
-  });
-  el('fx-about-text').addEventListener('click', (e) => {
-    const a = (e.target as Element | null)?.closest?.('a');
-    const now = about;
-    if (!a || !now?.copy) return;
-    e.preventDefault();
-    now.copy(a.href).then(
-      () => (note.textContent = now.t.sourceCopied),
-      () => (note.textContent = now.t.sourceCopyFailed),
-    );
   });
 }
 
@@ -726,7 +710,7 @@ async function main(): Promise<void> {
   phase('connected');
   const s = fx.session;
   const t = STRINGS[uiLang(s.locale)];
-  setLegal(t, (text) => fx.copy(text));
+  setLegal(t);
   const info = s.files?.[0];
   const kind = kindOf(info?.ext);
   if (!info || !kind) {

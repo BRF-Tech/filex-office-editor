@@ -199,23 +199,25 @@ html[data-fx-phone] #fx-about-panel {
   font-size: 12.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
   user-select: text;
 }
-#fx-about-text a {
-  color: var(--fe-accent, #2f6feb);
-  text-decoration: underline;
-}
-#fx-about-text a:focus-visible {
-  outline: 2px solid var(--fe-accent, #2f6feb);
-  outline-offset: 1px;
-}
-#fx-about-note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--fe-text-muted, #57606a);
-}
-#fx-about-note:empty {
-  display: none;
+/*
+ * The source address: plain text, not a link (the app's page may open no
+ * tab), set apart from the words around it so that it is easy to select and
+ * copy. Nothing about it says "click": no pointer, no underline.
+ */
+.fx-about-source {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.14);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
 }
 #fx-status {
   position: absolute;

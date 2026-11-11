@@ -9,6 +9,25 @@ update.
 
 ## [Unreleased]
 
+For filex 0.57.0 or later, as 0.5.2, asking for the same permissions:
+ONLYOFFICE Docs 10.0.0 and x2t `v10.0.0.169+1` as in 0.5.2.
+
+### Changed
+
+- **The source address in "About this editor" is plain text.** The
+  address of this version's source in the notice is no longer a link and
+  a click on it does nothing: filex's sandbox lets the app's page open no
+  tab, and 0.5.2's way round that (a click put the link on the clipboard
+  through filex and the panel said so) is gone. The address is set apart
+  in a monospace face, to select, copy and open where you like. The
+  notice's words are unchanged.
+- The README's picture of the panel shows the address as it is now.
+- Building: the browser run checks, once per browser on a computer and a
+  phone, in light and dark, that the panel holds no link, that the address
+  is set apart and selectable, that a click on it opens no page and asks
+  filex for nothing, and that a drag across it selects it whole
+  (`aboutRun`); the test harness no longer answers `clipboard.write`.
+
 ## [0.5.2] - 2026-11-11
 
 For filex 0.57.0 or later, as 0.5.1, asking for the same permissions:

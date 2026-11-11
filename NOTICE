@@ -282,8 +282,9 @@ a modified version:
     therefore never hidden, and the app adds this notice behind an "About
     this editor" button (an i in a circle) in the corner of the editor
     frame, on every open - never hidden, reachable by keyboard; a click,
-    Enter or Space shows it whole, the source as a link (src/app/about.ts;
-    until 0.5.1 it was a line under the editor):
+    Enter or Space shows it whole, the source address in it as plain text
+    to select and copy, since the app's sandboxed page may open no tab
+    (src/app/about.ts; until 0.5.1 it was a line under the editor):
 
       "Based on ONLYOFFICE Docs by Ascensio System SIA; this version may
        have been modified (Docs <version>, build <build>, ONLYOFFICE source
