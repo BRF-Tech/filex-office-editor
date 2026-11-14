@@ -9,6 +9,10 @@ update.
 
 ## [Unreleased]
 
+### Changed
+
+- playwright-core 1.65.1 (was 1.65.0).
+
 ## [0.5.3] - 2026-11-11
 
 For filex 0.57.0 or later, as 0.5.2, asking for the same permissions:
