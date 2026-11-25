@@ -20,7 +20,7 @@
     "esbuild": "0.28.2",
     "playwright-core": "1.65.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.2"
   },
   "engines": {
     "node": ">=22.12.0"

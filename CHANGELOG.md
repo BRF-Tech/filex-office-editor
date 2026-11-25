@@ -13,6 +13,7 @@ update.
 
 - playwright-core 1.65.1 (was 1.65.0).
 - vitest 5.1.1 (was 5.1.0).
+- vitest 5.1.2 (was 5.1.1).
 
 ## [0.5.3] - 2026-11-11
 
